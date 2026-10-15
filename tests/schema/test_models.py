@@ -31,7 +31,7 @@ from eagleview.schema.overlay import Overlay
 from eagleview.schema.result import FailureCategory, RunResult
 from eagleview.schema.templating import TemplateError, evaluate_when, render_template
 from eagleview.schema.tenant import TenantProfile
-from tests.fixtures import APP_PROFILE, CAPABILITY, OVERLAY, POLICY, REPO
+from tests.fixtures import APP_PROFILE, CAPABILITY, OVERLAY, POLICY, REPO, TRAINING_POLICY
 
 # --- schema_version -------------------------------------------------------------------------------
 
@@ -145,6 +145,21 @@ def test_committed_policy_loads() -> None:
     policy = load_policy(POLICY)
     assert policy.allowed_origins["lantern-bay"] == ["http://127.0.0.1:8601"]
     assert {p.name for p in policy.sensitivity_patterns} >= {"ssn", "card", "email", "phone", "dob"}
+
+
+def test_amount_redaction_is_on_by_default_and_off_only_for_training() -> None:
+    default = load_policy(POLICY)
+    training = load_policy(TRAINING_POLICY)
+    assert default.redact_amounts is True
+    assert training.redact_amounts is False
+    # Omitting the switch is production-safe.
+    data = load_yaml(POLICY.read_text())
+    del data["redact_amounts"]
+    assert load_policy_data(data).redact_amounts is True  # type: ignore[attr-defined]
+    # The training policy must not drift from the default in anything else.
+    same = training.model_copy(update={"id": default.id, "redact_amounts": default.redact_amounts})
+    assert same == default
+    assert "synthetic training tenants" in TRAINING_POLICY.read_text()
 
 
 def test_policy_rejects_origin_with_path_and_overlapping_action_lists() -> None:

@@ -21,7 +21,7 @@ from eagleview.schema.hashing import content_hash
 from eagleview.schema.predicates import AllOf, AnyOf, Not, OutputPresent, TextMatches, TextPresent
 from tests.fixtures import CAPABILITY
 
-PINNED_HASH = "sha256:5fd330c28b6568b9f11a7e65d1d345252e5c142551d922c5b05da3147b590739"
+PINNED_HASH = "sha256:b77ded0fcf2f37e3816b4590412aeeecc683fb0ef90b9100e939acde3fe873d0"
 
 
 def fixture_data() -> dict[str, Any]:

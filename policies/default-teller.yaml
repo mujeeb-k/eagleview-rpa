@@ -29,6 +29,10 @@ irreversible_handling:
   discovery: escalate          # block, and ask a human for approval
   replay: require_approval     # gate on an approval token bound to (run_id, step_id)
 
+# Mask amounts (balances, available funds) in fields a capability declares sensitive, in logs,
+# results and screenshots. Production-safe default; only policies/training-teller.yaml turns it off.
+redact_amounts: true
+
 # Applied by the redactor to every string written. A group named `v` limits the replacement to
 # that group, so the label survives and the value does not.
 sensitivity_patterns:

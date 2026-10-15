@@ -16,11 +16,11 @@ from eagleview.safety.redaction import Redactor
 from eagleview.safety.secrets import SecretResolver
 from eagleview.schema.action import TextBox
 from eagleview.schema.result import RunResult
-from tests.fixtures import CAPABILITY, POLICY
+from tests.fixtures import CAPABILITY, POLICY, TRAINING_POLICY
 
 
-def make_redactor() -> Redactor:
-    redactor = Redactor(load_policy(POLICY).sensitivity_patterns)
+def make_redactor(policy: Path = POLICY) -> Redactor:
+    redactor = Redactor.from_policy(load_policy(policy))
     redactor.use_capability(load_capability(CAPABILITY))
     return redactor
 
@@ -127,7 +127,13 @@ def test_summary_applies_typed_masking_to_run_results(writer: EvidenceWriter) ->
     )
     data = json.loads(writer.summary(result).read_text())
     assert data["outputs"]["member_name"] == "D. J. Q."
-    assert data["outputs"]["share_accounts"][0]["balance"] == "1234.56"
+    row = data["outputs"]["share_accounts"][0]
+    assert row == {
+        "suffix": "S00",
+        "description": "Regular Share",
+        "balance": "[amount]",
+        "available": "[amount]",
+    }
 
 
 def _png(width: int = 200, height: int = 100, metadata: str | None = None) -> bytes:
@@ -199,3 +205,49 @@ def test_top_level_event_keys_are_redacted(writer: EvidenceWriter) -> None:
     writer.redactor.register_inputs({"member_id": "10482"})
     writer.event("step.observe", "automation", **{"row 10482": "x"})
     assert "10482" not in writer.events_path.read_text()
+
+
+def _success(timing: int) -> RunResult:
+    return RunResult(
+        run_id="r_test",
+        capability="member.lookup_share_balances@1.0.0",
+        tenant="lantern-bay",
+        status="success",
+        outputs={
+            "member_name": "DOE, JANE Q",
+            "share_accounts": [
+                {
+                    "suffix": "S00",
+                    "description": "Regular Share",
+                    "balance": Decimal("1234.56"),
+                    "available": Decimal("1200.00"),
+                }
+            ],
+        },
+        timing_ms={"total": timing, "step.submit_search": 10482},
+        recoveries=[],
+    )
+
+
+@pytest.mark.parametrize("policy", [POLICY, TRAINING_POLICY])
+def test_numbers_survive_and_results_reload(tmp_path: Path, policy: Path) -> None:
+    """Regression: value-aware scrubbing turned timing_ms 10482 into "[member_id]", which no
+    longer validated as a RunResult. Numbers outside declared fields are never touched."""
+    writer = EvidenceWriter(tmp_path, "r_test", make_redactor(policy))
+    writer.redactor.register_inputs({"member_id": "10482"})
+    path = writer.write_json("result", _success(10482))
+    reloaded = RunResult.model_validate_json(path.read_text())
+    assert reloaded.timing_ms == {"total": 10482, "step.submit_search": 10482}
+    assert reloaded.outputs is not None and reloaded.outputs["member_name"] == "D. J. Q."
+    writer.event("run.finish", "automation", elapsed_ms=10482, note="member 10482 done")
+    event = lines(writer)[0]
+    assert event["elapsed_ms"] == 10482  # still an int
+    assert event["note"] == "member [member_id] done"  # strings are still scrubbed
+
+
+def test_training_policy_keeps_amounts_in_results(tmp_path: Path) -> None:
+    writer = EvidenceWriter(tmp_path, "r_test", make_redactor(TRAINING_POLICY))
+    data = json.loads(writer.summary(_success(5)).read_text())
+    row = data["outputs"]["share_accounts"][0]
+    assert (row["balance"], row["available"]) == ("1234.56", "1200.00")
+    assert data["outputs"]["member_name"] == "D. J. Q."  # names are masked under any policy

@@ -71,6 +71,9 @@ class Policy(BaseModel):
     irreversible_label_patterns: list[str] = Field(default_factory=list[str])
     irreversible_handling: IrreversibleHandling = Field(default_factory=IrreversibleHandling)
     sensitivity_patterns: list[SensitivityPattern] = Field(default_factory=list[SensitivityPattern])
+    # Mask amounts in fields declared sensitive. True is production-safe; only a policy for
+    # synthetic training tenants may turn it off.
+    redact_amounts: bool = True
 
     @model_validator(mode="after")
     def _origins_are_origins(self) -> Self:

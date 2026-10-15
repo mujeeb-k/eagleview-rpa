@@ -8,12 +8,19 @@ from eagleview.artifacts.yaml_io import load_capability, load_policy
 from eagleview.safety.redaction import Redactor, luhn_ok, mask_identifier, mask_name, mask_typed
 from eagleview.safety.secrets import SecretMissing, SecretResolver, env_var
 from eagleview.schema.common import Sensitivity
-from tests.fixtures import CAPABILITY, POLICY
+from tests.fixtures import CAPABILITY, POLICY, TRAINING_POLICY
 
 
 @pytest.fixture
 def redactor() -> Redactor:
-    r = Redactor(load_policy(POLICY).sensitivity_patterns)
+    r = Redactor.from_policy(load_policy(POLICY))
+    r.use_capability(load_capability(CAPABILITY))
+    return r
+
+
+@pytest.fixture
+def training() -> Redactor:
+    r = Redactor.from_policy(load_policy(TRAINING_POLICY))
     r.use_capability(load_capability(CAPABILITY))
     return r
 
@@ -27,30 +34,58 @@ def test_typed_masks() -> None:
     assert mask_name("DOE, JANE Q") == "D. J. Q."
     assert mask_typed("Regular Share", Sensitivity.pii, "description") == "[pii]"
     assert mask_typed("hunter2", Sensitivity.secret, "password") == "[secret]"
-    assert mask_typed(Decimal("12.50"), Sensitivity.pii, "balance") == Decimal("12.50")
     assert mask_typed("10482", Sensitivity.none, "x") == "10482"
+    # Numbers in a declared field: identifiers masked; amounts masked unless the policy says not.
+    assert mask_typed(10482, Sensitivity.identifier, "member_id") == "****0482"
+    assert mask_typed(Decimal("12.50"), Sensitivity.pii, "balance") == "[amount]"
+    assert mask_typed(
+        Decimal("12.50"), Sensitivity.pii, "balance", redact_amounts=False
+    ) == Decimal("12.50")
+    assert mask_typed(True, Sensitivity.pii, "flag") is True
+    assert mask_typed(Decimal("12.50"), Sensitivity.none, "balance") == Decimal("12.50")
+
+
+OUTPUTS = {
+    "member_name": "DOE, JANE Q",
+    "share_accounts": [
+        {"suffix": "S00", "description": "Regular Share", "balance": Decimal("1234.56")}
+    ],
+}
 
 
 def test_typed_masking_follows_the_capability(redactor: Redactor) -> None:
-    out = redactor.redact_tree(
-        {
-            "inputs": {"member_id": "10482"},
-            "outputs": {
-                "member_name": "DOE, JANE Q",
-                "share_accounts": [
-                    {"suffix": "S00", "description": "Regular Share", "balance": Decimal("1234.56")}
-                ],
-            },
-        }
-    )
+    out = redactor.redact_tree({"inputs": {"member_id": "10482"}, "outputs": OUTPUTS})
     assert out == {
         "inputs": {"member_id": "****0482"},
         "outputs": {
             "member_name": "D. J. Q.",
-            # Item fields inherit the array's sensitivity; amounts pass through as strings.
-            "share_accounts": [{"suffix": "[pii]", "description": "[pii]", "balance": "1234.56"}],
+            # suffix and description declare `none`; balance inherits the array's pii.
+            "share_accounts": [
+                {"suffix": "S00", "description": "Regular Share", "balance": "[amount]"}
+            ],
         },
     }
+
+
+def test_training_policy_keeps_amounts(training: Redactor) -> None:
+    out = training.redact_tree({"outputs": OUTPUTS})
+    assert out == {
+        "outputs": {
+            "member_name": "D. J. Q.",
+            "share_accounts": [
+                {"suffix": "S00", "description": "Regular Share", "balance": "1234.56"}
+            ],
+        }
+    }
+
+
+def test_unlabelled_item_fields_fail_closed(redactor: Redactor) -> None:
+    out = redactor.redact_tree(
+        {"outputs": {"share_accounts": [{"suffix": "S00", "nickname": "Rainy day"}]}}
+    )
+    # A field with no sensitivity of its own, declared or not, takes the array's: masked.
+    assert out == {"outputs": {"share_accounts": [{"suffix": "S00", "nickname": "[pii]"}]}}
+    assert redactor.output_specs["share_accounts"].items["balance"].sensitivity is None  # type: ignore[index]
 
 
 # --- layer 2: value-aware -------------------------------------------------------------------------
@@ -78,6 +113,12 @@ def test_name_tokens_respect_word_class_and_minimum_length(redactor: Redactor) -
     assert out.endswith("[member_name]")  # the full value is still scrubbed
 
 
+def test_name_tokens_never_rewrite_placeholders(redactor: Redactor) -> None:
+    redactor.register("AAA, NAME", Sensitivity.pii, "member_name", is_name=True)
+    out = redactor.redact_text("AAA, NAME10000 and NAME")
+    assert out == "[member_name]10000 and [member_name]"
+
+
 def test_short_and_empty_values_are_ignored_but_secrets_are_not(redactor: Redactor) -> None:
     redactor.register("", Sensitivity.identifier, "x")
     redactor.register("ab", Sensitivity.identifier, "x")
@@ -86,16 +127,27 @@ def test_short_and_empty_values_are_ignored_but_secrets_are_not(redactor: Redact
     assert redactor.redact_text("pw=pw") == "[secret]=[secret]"
 
 
-def test_amounts_are_never_registered(redactor: Redactor) -> None:
-    redactor.register_outputs(
-        {
-            "share_accounts": [
-                {"suffix": "S00", "description": "Regular Share", "balance": Decimal("1234.56")}
-            ]
-        }
+def test_amounts_are_scrubbed_from_text_only_when_the_policy_says_so(
+    redactor: Redactor, training: Redactor
+) -> None:
+    rows = {
+        "share_accounts": [
+            {
+                "suffix": "S00",
+                "description": "Regular Share",
+                "balance": Decimal("1234.56"),
+                "available": Decimal("0.00"),
+            }
+        ]
+    }  # noqa: E501
+    text = "Regular Share S00 $1,234.56 1234.56 avail 0.00; drawer limit $10,000.00"
+    redactor.register_outputs(rows)
+    assert redactor.redact_text(text) == (
+        "Regular Share S00 [share_accounts.balance] [share_accounts.balance] "
+        "avail [share_accounts.available]; drawer limit $10,000.00"
     )
-    out = redactor.redact_text("Regular Share S00 $1,234.56 1234.56")
-    assert out == "[share_accounts.description] [share_accounts.suffix] $1,234.56 1234.56"
+    training.register_outputs(rows)
+    assert training.redact_text(text) == text
 
 
 def test_secret_resolver_registers_values() -> None:

@@ -202,6 +202,11 @@
       "title": "Irreversible Label Patterns",
       "type": "array"
     },
+    "redact_amounts": {
+      "default": true,
+      "title": "Redact Amounts",
+      "type": "boolean"
+    },
     "routes": {
       "items": {
         "$ref": "#/$defs/RouteRule"

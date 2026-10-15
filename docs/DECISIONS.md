@@ -210,7 +210,7 @@ double-click, and Return/Enter/space. "Post" is irreversible; "Posted", "Postal 
 value from it. Dict keys, ints and Decimals are checked as well as strings. Top-level event keys are
 redacted too: the property test caught a leak there.
 
-**Amounts are not PII.** Typed masking applies to strings only. Balances pass through, because once
+**Amounts are not PII.** *(Superseded below: amount masking is a policy switch.)* Typed masking applies to strings only. Balances pass through, because once
 the identifiers next to them are masked they identify no one, and they are the evidence that
 typed extraction worked. Array item fields inherit the array's sensitivity unless they declare
 their own.
@@ -243,3 +243,25 @@ so hidden `value=` attributes are covered as well as text nodes.
 graph, including ancestor `__init__` files and relative imports, and also imports the guarded
 packages in a fresh interpreter. A self-test plants a two-hop `anthropic` import to prove the
 checker catches it. A missing guarded package fails the test rather than passing it.
+
+## 2026-10-15 — P2 follow-ups: amounts, item sensitivity, numbers
+
+**Amount masking is a policy switch, on by default.** `redact_amounts: true` in
+`policies/default-teller.yaml` masks amounts in sensitive fields as `[amount]`, both in results and
+in text, where `1234.56`, `1,234.56` and `$1,234.56` are matched on digit boundaries, so `0.00`
+leaves `$10,000.00` alone. `policies/training-teller.yaml` is identical except for
+`redact_amounts: false`, and it is only for synthetic training tenants; evidence scripts use it
+so balances show. A test fails if the two policies drift apart in anything else.
+
+**Account-type labels are declared, not exempted.** The capability fixture and the PLAN §3.2
+example mark `suffix` and `description` as `sensitivity: none`. Item fields without their own
+sensitivity, declared or not, still inherit the array's, so a new field fails closed.
+
+**Numbers are changed only in declared fields.** Value-aware and pattern scrubbing apply to strings
+(and dict keys) only. An int, float or Decimal anywhere else is written as it is, so a
+`timing_ms` of 10482 survives and a written RunResult reloads. Within a declared field, a numeric
+identifier is masked and an amount follows `redact_amounts`.
+
+**Name tokens never rewrite placeholders.** The second scrubbing pass skips `[label]`
+placeholders from the first pass. The property test found the case: a name token `NAME` was
+turning `[member_name]` into `[member_[member_name]]`.

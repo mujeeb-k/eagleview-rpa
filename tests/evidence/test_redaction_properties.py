@@ -1,15 +1,16 @@
 """Property: generated PII never survives `EvidenceWriter`.
 
-Registered values (inputs, outputs, secrets) must vanish whatever surrounds them: mid-string, in
-dict keys, as ints, in any letter case, next to non-ASCII text. Pattern-only values (SSN, card,
-email, phone, labelled DOB) are embedded between separators, because a regex cannot tell an SSN
-glued to other digits from a longer number; that limit is documented in docs/DECISIONS.md."""
+Registered values (inputs, outputs, secrets) must vanish from every string whatever surrounds
+them: mid-string, in dict keys, in any letter case, next to non-ASCII text. Bare numbers outside
+declared fields are deliberately left alone (see test_writer's RunResult reload test).
+Pattern-only values (SSN, card, email, phone, labelled DOB) are embedded between separators,
+because a regex cannot tell an SSN glued to other digits from a longer number; that limit is
+documented in docs/DECISIONS.md."""
 
 import json
 import re
 import tempfile
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 
 from hypothesis import HealthCheck, given, settings
@@ -112,8 +113,6 @@ def payloads(draw: st.DrawFn) -> tuple[Pii, dict[str, object]]:
         "typed": draw(FILLER) + pii.secret + draw(FILLER),
         "inputs": {"member_id": pii.member_id},
         "outputs": {"member_name": pii.name},
-        "as_int": int(pii.member_id),
-        "as_decimal": Decimal(pii.card.replace(" ", "").replace("-", "")),
         "nested": [{case(pii.name): [pii.email, {"k": pii.phone}]}, (pii.ssn,)],
         f"key {pii.member_id}": "x",
         "first_name_token": case(pii.name.split(", ")[1]),
@@ -174,9 +173,10 @@ def test_generated_pii_never_survives_the_writer(sample: tuple[Pii, dict[str, ob
         pii.dob,
     ):
         assert value.casefold() not in folded, value
-    assert pii.card.replace(" ", "").replace("-", "") not in written
+    # Placeholders such as "[member_name]" are the writer's own labels, not leaked text.
+    unlabelled = re.sub(r"\[[a-z0-9_.]+\]", " ", written)
     for token in re.findall(r"[^\W\d_]+", pii.name):
-        assert not _token_pattern(token).search(written), token
+        assert not _token_pattern(token).search(unlabelled), token
 
 
 @settings(max_examples=60, deadline=None)

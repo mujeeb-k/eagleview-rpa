@@ -8,3 +8,4 @@ APP_PROFILE = FIXTURES / "app_profiles" / "ironbridge-teller.yaml"
 OVERLAY = FIXTURES / "overlays" / "copperhill" / "ironbridge-teller.yaml"
 REPO = FIXTURES.parent.parent
 POLICY = REPO / "policies" / "default-teller.yaml"
+TRAINING_POLICY = REPO / "policies" / "training-teller.yaml"

@@ -120,8 +120,9 @@ outputs:
     type: array
     sensitivity: pii
     items:
-      suffix:       { type: string, pattern: "^[A-Z0-9]{2,4}$" }   # "S10" at one tenant, "20" at another
-      description:  { type: string }                               # the tenant's own label
+      suffix:       { type: string, pattern: "^[A-Z0-9]{2,4}$", sensitivity: none }  # "S10" at one tenant, "20" at another
+      description:  { type: string, sensitivity: none }                               # the tenant's own label
+      # Unlabelled item fields inherit the array's sensitivity (fail closed): balances are pii.
       balance:      { type: decimal, scale: 2 }      # serialized as "1234.56"
       available:    { type: decimal, scale: 2 }
 

@@ -9,8 +9,10 @@
    labelled DOB and account numbers) are applied to every string.
 
 Redaction walks the object tree before anything is serialized, so JSON escaping cannot hide a
-value from it. Amounts (Decimal, int) are not treated as PII: once the identifiers next to them are
-masked they identify no one, and they are the evidence that typed extraction worked."""
+value from it. Numbers (int, float, Decimal) are changed only where a field declares them
+sensitive; anywhere else they are written as they are, so counters and timings survive and results
+reload. Amounts in a sensitive field are masked unless the policy sets `redact_amounts: false`,
+which only the synthetic training policy does."""
 
 import html
 import re
@@ -26,11 +28,12 @@ from pydantic import BaseModel
 
 from eagleview.schema.capability import Capability, OutputSpec
 from eagleview.schema.common import Sensitivity
-from eagleview.schema.policy import SensitivityPattern
+from eagleview.schema.policy import Policy, SensitivityPattern
 
 MIN_VALUE_LENGTH = 3  # shorter values would scrub half the screen
 MIN_NAME_TOKEN_LENGTH = 3  # shorter tokens ("Li", "Q") would hit ordinary words
 _SCRUBBED = (Sensitivity.identifier, Sensitivity.pii, Sensitivity.secret)
+_PLACEHOLDER = re.compile(r"(\[[a-z0-9_.]+\])")
 
 
 def luhn_ok(text: str) -> bool:
@@ -60,15 +63,31 @@ def is_name_field(name: str) -> bool:
     return name == "name" or name.endswith("_name")
 
 
-def mask_typed(value: object, sensitivity: Sensitivity, field_name: str) -> object:
-    """Layer 1 for one value. Only strings are masked; amounts and flags pass through."""
-    if not isinstance(value, str) or sensitivity == Sensitivity.none:
+def mask_typed(
+    value: object, sensitivity: Sensitivity, field_name: str, *, redact_amounts: bool = True
+) -> object:
+    """Layer 1 for one value of a declared field. Flags and nulls pass through."""
+    if value is None or isinstance(value, bool) or sensitivity == Sensitivity.none:
         return value
     if sensitivity == Sensitivity.secret:
         return "[secret]"
+    if isinstance(value, int | float | Decimal):
+        if sensitivity == Sensitivity.identifier:
+            return mask_identifier(str(value))
+        return "[amount]" if redact_amounts else value
+    if not isinstance(value, str):
+        return value
     if sensitivity == Sensitivity.identifier:
         return mask_identifier(value)
     return mask_name(value) if is_name_field(field_name) else "[pii]"
+
+
+def amount_variants(value: Decimal | int | float) -> set[str]:
+    """How an amount is written in text: `1234.56`, `1,234.56`, `$1,234.56`."""
+    number = Decimal(str(value))
+    plain = format(abs(number), "f")
+    grouped = format(abs(number), ",f")
+    return {plain, grouped, "$" + plain, "$" + grouped}
 
 
 def _class_boundary(token: str) -> str:
@@ -89,6 +108,9 @@ class _Compiled:
 @dataclass
 class Redactor:
     patterns: Sequence[SensitivityPattern] = ()
+    # Production-safe default: amounts in sensitive fields are masked. Only a synthetic training
+    # policy turns this off.
+    redact_amounts: bool = True
     input_sensitivity: dict[str, Sensitivity] = field(default_factory=dict[str, Sensitivity])
     output_specs: dict[str, OutputSpec] = field(default_factory=dict[str, OutputSpec])
     _values: dict[str, str] = field(default_factory=dict[str, str])  # casefolded value -> label
@@ -99,6 +121,10 @@ class Redactor:
         self._pattern_regexes = [
             (p, re.compile(p.regex, re.IGNORECASE if p.ignore_case else 0)) for p in self.patterns
         ]
+
+    @classmethod
+    def from_policy(cls, policy: Policy) -> "Redactor":
+        return cls(policy.sensitivity_patterns, redact_amounts=policy.redact_amounts)
 
     # --- registration -------------------------------------------------------------------------
 
@@ -113,8 +139,14 @@ class Redactor:
         """Scrub `value` from everything written from now on (layer 2)."""
         if sensitivity not in _SCRUBBED or value is None or isinstance(value, bool):
             return
-        if isinstance(value, Decimal | int) and sensitivity == Sensitivity.pii:
-            return  # amounts are not PII; see the module docstring
+        if isinstance(value, Decimal | int | float) and sensitivity == Sensitivity.pii:
+            if self.redact_amounts:
+                # Matched with digit boundaries, so 0.00 does not hit $10,000.00.
+                for variant in amount_variants(value):
+                    if len(variant) >= MIN_VALUE_LENGTH:
+                        self._tokens[variant.casefold()] = label
+                self._compiled = None
+            return
         text = " ".join(str(value).split())
         minimum = 1 if sensitivity == Sensitivity.secret else MIN_VALUE_LENGTH
         for variant in {
@@ -181,9 +213,16 @@ class Redactor:
         def label(m: re.Match[str]) -> str:
             return f"[{labels.get(m.group(0).casefold(), 'redacted')}]"
 
-        for regex in (compiled.values, compiled.tokens):
-            if regex is not None:
-                text = regex.sub(label, text)
+        if compiled.values is not None:
+            text = compiled.values.sub(label, text)
+        if compiled.tokens is not None:
+            # Leave the placeholders from pass 1 alone: a name token "name" must not rewrite
+            # "[member_name]" into "[member_[member_name]]".
+            tokens = compiled.tokens
+            text = "".join(
+                part if _PLACEHOLDER.fullmatch(part) else tokens.sub(label, part)
+                for part in _PLACEHOLDER.split(text)
+            )
         return text
 
     def scrub_patterns(self, text: str) -> str:
@@ -214,7 +253,12 @@ class Redactor:
         if key == "inputs" and isinstance(value, Mapping):
             mapping = cast(Mapping[str, object], value)
             return {
-                k: mask_typed(v, self.input_sensitivity.get(k, Sensitivity.none), k)
+                k: mask_typed(
+                    v,
+                    self.input_sensitivity.get(k, Sensitivity.none),
+                    k,
+                    redact_amounts=self.redact_amounts,
+                )
                 for k, v in mapping.items()
             }
         if key == "outputs" and isinstance(value, Mapping):
@@ -234,12 +278,14 @@ class Redactor:
                     for key, cell in cast(Mapping[str, object], row).items():
                         item = spec.items.get(key)
                         sensitivity = (item.sensitivity if item else None) or spec.sensitivity
-                        masked[key] = mask_typed(cell, sensitivity, key)
+                        masked[key] = mask_typed(
+                            cell, sensitivity, key, redact_amounts=self.redact_amounts
+                        )
                     rows.append(masked)
                 else:
                     rows.append(row)
             return rows
-        return mask_typed(value, spec.sensitivity, name)
+        return mask_typed(value, spec.sensitivity, name, redact_amounts=self.redact_amounts)
 
     def redact_tree(self, value: object, *, exempt_keys: Iterable[str] = ()) -> object:
         """A JSON-ready copy of `value` with all three layers applied. Top-level keys listed in
@@ -269,11 +315,9 @@ class Redactor:
         if value is None or isinstance(value, bool):
             return value
         if isinstance(value, int | float | Decimal):
-            text = str(value)
-            redacted = self.redact_text(text)
-            if redacted != text:
-                return redacted
-            return text if isinstance(value, Decimal) else value
+            # Numbers outside declared fields are never scrubbed: a timing of 10482 ms is not a
+            # member number, and rewriting it would break the result's types on reload.
+            return str(value) if isinstance(value, Decimal) else value
         if isinstance(value, Mapping):
             mapping = cast(Mapping[object, object], value)
             return {
