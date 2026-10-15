@@ -5,3 +5,4 @@ runs/
 *.trace.zip
 .pytest_cache/
 .ruff_cache/
+.claude/settings.local.json

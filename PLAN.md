@@ -361,7 +361,7 @@ ignoring it.
       to a page, and dispatch a click back from it.
 - [x] **Spike C, SDK:** confirm the installed anthropic SDK version handles `toolset_name` and
       `computer_toolset_20260801`. If not, build the request with raw dicts.
-      *(SDK confirmed offline. The live API check is pending: the key needs an `anthropic-workspace-id`.)*
+      *(Fully verified: offline SDK round trip, and a live API call with the toolset passes.)*
 - **Done when:** all three spikes pass as tests, and their findings are written to DECISIONS.md.
 
 ### P1: Mock bank, "Ironbridge Teller 7"

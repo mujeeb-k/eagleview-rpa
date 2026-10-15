@@ -25,6 +25,8 @@ or vendors; all institutions and data are the fictional ones defined in PLAN.md 
 4. **Nothing sensitive reaches disk unredacted.** All log and evidence writes go through
    `eagleview.evidence.writer`, which applies `eagleview.safety.redaction`. Raw screenshots stay in memory.
    Playwright traces, videos, and HAR files are OFF by default, because they contain raw DOM and PII.
+   One exception: an opt-in demo video of the synthetic mock bank, recorded only by
+   `scripts/evidence/demo_video.sh --record-video` (see docs/DECISIONS.md, "Demo video exception").
 5. **Secrets** never appear in the repo, in prompts, or in artifacts. Credentials are written as
    `secret://<name>` and resolved from the environment at runtime. The LLM never sees a password: the
    harness logs in before discovery starts.
@@ -80,3 +82,6 @@ Re-verify at https://platform.claude.com/docs/en/agents-and-tools/tool-use/compu
 - If a design question isn't answered by PLAN.md, choose the simplest option consistent with the
   invariants, add a 2–3 line entry to docs/DECISIONS.md, and continue.
 - Never put an API key anywhere but `.env`, which is gitignored.
+- Every end-of-phase summary must include a section 'Decisions to understand': the 3–5 most important
+  design choices made in that phase, each explained in plain language in 2–3 sentences, including the
+  alternative and why it was rejected.

@@ -68,9 +68,14 @@ typed `toolset_name`, and they keep it when `response.content` is echoed back. `
 has `toolset_name` as well. I dispatch on `(toolset_name, name)`. The per-member classes, such as
 `ComputerLeftClickToolUseBlock`, are not in the Messages content union.
 
-**Server acceptance is unverified.** The one live call returned 400 because the key in `.env` is not
-scoped to a workspace, so the API requires `anthropic-workspace-id`. The live test sends an optional
-`ANTHROPIC_WORKSPACE_ID` as that header. P6 must not start until `make test-live` passes.
+**The server accepts the toolset: fully verified.** With a workspace-scoped key, `make test-live`
+passed. `claude-sonnet-5-5` with adaptive summarized thinking accepted the bare toolset entry and
+replied with a `screenshot` `tool_use` carrying `toolset_name: "computer"`. The first attempt, with
+an org key not scoped to a workspace, returned 400 asking for `anthropic-workspace-id`.
+
+**The shared Anthropic client (P6) must honor an optional `ANTHROPIC_WORKSPACE_ID`.** When it is set,
+the client sends it as `anthropic-workspace-id` via `default_headers`, as the live test does. Without
+this, users whose identity-linked keys are not scoped to a workspace cannot run discovery.
 
 ## 2026-10-15 — Demo video exception to invariant 4
 
