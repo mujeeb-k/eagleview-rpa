@@ -1,0 +1,60 @@
+[project]
+name = "eagleview"
+version = "0.1.0"
+description = "Compile LLM-discovered UI workflows on legacy back-office apps into deterministic, replayable capability artifacts."
+readme = "README.md"
+authors = [
+    { name = "Mujeeb Khan", email = "172436749+mujeeb-k@users.noreply.github.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "anthropic>=1.15.0",
+    "fastapi>=0.143.2",
+    "httpx2>=2.0",
+    "jinja2>=3.1.6",
+    "playwright>=1.64.0",
+    "pydantic>=2.14.1",
+    "ruamel-yaml>=0.19.1",
+    "typer>=0.27.3",
+    "uvicorn>=0.54.0",
+    "websockets>=17.2",
+]
+
+[project.scripts]
+eagleview = "eagleview.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "python-dotenv>=1.2.4",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+include = ["src", "tests"]
+typeCheckingMode = "standard"
+strict = ["src/eagleview/schema", "src/eagleview/replay"]
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["live: calls the real Claude API; needs ANTHROPIC_API_KEY (run with `make test-live`)"]
+addopts = "-m 'not live'"

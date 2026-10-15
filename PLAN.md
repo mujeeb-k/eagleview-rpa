@@ -349,17 +349,19 @@ ignoring it.
 ## 7. Phases (each ends with: make check, tick boxes, commit, STOP and summarize)
 
 ### P0: Bootstrap and spikes
-- [ ] Set up the uv project, ruff, pyright, pytest, Makefile (`check`, `bank`, `demo-offline`, `demo-full`),
+- [x] Set up the uv project, ruff, pyright, pytest, Makefile (`check`, `bank`, `demo-offline`, `demo-full`),
       `.env.example`, `.gitignore` (.env, runs/, *.trace.zip), and GitHub Actions CI (check + offline tests).
-- [ ] Create docs/DECISIONS.md.
-- [ ] **Spike A, grounding across frames:** on a nested-frameset test page, map a pixel to a node using
+      *(CI workflow written; not yet run, because the repo has no remote.)*
+- [x] Create docs/DECISIONS.md.
+- [x] **Spike A, grounding across frames:** on a nested-frameset test page, map a pixel to a node using
       CDP `DOM.getNodeForLocation` and get its role and name using `Accessibility.getPartialAXTree`.
       Verify it pierces frames. If not, fall back to recursive `elementFromPoint` with frame offsets.
       Record the result in DECISIONS.md.
-- [ ] **Spike B, screencast:** stream frames with CDP `Page.startScreencast` (acknowledging each frame)
+- [x] **Spike B, screencast:** stream frames with CDP `Page.startScreencast` (acknowledging each frame)
       to a page, and dispatch a click back from it.
-- [ ] **Spike C, SDK:** confirm the installed anthropic SDK version handles `toolset_name` and
+- [x] **Spike C, SDK:** confirm the installed anthropic SDK version handles `toolset_name` and
       `computer_toolset_20260801`. If not, build the request with raw dicts.
+      *(SDK confirmed offline. The live API check is pending: the key needs an `anthropic-workspace-id`.)*
 - **Done when:** all three spikes pass as tests, and their findings are written to DECISIONS.md.
 
 ### P1: Mock bank, "Ironbridge Teller 7"
@@ -503,6 +505,10 @@ This app must feel like a real 2004-era core system:
       screenshots, decisions, locator ranks, and recoveries.
 - [ ] `evidence/README.md`: a table of scenario, command, status, and what it demonstrates, with links.
 - [ ] A test scans /evidence for PII patterns and fails if any are found.
+- [ ] Demo video (the one exception to invariant 4): `scripts/evidence/demo_video.sh --record-video`
+      records the mock bank only (synthetic data), and only with that explicit flag. It is never on by
+      default. Output goes to `evidence/demo.mp4`, under 3 minutes. Playwright records webm, so the
+      script transcodes it. The PII scan can't read video; the synthetic-only rule is what covers it.
 
 ### P11: Docs and polish
 - [ ] README: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
