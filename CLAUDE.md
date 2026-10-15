@@ -85,3 +85,6 @@ Re-verify at https://platform.claude.com/docs/en/agents-and-tools/tool-use/compu
 - Every end-of-phase summary must include a section 'Decisions to understand': the 3–5 most important
   design choices made in that phase, each explained in plain language in 2–3 sentences, including the
   alternative and why it was rejected.
+- Work directly on main. No feature branches, worktrees, or PRs. At the end of each phase, after
+  make check passes: commit to main and git push origin main, then confirm CI passed. Never force-push
+  or rewrite history from here on.
