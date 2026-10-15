@@ -36,7 +36,8 @@ def test_frameset_load_counts_as_four_requests(lantern: Bank) -> None:
 async def test_session_expires_mid_flow_and_sign_on_recovers(page: Page, lantern: Bank) -> None:
     await sign_on(page, lantern)
     lantern.set_faults(session_expire_after_requests="2")
-    main = await search(page, lantern, DEMO_MEMBER)  # GET /inq (1), POST /inq (2), GET /member
+    # GET /inq is request 1, POST /inq is 2, so GET /member is the one that expires.
+    main = await search(page, lantern, DEMO_MEMBER)
     await expect(main.get_by_text("SESSION EXPIRED")).to_be_visible()
     await main.get_by_role("link", name="Sign On").click()  # target=_top leaves the frameset
     await sign_on(page, lantern)
@@ -193,3 +194,24 @@ def test_reset_restores_seed_state(lantern: Bank) -> None:
         assert "S50" not in c.get("/member").text
         r = c.post("/share/post", data={"f3": "170", "f4": "", "f5": "Monthly"})
         assert str(lantern.tenant.txn_base) in r.text  # transaction numbers restart too
+
+
+async def test_modal_occludes_but_does_not_remove_text(page: Page, lantern: Bank) -> None:
+    # Pins the behaviour recorded in DECISIONS.md: DOM visibility alone cannot see the modal, so
+    # Eagleview's visibility checks must hit-test. If this ever fails, revisit that decision.
+    lantern.set_faults(unknown_modal_on="/member")
+    await sign_on(page, lantern)
+    main = await open_member(page, lantern, DEMO_MEMBER)
+    await expect(main.get_by_text("Cash Drawer Alert")).to_be_visible()
+    await expect(main.get_by_text("Share Accounts")).to_be_visible()  # Playwright: "visible"
+    frame = page.frame(name="main")
+    assert frame is not None
+    topmost = await frame.evaluate(
+        """() => {
+            const cell = [...document.querySelectorAll('b')]
+                .find(b => b.textContent === 'Share Accounts');
+            const r = cell.getBoundingClientRect();
+            return cell.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        }"""
+    )
+    assert topmost is False  # hit-testing sees the overlay on top

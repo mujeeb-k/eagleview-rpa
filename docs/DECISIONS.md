@@ -117,3 +117,8 @@ is the point of the idempotency rule in §4.
 scoped by host, not port). Servers bind 127.0.0.1, not `localhost`. On tenant A, Enter in the search
 field does not submit: the form has two text inputs and no submit button, so only the GO image works.
 Form bodies are parsed by hand rather than adding `python-multipart`.
+
+**The fake modals block clicks, not the DOM.** Text under the overlay is still in the DOM, and
+Playwright still calls it "visible". A step whose `expect` is `text_present` would pass straight
+through `unknown_modal_on=/member`. So P3's `text_boxes()` and visibility predicates must hit-test:
+text counts as visible only if it is the topmost element at its own centre, through frames.

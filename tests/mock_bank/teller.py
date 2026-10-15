@@ -14,7 +14,11 @@ async def sign_on(page: Page, bank: Bank) -> None:
         await expect(page.get_by_text("Select Branch")).to_be_visible()
         await page.locator("select[name='br']").select_option(index=0)
         await page.get_by_role("button", name="Continue").click()
+    # All three frames, not just main: banner and nav requests count toward session expiry, so a
+    # caller arming session_expire_after_requests must know they have already been served.
     await expect(main_frame(page).get_by_text("Teller Home")).to_be_visible()
+    await expect(page.frame_locator("frame[name='banner']").get_by_text("Sign Off")).to_be_visible()
+    await expect(nav_frame(page).get_by_text("FUNCTIONS")).to_be_visible()
 
 
 async def search(page: Page, bank: Bank, member: str) -> FrameLocator:
