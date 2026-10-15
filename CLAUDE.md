@@ -82,6 +82,9 @@ Re-verify at https://platform.claude.com/docs/en/agents-and-tools/tool-use/compu
 - If a design question isn't answered by PLAN.md, choose the simplest option consistent with the
   invariants, add a 2–3 line entry to docs/DECISIONS.md, and continue.
 - Never put an API key anywhere but `.env`, which is gitignored.
+- Before finishing a phase, stop every server you started for manual testing (mock bank, console)
+  and confirm its ports are free with `lsof -nP -iTCP:<port> -sTCP:LISTEN`. Check by port, not by
+  process name: the venv's python can show up as `Python`, so a `pkill -f python` pattern misses it.
 - Write end-of-phase summaries for a reader who hasn't followed the session: plain language, short
   sentences, define any technical term on first use, lead with what was built and what I need to do.
 - Every end-of-phase summary must include a section 'Decisions to understand': the 3–5 most important

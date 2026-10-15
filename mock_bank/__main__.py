@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from mock_bank.config import Tenant, all_tenants, load_tenant
-from mock_bank.server import serve
+from mock_bank.server import PortInUse, serve
 
 
 def ensure_passwords(tenants: list[Tenant], env_file: Path) -> dict[str, str]:
@@ -47,8 +47,17 @@ def main(argv: list[str]) -> int:
         print(
             f"{t.short_name}: sign on as {t.username} with ${t.password_env} from .env", flush=True
         )
-    with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(serve(tenants, passwords))
+    try:
+        with contextlib.suppress(KeyboardInterrupt):
+            asyncio.run(serve(tenants, passwords))
+    except PortInUse as e:
+        port = e.tenant.port
+        print(
+            f"Port {port} ({e.tenant.short_name}) is already in use, maybe by another `make bank`. "
+            f"Find the process with: lsof -nP -iTCP:{port} -sTCP:LISTEN",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
