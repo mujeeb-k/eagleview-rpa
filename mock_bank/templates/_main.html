@@ -1,0 +1,13 @@
+{% from "_macros.html" import footer with context %}<html>
+<head><title>{% block title %}Ironbridge Teller{% endblock %}</title></head>
+<body bgcolor="{{ t.theme.page_bg }}" topmargin="6" leftmargin="8" marginheight="6" marginwidth="8">
+<table width="100%" border="0" cellspacing="0" cellpadding="0"><tr>
+<td><font face="{{ t.theme.font_face }}" size="4" color="#000000"><b>{% block heading %}{% endblock %}</b></font></td>
+<td align="right" valign="top"><font face="Courier New" size="1" color="#888888">{% block screen %}{% endblock %}</font></td>
+</tr></table>
+<br>
+{% block content %}{% endblock %}
+{{ footer() }}
+{% include "_modal.html" %}
+</body>
+</html>

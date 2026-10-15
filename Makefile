@@ -16,8 +16,9 @@ test:
 test-live:
 	uv run pytest -m live -v
 
+# Both training tenants: Lantern Bay on 8601, Copperhill on 8602. Needs IRONBRIDGE_TELLER_PASSWORD.
 bank:
-	@echo "make bank: not implemented until P1 (mock bank)" >&2; exit 1
+	uv run python -m mock_bank
 
 demo-offline:
 	@echo "make demo-offline: not implemented until P11" >&2; exit 1

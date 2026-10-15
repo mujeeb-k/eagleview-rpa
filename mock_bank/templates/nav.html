@@ -1,0 +1,26 @@
+<html>
+<head><title>nav</title>
+<style>td.mnu { padding: 4px 6px; border-bottom: 1px solid #FFFFFF; }</style></head>
+<body bgcolor="{{ t.theme.nav_bg }}" topmargin="4" leftmargin="4">
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tr><td><font face="Arial" size="1" color="#555555"><b>FUNCTIONS</b></font></td></tr>
+{% for key in t.nav %}
+<tr><td class="mnu"><font face="{{ t.theme.font_face }}" size="2">
+{%- if key == "inquiry" -%}
+<a href="/inq" target="main"><font color="{{ t.theme.nav_link }}">{{ t.labels.member_inquiry }}</font></a>
+{%- elif key == "totals" -%}
+<a href="/na?f=TTOT" target="main" onclick="top.main.location.href='/na?f=TTOT';return false;"><font color="{{ t.theme.nav_link }}">Teller Totals</font></a>
+{%- elif key == "drawer" -%}
+<a href="/na?f=CDRW" target="main" onclick="top.main.location.href='/na?f=CDRW';return false;"><font color="{{ t.theme.nav_link }}">Cash Drawer</font></a>
+{%- elif key == "reports" -%}
+<a href="/na?f=RPTS" target="main" onclick="top.main.location.href='/na?f=RPTS';return false;"><font color="{{ t.theme.nav_link }}">Reports</font></a>
+{%- elif key == "help" -%}
+<a href="/na?f=HELP" target="main"><font color="{{ t.theme.nav_link }}">Help</font></a>
+{%- elif key == "signoff" -%}
+<a href="/signoff" target="_top"><font color="{{ t.theme.nav_link }}">Sign Off</font></a>
+{%- endif -%}
+</font></td></tr>
+{% endfor %}
+</table>
+</body>
+</html>

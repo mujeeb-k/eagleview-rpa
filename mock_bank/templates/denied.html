@@ -1,0 +1,9 @@
+{% extends "_main.html" %}
+{% block title %}Ironbridge Teller - Access Denied{% endblock %}
+{% block heading %}ACCESS DENIED{% endblock %}
+{% block screen %}SEC403{% endblock %}
+{% block content %}
+<font face="{{ t.theme.font_face }}" size="2" color="#CC0000"><b>IBT-0403 ACCESS DENIED</b></font><br>
+<font face="{{ t.theme.font_face }}" size="2">Your operator profile (INQUIRY ONLY) is not authorized for function {{ function }}.
+Contact your supervisor.</font>
+{% endblock %}

@@ -83,3 +83,37 @@ this, users whose identity-linked keys are not scoped to a workspace cannot run 
 that records, and it keeps invariant 7 intact. It records synthetic mock-bank data only to
 `evidence/demo.mp4`, under 3 minutes, transcoded from Playwright's webm. Video is never on by default,
 and the PII scan can't read it, so the synthetic-only rule is what protects it. Scheduled for P10.
+
+## 2026-10-15 — P1 mock bank
+
+**The mock bank is a top-level `mock_bank/` package, outside `src/`.** It is the system under test,
+not part of Eagleview, so Eagleview never imports it and reaches it only over HTTP and a browser.
+Tests import it through pytest's `pythonpath`; Faker is a dev dependency because only the bank uses it.
+
+**The training password is a secret too.** The bank accepts whatever `IRONBRIDGE_TELLER_PASSWORD`
+holds; `make bank` refuses to start without it. Convention for P4: `secret://<name>` resolves to the
+environment variable `<NAME>` uppercased. Tests generate a random password per session.
+
+**One dataset, seed 7, on both tenants.** The tenants are two credit unions loaded with the same
+training data, so scenario 13 can replay member 10482 on both. The training region runs on a frozen
+business date (2026-10-15) and DOB is drawn from the seeded RNG, not Faker's today-relative
+`date_of_birth`. Member 10482 is pinned to S00, S01 and S10, and a golden test fails if a Faker upgrade
+shifts its data.
+
+**Fault semantics.** A route is an exact path, matched for any method. `session_expire_after_requests=N`
+counts authenticated page requests only (static images and `/__admin` excluded; a frameset load is 4),
+then expires the next requester's session and disarms, so a single relogin can recover. Modal faults fire
+on every response for the route and are dismissed client-side. I added `maintenance=on` because the app
+profile declares a `maintenance_banner` state that otherwise could never be triggered.
+
+**Inquiry-only operators can look members up.** "ACCESS DENIED" applies to Open Share and Post, as a
+200 page with `IBT-0403`, the way legacy apps report it, not an HTTP 403. Lookups need no write rights.
+
+**No double-post guard, on purpose.** The review form carries the transaction in hidden fields with no
+submission token, so posting twice opens two shares. Commit safety has to come from Eagleview, which
+is the point of the idempotency rule in §4.
+
+**Small realism choices that later phases should know.** Cookie names are per tenant (cookies are
+scoped by host, not port). Servers bind 127.0.0.1, not `localhost`. On tenant A, Enter in the search
+field does not submit: the form has two text inputs and no submit button, so only the GO image works.
+Form bodies are parsed by hand rather than adding `python-multipart`.

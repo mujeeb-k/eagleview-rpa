@@ -1,0 +1,24 @@
+{% extends "_main.html" %}
+{% from "_macros.html" import bar with context %}
+{% set f = t.theme.font_face %}
+{% block title %}Ironbridge Teller - Review{% endblock %}
+{% block heading %}Review - Open Share{% endblock %}
+{% block screen %}SHR210{% endblock %}
+{% block content %}
+{{ bar("Transaction Summary") }}
+<table border="1" cellspacing="0" cellpadding="4" bordercolor="#999999">
+<tr><td bgcolor="#EEEEEE"><font face="{{ f }}" size="2">Member</font></td><td><font face="{{ f }}" size="2">{{ m.display_name }} (#{{ m.number }})</font></td></tr>
+<tr><td bgcolor="#EEEEEE"><font face="{{ f }}" size="2">Share Type</font></td><td><font face="{{ f }}" size="2">{{ product }}</font></td></tr>
+<tr><td bgcolor="#EEEEEE"><font face="{{ f }}" size="2">Suffix</font></td><td><font face="Courier New" size="2">{{ suffix }}</font></td></tr>
+<tr><td bgcolor="#EEEEEE"><font face="{{ f }}" size="2">Nickname</font></td><td><font face="{{ f }}" size="2">{{ d.nickname or "-" }}</font></td></tr>
+<tr><td bgcolor="#EEEEEE"><font face="{{ f }}" size="2">Dividend Frequency</font></td><td><font face="{{ f }}" size="2">{{ d.frequency }}</font></td></tr>
+</table>
+<br>
+<font face="{{ f }}" size="2" color="#990000">Posting opens the share immediately and cannot be reversed from this screen.</font><br><br>
+<form method="post" action="/share/post">
+<input type="hidden" name="f3" value="{{ d.product }}">
+<input type="hidden" name="f4" value="{{ d.nickname }}">
+<input type="hidden" name="f5" value="{{ d.frequency }}">
+<input type="submit" value="Post"> <input type="button" value="Back" onclick="location.href='/share/open';">
+</form>
+{% endblock %}

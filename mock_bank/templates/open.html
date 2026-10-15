@@ -1,0 +1,24 @@
+{% extends "_main.html" %}
+{% from "_macros.html" import bar, errors_box with context %}
+{% set f = t.theme.font_face %}
+{% block title %}Ironbridge Teller - Open Share{% endblock %}
+{% block heading %}Open Share Account{% endblock %}
+{% block screen %}SHR200{% endblock %}
+{% block content %}
+{{ errors_box(errors) }}
+<font face="{{ f }}" size="2">Member: <b>{{ m.display_name }}</b> &nbsp; #{{ m.number }}</font><br><br>
+{{ bar("New Share") }}
+<form method="post" action="/share/open">
+<table border="0" cellspacing="0" cellpadding="4">
+<tr><td><font face="{{ f }}" size="2">Share Type</font></td>
+<td><select name="f3"><option value="">-- Select --</option>
+{% for code, p in products.items() %}<option value="{{ code }}"{% if form.get("f3") == code %} selected{% endif %}>{{ p[0] }}</option>{% endfor %}
+</select></td></tr>
+<tr><td><font face="{{ f }}" size="2">Nickname</font></td>
+<td><input type="text" name="f4" size="24" value="{{ form.get('f4', '') }}"> <font face="{{ f }}" size="1" color="#666666">(optional, 20 max)</font></td></tr>
+<tr><td valign="top"><font face="{{ f }}" size="2">Dividend Frequency</font></td>
+<td>{% for fq in frequencies %}<input type="radio" name="f5" value="{{ fq }}"{% if form.get("f5") == fq %} checked{% endif %}><font face="{{ f }}" size="2">{{ fq }}</font>&nbsp;&nbsp;{% endfor %}</td></tr>
+<tr><td></td><td><input type="submit" value="Validate"> <input type="button" value="Cancel" onclick="location.href='/member';"></td></tr>
+</table>
+</form>
+{% endblock %}

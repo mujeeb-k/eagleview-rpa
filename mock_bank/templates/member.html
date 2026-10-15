@@ -1,0 +1,71 @@
+{% extends "_main.html" %}
+{% from "_macros.html" import bar with context %}
+{% set f = t.theme.font_face %}
+{% block title %}Ironbridge Teller - Member Detail{% endblock %}
+{% block heading %}Member Detail{% endblock %}
+{% block screen %}MBR010{% endblock %}
+{% block content %}
+{{ bar("Member Information") }}
+<table border="0" cellspacing="0" cellpadding="3">
+<tr><td><font face="{{ f }}" size="2"><b>Name:</b></font></td><td width="260"><font face="{{ f }}" size="2">{{ m.display_name }}</font></td>
+    <td><font face="{{ f }}" size="2"><b>Member #:</b></font></td><td><font face="{{ f }}" size="2">{{ m.number }}</font></td></tr>
+<tr><td><font face="{{ f }}" size="2"><b>SSN:</b></font></td><td><font face="{{ f }}" size="2">{{ m.masked_ssn }}</font></td>
+    <td><font face="{{ f }}" size="2"><b>DOB:</b></font></td><td><font face="{{ f }}" size="2">{{ m.masked_dob }}</font></td></tr>
+<tr><td><font face="{{ f }}" size="2"><b>Phone:</b></font></td><td><font face="{{ f }}" size="2">{{ m.phone }}</font></td>
+    <td><font face="{{ f }}" size="2"><b>Email:</b></font></td><td><font face="{{ f }}" size="2">{{ m.email }}</font></td></tr>
+<tr><td valign="top"><font face="{{ f }}" size="2"><b>Address:</b></font></td><td><font face="{{ f }}" size="2">{{ m.street }}<br>{{ m.city }}, {{ m.state }} {{ m.zip }}</font></td>
+    <td valign="top"><font face="{{ f }}" size="2"><b>Member Since:</b></font></td><td valign="top"><font face="{{ f }}" size="2">{{ m.joined | mdy }}</font></td></tr>
+<tr><td valign="top"><font face="{{ f }}" size="2"><b>Notes:</b></font></td><td colspan="3"><font face="{{ f }}" size="2">{{ m.notes or "-" }}</font></td></tr>
+</table>
+<br>
+{{ bar("Share Accounts") }}
+<table border="1" cellspacing="0" cellpadding="3" bordercolor="#999999" width="100%">
+<tr bgcolor="#DDDDDD">
+<td><font face="{{ f }}" size="2"><b>Sfx</b></font></td><td><font face="{{ f }}" size="2"><b>Description</b></font></td>
+<td><font face="{{ f }}" size="2"><b>Nickname</b></font></td>
+<td align="right"><font face="{{ f }}" size="2"><b>Balance</b></font></td><td align="right"><font face="{{ f }}" size="2"><b>Available</b></font></td>
+</tr>
+{% for sh in m.shares %}
+<tr>
+<td><font face="Courier New" size="2">{{ sh.suffix }}</font></td><td><font face="{{ f }}" size="2">{{ sh.description }}</font></td>
+<td><font face="{{ f }}" size="2">{{ sh.nickname or "&nbsp;" | safe }}</font></td>
+<td align="right"><font face="Courier New" size="2">{{ sh.balance | money }}</font></td><td align="right"><font face="Courier New" size="2">{{ sh.available | money }}</font></td>
+</tr>
+{% endfor %}
+</table>
+<br>
+{{ bar("Loan Accounts") }}
+<table border="1" cellspacing="0" cellpadding="3" bordercolor="#999999" width="100%">
+<tr bgcolor="#DDDDDD">
+<td><font face="{{ f }}" size="2"><b>Sfx</b></font></td><td><font face="{{ f }}" size="2"><b>Description</b></font></td>
+<td align="right"><font face="{{ f }}" size="2"><b>Balance</b></font></td><td align="right"><font face="{{ f }}" size="2"><b>Rate</b></font></td>
+<td align="right"><font face="{{ f }}" size="2"><b>Payment</b></font></td><td><font face="{{ f }}" size="2"><b>Next Due</b></font></td>
+</tr>
+{% for ln in m.loans %}
+<tr>
+<td><font face="Courier New" size="2">{{ ln.suffix }}</font></td><td><font face="{{ f }}" size="2">{{ ln.description }}</font></td>
+<td align="right"><font face="Courier New" size="2">{{ ln.balance | money }}</font></td><td align="right"><font face="Courier New" size="2">{{ ln.rate }}%</font></td>
+<td align="right"><font face="Courier New" size="2">{{ ln.payment | money }}</font></td><td><font face="{{ f }}" size="2">{{ ln.next_due | mdy }}</font></td>
+</tr>
+{% else %}
+<tr><td colspan="6"><font face="{{ f }}" size="2"><i>No loan accounts.</i></font></td></tr>
+{% endfor %}
+</table>
+<br>
+{{ bar("Recent Activity") }}
+<table border="1" cellspacing="0" cellpadding="3" bordercolor="#999999" width="100%">
+<tr bgcolor="#DDDDDD">
+<td><font face="{{ f }}" size="2"><b>Date</b></font></td><td><font face="{{ f }}" size="2"><b>Sfx</b></font></td>
+<td><font face="{{ f }}" size="2"><b>Description</b></font></td><td align="right"><font face="{{ f }}" size="2"><b>Amount</b></font></td>
+</tr>
+{% for x in activity %}
+<tr>
+<td><font face="{{ f }}" size="2">{{ x.posted | mdy }}</font></td><td><font face="Courier New" size="2">{{ x.suffix }}</font></td>
+<td><font face="{{ f }}" size="2">{{ x.description }}</font></td><td align="right"><font face="Courier New" size="2">{{ x.amount | amount }}</font></td>
+</tr>
+{% endfor %}
+</table>
+<br>
+<input type="button" value="Open Share" onclick="location.href='/share/open';">
+<input type="button" value="New Search" onclick="location.href='/inq';">
+{% endblock %}

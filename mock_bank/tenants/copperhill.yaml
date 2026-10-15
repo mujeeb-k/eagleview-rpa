@@ -1,0 +1,30 @@
+# Tenant B: Copperhill Community Credit Union (fictional), Ironbridge Teller 7.4.
+# Same product and same training dataset as tenant A. It differs in labels, theme, nav order,
+# the Search button, and a Select Branch interstitial after sign-on.
+slug: copperhill
+name: Copperhill Community Credit Union
+short_name: COPPERHILL CCU
+version: "7.4.1"
+port: 8602
+seed: 7
+username: teller01
+teller_id: TLR-2210
+drawer: "11"
+branches: [Hillcrest, Copper Falls, Riverside]
+select_branch: true
+search_button: text
+nav: [drawer, totals, inquiry, reports, help, signoff]
+labels:
+  member_inquiry: Member Lookup
+  member_no: Acct Holder No.
+theme:
+  banner_bg: "#2F4F2F"
+  banner_fg: "#F5F5DC"
+  nav_bg: "#F5F5DC"
+  nav_link: "#2F4F2F"
+  page_bg: "#FFFFF0"
+  bar_bg: "#8B5A2B"
+  bar_fg: "#FFFFFF"
+  font_face: Verdana, Geneva
+injection_member: "10377"
+txn_base: 4400001

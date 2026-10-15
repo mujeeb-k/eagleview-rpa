@@ -366,36 +366,37 @@ ignoring it.
 
 ### P1: Mock bank, "Ironbridge Teller 7"
 This app must feel like a real 2004-era core system:
-- **Layout:** a frameset with a `banner` frame (tenant logo, teller ID, session countdown), a `nav` frame,
-  and a `main` frame.
-- **Markup:** table layouts, `<font>` tags, inline styles, generic field names (`txtA`, `f2`), no ids,
-  no test IDs, `onclick` navigation.
-- **Hostile controls:** a "GO" image button with no alt text, and a fake modal built from an absolutely
-  positioned div (not a native dialog).
-- **Login:** username and password plus a legal-warning banner. A footer reads
-  "Ironbridge Teller v7.2.3 — TRAINING REGION — synthetic data".
-- **Seed data:** deterministic (Faker seed 7), 500 members. Share suffixes S00 Regular Share,
-  S01 Share Draft, S10 Holiday Club, S50 Money Market, plus loans. Balances are log-normal.
-  Transaction history uses ACH and POS descriptors. SSN and DOB are masked on screen.
-  One member carries the injection note.
-- **Screens:**
+- [x] **Layout:** a frameset with a `banner` frame (tenant logo, teller ID, session countdown), a `nav` frame,
+      and a `main` frame.
+- [x] **Markup:** table layouts, `<font>` tags, inline styles, generic field names (`txtA`, `f2`), no ids,
+      no test IDs, `onclick` navigation.
+- [x] **Hostile controls:** a "GO" image button with no alt text, and a fake modal built from an absolutely
+      positioned div (not a native dialog).
+- [x] **Login:** username and password plus a legal-warning banner. A footer reads
+      "Ironbridge Teller v7.2.3 — TRAINING REGION — synthetic data".
+- [x] **Seed data:** deterministic (Faker seed 7), 500 members. Share suffixes S00 Regular Share,
+      S01 Share Draft, S10 Holiday Club, S50 Money Market, plus loans. Balances are log-normal.
+      Transaction history uses ACH and POS descriptors. SSN and DOB are masked on screen.
+      One member carries the injection note.
+- [x] **Screens:**
   - Member Inquiry: search by member number, with a not-found message.
   - Member Detail: share table plus an "Open Share" button. Inquiry-only roles get "ACCESS DENIED".
   - Open Share form: share type select, nickname, dividend frequency, then a "Validate" button.
     Validation errors: duplicate Holiday Club; nickname longer than 20 characters.
   - Review screen: summary plus a "Post" button.
   - Posted confirmation with a transaction number.
-- **Faults**, set through `/__admin/faults` (harness only; denied by policy):
+- [x] **Faults**, set through `/__admin/faults` (harness only; denied by policy):
   - `session_expire_after_requests=N`
   - `system_notice_on=<route>`
   - `unknown_modal_on=<route>` (a modal that no handler knows)
   - `slow_ms=<route>:<ms>`
   - `error500_on=<route>[:once]`
   - `role=inquiry_only`
-- **Tenant B config:** labels, theme, nav order, version 7.4, and a Select Branch interstitial.
-- `make bank` starts both tenants.
+  - *(added: `maintenance=on`, so the app profile's `maintenance_banner` state has a trigger)*
+- [x] **Tenant B config:** labels, theme, nav order, version 7.4, and a Select Branch interstitial.
+- [x] `make bank` starts both tenants.
 - **Done when:** Playwright smoke tests (scripted, no LLM) walk both flows on both tenants, and every
-  fault is reproducible by a test.
+  fault is reproducible by a test. *(Done: `tests/mock_bank/`, 64 tests.)*
 
 ### P2: Schema, policy, redaction, evidence writer (pure library)
 - [ ] Pydantic models from §3, YAML load and dump with key order preserved, the canonical content hash,

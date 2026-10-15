@@ -1,0 +1,28 @@
+{% extends "_main.html" %}
+{% from "_macros.html" import bar, errors_box with context %}
+{% block title %}Ironbridge Teller - {{ t.labels.member_inquiry }}{% endblock %}
+{% block heading %}Member Search{% endblock %}
+{% block screen %}INQ001{% endblock %}
+{% block content %}
+{{ errors_box([error] if error else []) }}
+{{ bar("Search Criteria") }}
+<form method="post" action="/inq">
+<table border="0" cellspacing="0" cellpadding="4">
+<tr>
+<td><font face="{{ t.theme.font_face }}" size="2">{{ t.labels.member_no }}</font></td>
+<td><input type="text" name="txtA" size="10" maxlength="10" value="{{ txt_a }}"></td>
+<td>{% if t.search_button == "image" -%}
+<img src="/img/go.svg" width="36" height="20" border="0" style="cursor:pointer" onclick="document.forms[0].submit();">
+{%- else -%}
+<input type="submit" value="Search">
+{%- endif %}</td>
+</tr>
+<tr>
+<td><font face="{{ t.theme.font_face }}" size="2">Last Name</font></td>
+<td><input type="text" name="txtB" size="18" value="{{ txt_b }}"></td>
+<td></td>
+</tr>
+</table>
+</form>
+<font face="{{ t.theme.font_face }}" size="1" color="#666666">Enter a member number, or a last name where name search is enabled.</font>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "_main.html" %}
+{% from "_macros.html" import bar with context %}
+{% set f = t.theme.font_face %}
+{% block title %}Ironbridge Teller - Posted{% endblock %}
+{% block heading %}Share Account Opened{% endblock %}
+{% block screen %}SHR220{% endblock %}
+{% block content %}
+{{ bar("Posting Confirmation") }}
+<table border="0" cellspacing="0" cellpadding="3">
+<tr><td><font face="{{ f }}" size="2"><b>Transaction #:</b></font></td><td><font face="Courier New" size="2">{{ p.txn }}</font></td></tr>
+<tr><td><font face="{{ f }}" size="2"><b>Member:</b></font></td><td><font face="{{ f }}" size="2">{{ m.display_name }} (#{{ m.number }})</font></td></tr>
+<tr><td><font face="{{ f }}" size="2"><b>Suffix:</b></font></td><td><font face="Courier New" size="2">{{ p.share.suffix }}</font></td></tr>
+<tr><td><font face="{{ f }}" size="2"><b>Share Type:</b></font></td><td><font face="{{ f }}" size="2">{{ p.share.description }}</font></td></tr>
+</table>
+<br>
+<input type="button" value="Member Detail" onclick="location.href='/member';">
+{% endblock %}

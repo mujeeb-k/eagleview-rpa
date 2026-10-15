@@ -1,0 +1,27 @@
+{% from "_macros.html" import footer with context %}<html>
+<head><title>Ironbridge Teller - Sign On</title></head>
+<body bgcolor="#E8E8E8">
+<center>
+<br>
+<table width="620" border="0" cellspacing="0" cellpadding="0"><tr><td bgcolor="{{ t.theme.banner_bg }}">
+<img src="/img/logo.svg" width="190" height="40" border="0">
+</td></tr></table>
+<table width="620" border="1" cellspacing="0" cellpadding="8" bgcolor="#FFFFFF" bordercolor="#999999"><tr><td>
+<font face="Arial" size="2" color="#990000"><b>WARNING:</b> This system is the property of {{ t.name }}
+and is for authorized use only. All activity is monitored and recorded. Unauthorized access or use is
+prohibited and may be subject to criminal and civil penalties. By signing on you consent to monitoring.</font>
+</td></tr></table>
+<br>
+<form method="post" action="/signon">
+<table border="0" cellspacing="0" cellpadding="4" bgcolor="#FFFFFF" style="border:1px solid #999999">
+<tr><td colspan="2" bgcolor="{{ t.theme.bar_bg }}"><font face="Arial" size="2" color="{{ t.theme.bar_fg }}"><b>Teller Sign On</b></font></td></tr>
+{% if error %}<tr><td colspan="2"><font face="Arial" size="2" color="#CC0000"><b>{{ error }}</b></font></td></tr>{% endif %}
+<tr><td align="right"><font face="Arial" size="2">Operator ID</font></td><td><input type="text" name="f1" size="16" autocomplete="off"></td></tr>
+<tr><td align="right"><font face="Arial" size="2">Password</font></td><td><input type="password" name="f2" size="16"></td></tr>
+<tr><td></td><td><input type="submit" value="Sign On"></td></tr>
+</table>
+</form>
+{{ footer() }}
+</center>
+</body>
+</html>

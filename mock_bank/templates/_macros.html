@@ -1,0 +1,18 @@
+{# Shared fragments. Deliberately 2004-era: tables for layout, <font> tags, inline styles,
+   no ids, no labels, no test hooks. #}
+{% macro bar(title) -%}
+<table width="100%" border="0" cellspacing="0" cellpadding="2"><tr>
+<td bgcolor="{{ t.theme.bar_bg }}"><font face="{{ t.theme.font_face }}" size="2" color="{{ t.theme.bar_fg }}"><b>{{ title }}</b></font></td>
+</tr></table>
+{%- endmacro %}
+{% macro footer() -%}
+<br><hr size="1" noshade>
+<font face="{{ t.theme.font_face }}" size="1" color="#666666">{{ t.footer }}</font>
+{%- endmacro %}
+{% macro errors_box(errors) -%}
+{% if errors %}
+<table border="1" cellspacing="0" cellpadding="4" bordercolor="#CC0000" bgcolor="#FFEEEE" width="100%"><tr><td>
+{% for e in errors %}<font face="{{ t.theme.font_face }}" size="2" color="#CC0000"><b>{{ e }}</b></font><br>{% endfor %}
+</td></tr></table><br>
+{% endif %}
+{%- endmacro %}

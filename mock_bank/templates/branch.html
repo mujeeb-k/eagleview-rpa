@@ -1,0 +1,17 @@
+{% from "_macros.html" import footer with context %}<html>
+<head><title>Ironbridge Teller - Select Branch</title></head>
+<body bgcolor="{{ t.theme.page_bg }}">
+<center><br><br>
+<form method="post" action="/branch">
+<table border="0" cellspacing="0" cellpadding="6" style="border:1px solid #999999">
+<tr><td colspan="2" bgcolor="{{ t.theme.bar_bg }}"><font face="{{ t.theme.font_face }}" size="3" color="{{ t.theme.bar_fg }}"><b>Select Branch</b></font></td></tr>
+{% if error %}<tr><td colspan="2"><font face="{{ t.theme.font_face }}" size="2" color="#CC0000"><b>{{ error }}</b></font></td></tr>{% endif %}
+<tr><td><font face="{{ t.theme.font_face }}" size="2">Branch</font></td>
+<td><select name="br">{% for b in t.branches %}<option value="{{ b }}">{{ b }}</option>{% endfor %}</select></td></tr>
+<tr><td></td><td><input type="submit" value="Continue"></td></tr>
+</table>
+</form>
+{{ footer() }}
+</center>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{# Fake modals: absolutely positioned divs over a fixed, pointer-blocking overlay. Not native
+   dialogs, so nothing in the accessibility tree says "dialog". #}
+{% if modal == "system_notice" %}
+<div class="ovl" style="position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.35);z-index:900">
+<div style="position:absolute;left:110px;top:80px;width:430px;background:#FFFFE1;border:2px outset #999999">
+<table width="100%" border="0" cellspacing="0" cellpadding="4">
+<tr><td bgcolor="#000080"><font face="Arial" size="2" color="#FFFFFF"><b>System Notice</b></font></td></tr>
+<tr><td><font face="Arial" size="2">End-of-day processing begins at 19:00. Transactions posted after
+that time carry the next business date.</font></td></tr>
+<tr><td align="center"><input type="button" value="OK" style="width:70px"
+ onclick="var d=this;while(d&&d.className!='ovl'){d=d.parentNode;}d.style.display='none';"></td></tr>
+</table></div></div>
+{% elif modal == "unknown" %}
+<div class="ovl" style="position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.35);z-index:900">
+<div style="position:absolute;left:90px;top:70px;width:470px;background:#F0F0F0;border:2px outset #999999">
+<table width="100%" border="0" cellspacing="0" cellpadding="4">
+<tr><td bgcolor="#800000"><font face="Arial" size="2" color="#FFFFFF"><b>Cash Drawer Alert</b></font></td></tr>
+<tr><td><font face="Arial" size="2">Drawer {{ t.drawer }} is over its cash limit ($10,000.00).
+Confirm that your supervisor has been notified before you continue.</font></td></tr>
+<tr><td><input type="checkbox" name="ack" onclick="this.parentNode.parentNode.nextElementSibling.getElementsByTagName('input')[0].disabled=!this.checked;">
+<font face="Arial" size="2">Supervisor notified</font></td></tr>
+<tr><td align="center"><input type="button" value="Continue" disabled style="width:90px"
+ onclick="var d=this;while(d&&d.className!='ovl'){d=d.parentNode;}d.style.display='none';"></td></tr>
+</table></div></div>
+{% endif %}

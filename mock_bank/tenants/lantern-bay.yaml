@@ -1,0 +1,28 @@
+# Tenant A: Lantern Bay Federal Credit Union (fictional), Ironbridge Teller 7.2.
+slug: lantern-bay
+name: Lantern Bay Federal Credit Union
+short_name: LANTERN BAY FCU
+version: "7.2.3"
+port: 8601
+seed: 7
+username: teller01
+teller_id: TLR-0417
+drawer: "04"
+branches: [Main Office]
+select_branch: false
+search_button: image
+nav: [inquiry, totals, drawer, reports, help, signoff]
+labels:
+  member_inquiry: Member Inquiry
+  member_no: "Member #"
+theme:
+  banner_bg: "#003366"
+  banner_fg: "#FFFFFF"
+  nav_bg: "#C0C0C0"
+  nav_link: "#000080"
+  page_bg: "#FFFFFF"
+  bar_bg: "#336699"
+  bar_fg: "#FFFFFF"
+  font_face: Arial, Helvetica
+injection_member: "10377"
+txn_base: 7200001
