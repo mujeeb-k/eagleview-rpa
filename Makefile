@@ -16,7 +16,8 @@ test:
 test-live:
 	uv run pytest -m live -v
 
-# Both training tenants: Lantern Bay on 8601, Copperhill on 8602. Needs IRONBRIDGE_TELLER_PASSWORD.
+# Both training tenants: Lantern Bay on 8601, Copperhill on 8602. Missing passwords are generated
+# into .env.
 bank:
 	uv run python -m mock_bank
 

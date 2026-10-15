@@ -3,27 +3,52 @@
 import asyncio
 import contextlib
 import os
+import secrets
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-from mock_bank.config import PASSWORD_ENV, all_tenants, load_tenant
+from mock_bank.config import Tenant, all_tenants, load_tenant
 from mock_bank.server import serve
 
 
+def ensure_passwords(tenants: list[Tenant], env_file: Path) -> dict[str, str]:
+    """Each tenant's password from the environment.
+
+    A missing one is generated and appended to `env_file` (gitignored), so a fresh clone needs no
+    setup and the harness later reads the same value.
+    """
+    passwords: dict[str, str] = {}
+    added: list[str] = []
+    for t in tenants:
+        value = os.environ.get(t.password_env, "")
+        if not value:
+            value = secrets.token_urlsafe(18)
+            os.environ[t.password_env] = value
+            added.append(f"{t.password_env}={value}")
+        passwords[t.slug] = value
+    if added:
+        existing = env_file.read_text() if env_file.exists() else ""
+        prefix = "" if not existing or existing.endswith("\n") else "\n"
+        with env_file.open("a") as f:
+            f.write(prefix + "\n".join(added) + "\n")
+        names = ", ".join(line.split("=", 1)[0] for line in added)
+        print(f"Generated {names} and saved to {env_file}.", flush=True)
+    return passwords
+
+
 def main(argv: list[str]) -> int:
-    load_dotenv(override=False)
-    password = os.environ.get(PASSWORD_ENV, "")
-    if not password:
-        print(
-            f"{PASSWORD_ENV} is not set. Put a training password of your choice in .env "
-            "(see .env.example); the harness reads the same variable.",
-            file=sys.stderr,
-        )
-        return 2
+    env_file = Path.cwd() / ".env"
+    load_dotenv(env_file, override=False)
     tenants = [load_tenant(slug) for slug in argv] if argv else all_tenants()
+    passwords = ensure_passwords(tenants, env_file)
+    for t in tenants:
+        print(
+            f"{t.short_name}: sign on as {t.username} with ${t.password_env} from .env", flush=True
+        )
     with contextlib.suppress(KeyboardInterrupt):
-        asyncio.run(serve(tenants, password))
+        asyncio.run(serve(tenants, passwords))
     return 0
 
 

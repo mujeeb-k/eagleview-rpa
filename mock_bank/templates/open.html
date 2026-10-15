@@ -12,7 +12,7 @@
 <table border="0" cellspacing="0" cellpadding="4">
 <tr><td><font face="{{ f }}" size="2">Share Type</font></td>
 <td><select name="f3"><option value="">-- Select --</option>
-{% for code, p in products.items() %}<option value="{{ code }}"{% if form.get("f3") == code %} selected{% endif %}>{{ p[0] }}</option>{% endfor %}
+{% for code, label in products.items() %}<option value="{{ code }}"{% if form.get("f3") == code %} selected{% endif %}>{{ label }}</option>{% endfor %}
 </select></td></tr>
 <tr><td><font face="{{ f }}" size="2">Nickname</font></td>
 <td><input type="text" name="f4" size="24" value="{{ form.get('f4', '') }}"> <font face="{{ f }}" size="1" color="#666666">(optional, 20 max)</font></td></tr>

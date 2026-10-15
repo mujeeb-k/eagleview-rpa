@@ -5,7 +5,10 @@ short_name: LANTERN BAY FCU
 version: "7.2.3"
 port: 8601
 seed: 7
+first_member: 10001  # 5-digit member numbers
+demo_member: "10482"
 username: teller01
+password_secret: lantern_bay_teller_password
 teller_id: TLR-0417
 drawer: "04"
 branches: [Main Office]
@@ -26,3 +29,9 @@ theme:
   font_face: Arial, Helvetica
 injection_member: "10377"
 txn_base: 7200001
+suffix_prefix: S
+share_types:
+  base: {description: Regular Share, low: 0, high: 0}
+  draft: {description: Share Draft, low: 1, high: 9, product: "110"}
+  club: {description: Holiday Club, low: 10, high: 19, product: "140"}
+  money_market: {description: Money Market, low: 50, high: 59, product: "170"}

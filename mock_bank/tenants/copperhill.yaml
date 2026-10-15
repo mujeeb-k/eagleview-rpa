@@ -1,13 +1,16 @@
 # Tenant B: Copperhill Community Credit Union (fictional), Ironbridge Teller 7.4.
-# Same product and same training dataset as tenant A. It differs in labels, theme, nav order,
-# the Search button, and a Select Branch interstitial after sign-on.
+# Same product as tenant A, but its own members, credentials and share types. The screens differ
+# in labels, theme, nav order, the Search button, and a Select Branch interstitial after sign-on.
 slug: copperhill
 name: Copperhill Community Credit Union
 short_name: COPPERHILL CCU
 version: "7.4.1"
 port: 8602
-seed: 7
-username: teller01
+seed: 31
+first_member: 2210001  # 7-digit member numbers
+demo_member: "2210236"
+username: tlr2210
+password_secret: copperhill_teller_password
 teller_id: TLR-2210
 drawer: "11"
 branches: [Hillcrest, Copper Falls, Riverside]
@@ -26,5 +29,12 @@ theme:
   bar_bg: "#8B5A2B"
   bar_fg: "#FFFFFF"
   font_face: Verdana, Geneva
-injection_member: "10377"
+injection_member: "2210377"
 txn_base: 4400001
+# Copperhill numbers shares without a letter prefix and names them its own way.
+suffix_prefix: ""
+share_types:
+  base: {description: Primary Savings, low: 1, high: 1}
+  draft: {description: Share Checking, low: 5, high: 9, product: "21"}
+  club: {description: Christmas Club, low: 20, high: 29, product: "24"}
+  money_market: {description: Premium Money Market, low: 70, high: 79, product: "27"}

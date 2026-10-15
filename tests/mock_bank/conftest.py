@@ -9,7 +9,7 @@ import httpx2 as httpx
 import pytest
 from playwright.async_api import Browser, BrowserContext, FrameLocator, Page, async_playwright
 
-from mock_bank.config import Tenant, all_tenants
+from mock_bank.config import ShareKind, Tenant, all_tenants
 from mock_bank.server import BankThread
 
 VIEWPORT = {"width": 1280, "height": 800}
@@ -20,6 +20,14 @@ class Bank:
     tenant: Tenant
     url: str
     password: str
+
+    @property
+    def demo(self) -> str:
+        return self.tenant.demo_member
+
+    def product(self, kind: ShareKind) -> str:
+        """The Open Share select code for a share kind at this tenant."""
+        return next(code for code, k in self.tenant.products.items() if k == kind)
 
     def admin(self) -> httpx.Client:
         return httpx.Client(base_url=self.url, timeout=10)
@@ -39,35 +47,39 @@ class Bank:
             yield c
 
 
+Banks = tuple[BankThread, dict[str, str]]
+
+
 @pytest.fixture(scope="session")
-def bank_thread() -> Iterator[tuple[BankThread, str]]:
-    password = secrets.token_urlsafe(16)  # per test session; never a committed value
-    thread = BankThread(all_tenants(), password).start()
-    yield thread, password
+def bank_thread() -> Iterator[Banks]:
+    # One random password per tenant per test session; never a committed value.
+    passwords = {t.slug: secrets.token_urlsafe(16) for t in all_tenants()}
+    thread = BankThread(all_tenants(), passwords).start()
+    yield thread, passwords
     thread.stop()
 
 
-def _bank(bank_thread: tuple[BankThread, str], slug: str) -> Bank:
-    thread, password = bank_thread
+def _bank(bank_thread: Banks, slug: str) -> Bank:
+    thread, passwords = bank_thread
     running = thread.running[slug]
-    bank = Bank(running.tenant, running.url, password)
+    bank = Bank(running.tenant, running.url, passwords[slug])
     with bank.admin() as c:
         c.post("/__admin/reset").raise_for_status()
     return bank
 
 
 @pytest.fixture
-def lantern(bank_thread: tuple[BankThread, str]) -> Bank:
+def lantern(bank_thread: Banks) -> Bank:
     return _bank(bank_thread, "lantern-bay")
 
 
 @pytest.fixture
-def copperhill(bank_thread: tuple[BankThread, str]) -> Bank:
+def copperhill(bank_thread: Banks) -> Bank:
     return _bank(bank_thread, "copperhill")
 
 
 @pytest.fixture(params=["lantern-bay", "copperhill"])
-def bank(request: pytest.FixtureRequest, bank_thread: tuple[BankThread, str]) -> Bank:
+def bank(request: pytest.FixtureRequest, bank_thread: Banks) -> Bank:
     return _bank(bank_thread, request.param)
 
 

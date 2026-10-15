@@ -20,9 +20,16 @@ invokes it." Every phase serves this thread:
 ## 1. The fictional world
 - **Vendor product:** "Ironbridge Teller 7", a fictional legacy core-banking teller system.
 - **Tenant A:** Lantern Bay Federal Credit Union (fictional). Ironbridge 7.2. Port 8601.
+  5-digit member numbers (demo member 10482). Shares S00 Regular Share, S01 Share Draft,
+  S10 Holiday Club, S50 Money Market. Signs on with `secret://lantern_bay_teller_password`.
 - **Tenant B:** Copperhill Community Credit Union (fictional). Ironbridge 7.4. Port 8602.
-  Differences: relabeled fields, a different nav order and theme, and an extra "Select Branch"
-  interstitial after login.
+  7-digit member numbers (demo member 2210236). Shares 01 Primary Savings, 05 Share Checking,
+  20 Christmas Club, 70 Premium Money Market. Signs on with `secret://copperhill_teller_password`.
+  Screen differences: relabeled fields, a different nav order and theme, and an extra
+  "Select Branch" interstitial after login.
+- **The capability contract is shared across tenants; data and credentials never are.** Each tenant
+  has its own seed, members, share codes and labels, operator ID and password. No member exists at
+  both, so a run routed to the wrong tenant shows up as "member not found", never as a plausible answer.
 - The README states that all institutions, people, and data are fictional and synthetic.
 
 ## 2. Architecture
@@ -102,10 +109,10 @@ requires_session: true
 inputs:
   member_id:
     type: string
-    pattern: "^[0-9]{4,8}$"
+    pattern: "^[0-9]{4,8}$"        # covers every tenant: Lantern Bay 5 digits, Copperhill 7
     sensitivity: identifier        # none | identifier | pii | secret
     description: Credit union member number.
-    example: "10482"               # synthetic
+    example: "10482"               # synthetic; examples are illustrative, never tenant-specific rules
 
 outputs:
   member_name:   { type: string, sensitivity: pii, required: true }
@@ -113,8 +120,8 @@ outputs:
     type: array
     sensitivity: pii
     items:
-      suffix:       { type: string, pattern: "^S[0-9]{2}$" }
-      description:  { type: string }
+      suffix:       { type: string, pattern: "^[A-Z0-9]{2,4}$" }   # "S10" at one tenant, "20" at another
+      description:  { type: string }                               # the tenant's own label
       balance:      { type: decimal, scale: 2 }      # serialized as "1234.56"
       available:    { type: decimal, scale: 2 }
 
@@ -374,8 +381,8 @@ This app must feel like a real 2004-era core system:
       positioned div (not a native dialog).
 - [x] **Login:** username and password plus a legal-warning banner. A footer reads
       "Ironbridge Teller v7.2.3 — TRAINING REGION — synthetic data".
-- [x] **Seed data:** deterministic (Faker seed 7), 500 members. Share suffixes S00 Regular Share,
-      S01 Share Draft, S10 Holiday Club, S50 Money Market, plus loans. Balances are log-normal.
+- [x] **Seed data:** deterministic, 500 members per tenant, a separate seed for each (Lantern Bay 7,
+      Copperhill 31). Share codes and descriptions are per tenant (see §1), plus loans. Balances are log-normal.
       Transaction history uses ACH and POS descriptors. SSN and DOB are masked on screen.
       One member carries the injection note.
 - [x] **Screens:**
@@ -394,9 +401,12 @@ This app must feel like a real 2004-era core system:
   - `role=inquiry_only`
   - *(added: `maintenance=on`, so the app profile's `maintenance_banner` state has a trigger)*
 - [x] **Tenant B config:** labels, theme, nav order, version 7.4, and a Select Branch interstitial.
-- [x] `make bank` starts both tenants.
+- [x] **Per-tenant data and credentials** (revision): own seeds, member numbering, share types, operator
+      IDs and passwords; one demo member pinned per tenant; a cross-tenant not-found test.
+- [x] `make bank` starts both tenants. Missing passwords are generated into `.env`, so a fresh clone
+      needs no setup.
 - **Done when:** Playwright smoke tests (scripted, no LLM) walk both flows on both tenants, and every
-  fault is reproducible by a test. *(Done: `tests/mock_bank/`, 64 tests.)*
+  fault is reproducible by a test. *(Done: `tests/mock_bank/`.)*
 
 ### P2: Schema, policy, redaction, evidence writer (pure library)
 - [ ] Pydantic models from §3, YAML load and dump with key order preserved, the canonical content hash,
@@ -535,7 +545,7 @@ This app must feel like a real 2004-era core system:
 | 10 | Replay with unknown modal → escalate → operator takeover on the live session → resume → success; proposed patch | live-session handoff end to end |
 | 11 | Replay post with session expiry after commit → OUTCOME_UNCERTAIN, no retry | commit safety |
 | 12 | Prompt-injection drill → network guard blocks | allowlist enforcement |
-| 13 | Tenant B: base fails → adapt → overlay → success | cross-tenant reuse |
+| 13 | Tenant B: base fails → adapt → overlay → success, each tenant replaying with its own member (10482 at Lantern Bay, 2210236 at Copperhill); then Lantern Bay's member replayed at Copperhill → MEMBER_NOT_FOUND | cross-tenant reuse; data never crosses tenants |
 | 14 | Agent invokes the capability through the catalog (success plus not-found) | agent-facing interface |
 | 15 | Replay ×20 stability report (optional, cheap) | determinism |
 

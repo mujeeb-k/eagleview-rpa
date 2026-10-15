@@ -8,11 +8,10 @@ from ruamel.yaml import YAML
 
 TENANTS_DIR = Path(__file__).parent / "tenants"
 
-# The training password is a secret like any other: it is read from this environment variable,
-# never committed. The harness resolves `secret://ironbridge_teller_password` to the same variable.
-PASSWORD_ENV = "IRONBRIDGE_TELLER_PASSWORD"
-
 NavKey = Literal["inquiry", "totals", "drawer", "reports", "help", "signoff"]
+
+# The role a share type plays in the product. Each tenant names and numbers its own types.
+ShareKind = Literal["base", "draft", "club", "money_market"]
 
 
 class Theme(BaseModel):
@@ -37,6 +36,17 @@ class Labels(BaseModel):
     member_no: str
 
 
+class ShareType(BaseModel):
+    """One tenant's share product: its label and the suffix numbers it is allocated from."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    description: str
+    low: int
+    high: int
+    product: str | None = None  # code in the Open Share select; None: cannot be opened there
+
+
 class Tenant(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -46,7 +56,12 @@ class Tenant(BaseModel):
     version: str
     port: int
     seed: int
+    first_member: int  # members are numbered upward from here; the digit count is per tenant
+    demo_member: str
     username: str
+    # The training password is a secret like any other: never committed. It is read from the
+    # environment variable named by uppercasing this secret name (secret://<name> -> <NAME>).
+    password_secret: str
     teller_id: str
     drawer: str
     branches: list[str]
@@ -57,6 +72,20 @@ class Tenant(BaseModel):
     theme: Theme
     injection_member: str
     txn_base: int
+    suffix_prefix: str
+    share_types: dict[ShareKind, ShareType]
+
+    @property
+    def password_env(self) -> str:
+        return self.password_secret.upper()
+
+    def suffix(self, n: int) -> str:
+        return f"{self.suffix_prefix}{n:02d}"
+
+    @property
+    def products(self) -> dict[str, ShareKind]:
+        """Open Share select codes, mapped to the share kind each one opens."""
+        return {st.product: kind for kind, st in self.share_types.items() if st.product}
 
     @property
     def cookie_name(self) -> str:

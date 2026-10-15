@@ -12,7 +12,7 @@ PAGES = ["/frames", "/banner", "/nav", "/home", "/inq", "/member", "/share/open"
 
 def _pages(bank: Bank) -> dict[str, str]:
     with bank.signed_on_client() as c:
-        c.post("/inq", data={"txtA": "10482", "txtB": ""})
+        c.post("/inq", data={"txtA": bank.demo, "txtB": ""})
         out = {p: c.get(p).text for p in PAGES}
         out["/signon"] = c.get("/signon").text
         return out
@@ -75,7 +75,7 @@ def test_copperhill_branch_interstitial_first_option_is_real(copperhill: Bank) -
     import httpx2 as httpx
 
     with httpx.Client(base_url=copperhill.url, follow_redirects=True) as c:
-        r = c.post("/signon", data={"f1": "teller01", "f2": copperhill.password})
+        r = c.post("/signon", data={"f1": copperhill.tenant.username, "f2": copperhill.password})
         assert r.url.path == "/branch"
         assert "Select Branch" in r.text
         options = re.findall(r'<option value="([^"]+)">', r.text)
@@ -89,7 +89,7 @@ def test_wrong_password_rejected(bank: Bank) -> None:
     import httpx2 as httpx
 
     with httpx.Client(base_url=bank.url, follow_redirects=True) as c:
-        r = c.post("/signon", data={"f1": "teller01", "f2": "not-the-password"})
+        r = c.post("/signon", data={"f1": bank.tenant.username, "f2": "not-the-password"})
         assert "INVALID OPERATOR ID OR PASSWORD" in r.text
         assert "SESSION EXPIRED" in c.get("/home").text
 
@@ -97,3 +97,18 @@ def test_wrong_password_rejected(bank: Bank) -> None:
 @pytest.mark.parametrize("path", ["/__admin/faults"])
 def test_admin_is_not_linked_from_the_ui(lantern: Bank, path: str) -> None:
     assert all(path not in html for html in _pages(lantern).values())
+
+
+def test_credentials_are_per_tenant(lantern: Bank, copperhill: Bank) -> None:
+    import httpx2 as httpx
+
+    assert lantern.password != copperhill.password
+    assert lantern.tenant.password_secret != copperhill.tenant.password_secret
+    assert lantern.tenant.username != copperhill.tenant.username
+    with httpx.Client(base_url=copperhill.url, follow_redirects=True) as c:
+        for user, pwd in [
+            (lantern.tenant.username, lantern.password),
+            (copperhill.tenant.username, lantern.password),
+        ]:
+            r = c.post("/signon", data={"f1": user, "f2": pwd})
+            assert "INVALID OPERATOR ID OR PASSWORD" in r.text

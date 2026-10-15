@@ -90,11 +90,11 @@ and the PII scan can't read it, so the synthetic-only rule is what protects it. 
 not part of Eagleview, so Eagleview never imports it and reaches it only over HTTP and a browser.
 Tests import it through pytest's `pythonpath`; Faker is a dev dependency because only the bank uses it.
 
-**The training password is a secret too.** The bank accepts whatever `IRONBRIDGE_TELLER_PASSWORD`
+**The training password is a secret too.** *(Superseded below: one password per tenant.)* The bank accepts whatever `IRONBRIDGE_TELLER_PASSWORD`
 holds; `make bank` refuses to start without it. Convention for P4: `secret://<name>` resolves to the
 environment variable `<NAME>` uppercased. Tests generate a random password per session.
 
-**One dataset, seed 7, on both tenants.** The tenants are two credit unions loaded with the same
+**One dataset, seed 7, on both tenants.** *(Superseded below: separate data per tenant.)* The tenants are two credit unions loaded with the same
 training data, so scenario 13 can replay member 10482 on both. The training region runs on a frozen
 business date (2026-10-15) and DOB is drawn from the seeded RNG, not Faker's today-relative
 `date_of_birth`. Member 10482 is pinned to S00, S01 and S10, and a golden test fails if a Faker upgrade
@@ -122,3 +122,21 @@ Form bodies are parsed by hand rather than adding `python-multipart`.
 Playwright still calls it "visible". A step whose `expect` is `text_present` would pass straight
 through `unknown_modal_on=/member`. So P3's `text_boxes()` and visibility predicates must hit-test:
 text counts as visible only if it is the topmost element at its own centre, through frames.
+
+## 2026-10-15 — P1 revision: tenants share the contract, never data or credentials
+
+**Each tenant has its own members, share types and credentials.** Real credit unions never share
+members or logins, and identical data would hide a run routed to the wrong tenant: it would return
+a plausible answer. Lantern Bay uses seed 7 and 5-digit numbers (demo member 10482); Copperhill uses
+seed 31 and 7-digit numbers (demo member 2210236). A test pins each demo member's name and balances.
+
+**Share types are tenant config.** Each tenant names its products and numbers its suffixes its own
+way ("S10 Holiday Club" at Lantern Bay, "20 Christmas Club" at Copperhill). The capability contract
+stays shared, so its output schema must not encode one tenant's codes: the suffix pattern is
+`^[A-Z0-9]{2,4}$` and the description is whatever label the tenant shows.
+
+**One secret per tenant.** `secret://lantern_bay_teller_password` and
+`secret://copperhill_teller_password` resolve to `LANTERN_BAY_TELLER_PASSWORD` and
+`COPPERHILL_TELLER_PASSWORD`; the operator IDs differ too. When either variable is missing,
+`make bank` generates a random value, appends it to the gitignored `.env`, and names the variable
+without printing it. A fresh clone needs no setup.

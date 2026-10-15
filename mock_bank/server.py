@@ -33,9 +33,9 @@ def _bind(port: int) -> socket.socket:
     return sock
 
 
-async def serve(tenants: list[Tenant], password: str) -> None:
-    """Serve every tenant on its configured port until interrupted."""
-    pairs = [(_server(t, password), _bind(t.port)) for t in tenants]
+async def serve(tenants: list[Tenant], passwords: dict[str, str]) -> None:
+    """Serve every tenant on its configured port until interrupted. Passwords are keyed by slug."""
+    pairs = [(_server(t, passwords[t.slug]), _bind(t.port)) for t in tenants]
     for t in tenants:
         print(f"Ironbridge Teller v{t.version} ({t.name}): http://{HOST}:{t.port}/", flush=True)
     await asyncio.gather(*(srv.serve(sockets=[sock]) for srv, sock in pairs))
@@ -44,8 +44,8 @@ async def serve(tenants: list[Tenant], password: str) -> None:
 class BankThread:
     """Every tenant on an ephemeral port, on a daemon thread. Used by tests and the harness."""
 
-    def __init__(self, tenants: list[Tenant], password: str) -> None:
-        self._pairs = [(_server(t, password), _bind(0)) for t in tenants]
+    def __init__(self, tenants: list[Tenant], passwords: dict[str, str]) -> None:
+        self._pairs = [(_server(t, passwords[t.slug]), _bind(0)) for t in tenants]
         self.running = {
             t.slug: Running(t, f"http://{HOST}:{sock.getsockname()[1]}")
             for t, (_, sock) in zip(tenants, self._pairs, strict=True)

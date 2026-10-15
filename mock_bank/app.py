@@ -15,16 +15,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from mock_bank.config import Tenant
+from mock_bank.config import ShareKind, Tenant
 from mock_bank.faults import Faults, FaultSpecError
-from mock_bank.seed import (
-    BUSINESS_DATE,
-    DIVIDEND_FREQUENCIES,
-    PRODUCTS,
-    Member,
-    Share,
-    seed_members,
-)
+from mock_bank.seed import BUSINESS_DATE, DIVIDEND_FREQUENCIES, Member, Share, generate
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 IDLE_TIMEOUT_S = 15 * 60
@@ -88,7 +81,7 @@ class Bank:
     next_error_ref: int = field(init=False)
 
     def __post_init__(self) -> None:
-        self.pristine = seed_members(self.tenant.seed, self.tenant.injection_member)
+        self.pristine = generate(self.tenant)
         self.reset()
 
     def reset(self) -> None:
@@ -290,12 +283,13 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
 
     def validate(m: Member, form: dict[str, str]) -> list[str]:
         errors: list[str] = []
-        product = form.get("f3", "")
-        if product not in PRODUCTS:
+        kind = tenant.products.get(form.get("f3", ""))
+        if kind is None:
             errors.append("IBT-2201 SHARE TYPE IS REQUIRED")
-        elif product == "140" and any(10 <= int(sh.suffix[1:]) <= 19 for sh in m.shares):
-            errors.append("IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE")
-        elif next_suffix(m, product) is None:
+        elif kind == "club" and any(sh.kind == "club" for sh in m.shares):
+            club = tenant.share_types["club"].description.upper()
+            errors.append(f"IBT-2210 MEMBER ALREADY HAS A {club} SHARE")
+        elif next_suffix(tenant, m, kind) is None:
             errors.append("IBT-2215 NO SUFFIX AVAILABLE FOR THIS SHARE TYPE")
         if len(form.get("f4", "")) > NICKNAME_MAX:
             errors.append(f"IBT-2214 NICKNAME EXCEEDS {NICKNAME_MAX} CHARACTERS")
@@ -310,7 +304,9 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
             m=m,
             form=form,
             errors=errors,
-            products=PRODUCTS,
+            products={
+                code: tenant.share_types[k].description for code, k in tenant.products.items()
+            },
             frequencies=DIVIDEND_FREQUENCIES,
         )
 
@@ -344,8 +340,9 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
         m = current_member(s)
         if m is None or s.draft is None:
             return RedirectResponse("/inq", status_code=303)
-        product = PRODUCTS[s.draft.product][0]
-        suffix = next_suffix(m, s.draft.product)
+        kind = tenant.products[s.draft.product]
+        product = tenant.share_types[kind].description
+        suffix = next_suffix(tenant, m, kind)
         return render(request, "review.html", m=m, d=s.draft, product=product, suffix=suffix)
 
     @app.post("/share/post", response_model=None)
@@ -358,15 +355,16 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
             return denied(request, "SHRPST")
         m = current_member(s)
         form = await read_form(request)
-        product = form.get("f3", "")
-        suffix = next_suffix(m, product) if m is not None and product in PRODUCTS else None
-        if m is None or suffix is None:
+        kind = tenant.products.get(form.get("f3", ""))
+        suffix = next_suffix(tenant, m, kind) if m is not None and kind is not None else None
+        if m is None or kind is None or suffix is None:
             ref = f"IBT-0500-{bank.next_error_ref:05d}"
             bank.next_error_ref += 1
             return render(request, "error.html", status=500, ref=ref)
         share = Share(
+            kind=kind,
             suffix=suffix,
-            description=PRODUCTS[product][0],
+            description=tenant.share_types[kind].description,
             balance=Decimal("0.00"),
             available=Decimal("0.00"),
             opened=BUSINESS_DATE,
@@ -429,10 +427,11 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
     return app
 
 
-def next_suffix(m: Member, product: str) -> str | None:
-    _, low, high = PRODUCTS[product]
+def next_suffix(tenant: Tenant, m: Member, kind: ShareKind) -> str | None:
+    share_type = tenant.share_types[kind]
     taken = {sh.suffix for sh in m.shares}
-    return next((f"S{n:02d}" for n in range(low, high + 1) if f"S{n:02d}" not in taken), None)
+    free = (tenant.suffix(n) for n in range(share_type.low, share_type.high + 1))
+    return next((sfx for sfx in free if sfx not in taken), None)
 
 
 GO_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="36" height="20">
