@@ -1,0 +1,15 @@
+# FIXTURE for tests only: transcribed from PLAN.md §3.3, with targets in full form.
+applies_to: { profile: ironbridge-teller, capabilities: ["*"] }
+tenant: copperhill
+label_aliases:            # consumed by anchor/text/a11y strategies
+  "Member #": ["Acct Holder No."]
+  "Member Inquiry": ["Member Lookup"]
+global_states_add:
+  - id: select_branch_interstitial
+    detect: { text_present: { text: "Select Branch" } }
+    recover:
+      type: select_then_click
+      select: { target: { locators: [ { strategy: anchor, anchor_text: ["Branch"], relation: right_of, control: select } ] }, option_index: 0 }
+      click: { locators: [ { strategy: text, text: "Continue" } ] }
+step_patches:             # keyed by semantic step id
+  submit_search: { target: { locators: { prepend: [ { strategy: text, text: "Search" } ] } } }

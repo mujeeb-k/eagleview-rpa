@@ -1,0 +1,45 @@
+# Default safety policy for Ironbridge Teller tenants. Enforced in two independent layers:
+# the pre-action check in Surface.act, and the network guard on every browser request.
+schema_version: "1.0"
+id: default-teller
+
+# Per tenant. The mock bank binds 127.0.0.1, and `localhost` is a different origin.
+allowed_origins:
+  lantern-bay: ["http://127.0.0.1:8601"]
+  copperhill: ["http://127.0.0.1:8602"]
+
+routes:
+  - { pattern: "/__admin/**", effect: deny }          # fault injection: harness only
+  - { pattern: "/share/post", methods: [POST], effect: irreversible }
+
+action_types:
+  allow: [click, double_click, move, scroll, type, key, fill, select, navigate, screenshot, zoom, wait]
+  deny: [drag, upload, download, right_click]
+
+# Keys and chords outside this list are refused. Names are xdotool-style, compared case-insensitively.
+allowed_keys:
+  [Return, Enter, Tab, shift+Tab, Escape, BackSpace, Delete, Up, Down, Left, Right,
+   Home, End, Page_Up, Page_Down, space, ctrl+a]
+
+# Whole words, case-insensitive, matched against the grounded target's label.
+# "Post" matches; "Posted" and "Closed Accounts" do not.
+irreversible_label_patterns: [post, commit, transfer, close, delete, approve]
+
+irreversible_handling:
+  discovery: escalate          # block, and ask a human for approval
+  replay: require_approval     # gate on an approval token bound to (run_id, step_id)
+
+# Applied by the redactor to every string written. A group named `v` limits the replacement to
+# that group, so the label survives and the value does not.
+sensitivity_patterns:
+  - { name: ssn, regex: "\\b\\d{3}-\\d{2}-\\d{4}\\b" }
+  - { name: card, regex: "\\b\\d(?:[ -]?\\d){12,18}\\b", luhn: true }
+  - { name: email, regex: "[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}" }
+  - { name: phone, regex: "(?:\\(\\d{3}\\)\\s?|\\b\\d{3}[-.])\\d{3}[-.]\\d{4}\\b" }
+  # Labelled values only: a bare date or digit run is everywhere on a teller screen.
+  - name: dob
+    regex: "\\b(?:DOB|date of birth|birth ?date)\\s*:?\\s*(?P<v>\\d{1,2}/\\d{1,2}/\\d{4})"
+    ignore_case: true
+  - name: account_number
+    regex: "\\b(?:acct|account|member)(?: holder)?\\s*(?:no\\.?|number|#)\\s*:?\\s*(?P<v>\\d[\\d-]{3,16}\\d)"
+    ignore_case: true

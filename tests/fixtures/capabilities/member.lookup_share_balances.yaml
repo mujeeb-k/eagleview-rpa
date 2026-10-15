@@ -1,0 +1,103 @@
+# FIXTURE for tests only: transcribed by hand from PLAN.md §3.2, with the `{ ... }` placeholder on
+# submit_search filled in. Artifacts under capabilities/ come from discovery, never from here.
+schema_version: "1.0"
+id: member.lookup_share_balances
+version: 1.0.0                     # semver: breaking input/output change = major
+title: Look up a member's share account balances
+description: >
+  Opens Member Inquiry, searches by member number, and returns the member's display name and every
+  share account with its current balance. Read-only.
+status: verified                   # draft | verified | approved | deprecated ; unattended use requires approved
+app: { profile: ironbridge-teller, versions: ">=7.2,<8.0" }
+risk: read_only                    # max over steps: read_only | write_staged | irreversible
+requires_session: true
+
+inputs:
+  member_id:
+    type: string
+    pattern: "^[0-9]{4,8}$"        # covers every tenant: Lantern Bay 5 digits, Copperhill 7
+    sensitivity: identifier        # none | identifier | pii | secret
+    description: Credit union member number.
+    example: "10482"               # synthetic; examples are illustrative, never tenant-specific rules
+
+outputs:
+  member_name:   { type: string, sensitivity: pii, required: true }
+  share_accounts:
+    type: array
+    sensitivity: pii
+    items:
+      suffix:       { type: string, pattern: "^[A-Z0-9]{2,4}$" }   # "S10" at one tenant, "20" at another
+      description:  { type: string }                               # the tenant's own label
+      balance:      { type: decimal, scale: 2 }      # serialized as "1234.56"
+      available:    { type: decimal, scale: 2 }
+
+outcomes:                          # expected business outcomes, returned not raised
+  - code: MEMBER_NOT_FOUND
+    kind: business
+    detect: { text_matches: { frame: main, pattern: "(?i)no member(s)? found" } }
+    message: No member exists with that number.
+    source: probed_verified        # authored | llm_proposed | probed | probed_verified
+
+steps:
+  - id: open_member_inquiry
+    intent: Open Member Inquiry from the left navigation menu.
+    action: { type: click }
+    target:
+      description: "'Member Inquiry' link in the navigation frame"
+      frame: ["nav"]
+      locators:                    # ranked; replay takes the first UNIQUE match
+        - { strategy: a11y, role: link, name: "Member Inquiry" }
+        - { strategy: text, text: "Member Inquiry", exact: true }
+        - { strategy: css, selector: "td.mnu a[href*='inq']" }
+        - { strategy: point, x: 84, y: 212, bound_to_fingerprint: "ironbridge-7.2/lantern-bay" }
+    risk: read
+    idempotent: true
+    expect: { text_present: { frame: main, text: "Member Search" } }
+    timeout_ms: 8000
+
+  - id: enter_member_id
+    intent: Type the member number into the search field.
+    action: { type: fill, value: "{{ inputs.member_id }}" }
+    target:
+      description: "Text input to the right of the 'Member #' label"
+      frame: ["main"]
+      locators:
+        - { strategy: anchor, anchor_text: ["Member #"], relation: right_of, control: textbox }
+        - { strategy: css, selector: "input[name='txtA']" }
+    risk: read
+    idempotent: true
+    expect: { field_value: { target: self, equals: "{{ inputs.member_id }}" } }
+
+  - id: submit_search
+    intent: Click the GO button next to the member number.
+    action: { type: click }
+    target:
+      description: "'GO' image button: no accessible name, so anchor + css only"
+      frame: ["main"]
+      locators:
+        - { strategy: anchor, anchor_text: ["Member #"], relation: right_of, control: image }
+        - { strategy: css, selector: "img[src*='go']" }
+      fragile: false               # 2 strategies verified unique
+    expect: { any: [ { text_present: { frame: main, text: "Share Accounts" } } ] }   # outcomes are checked in parallel
+
+  - id: read_balances
+    action: { type: extract }
+    extract:
+      member_name: { target: { locators: [ { strategy: anchor, anchor_text: ["Name:"], relation: right_of, control: text } ] } }
+      share_accounts:
+        table:
+          anchor_text: "Share Accounts"          # find the table under this caption
+          header_row: true
+          columns: { suffix: "Sfx", description: "Description", balance: "Balance", available: "Available" }
+          parse: { balance: money_us, available: money_us }
+
+success:
+  all:
+    - { text_present: { frame: main, text: "Share Accounts" } }
+    - { output_present: share_accounts }
+
+provenance:
+  discovered_by: { run_id: "r_fixture_discovery", model: claude-sonnet-5-5, at: "2026-10-15T12:00:00Z" }
+  verified_by: [ { run_id: "r_fixture_verify", at: "2026-10-15T12:05:00Z" } ]
+  approved_by: null
+  content_hash: sha256:5fd330c28b6568b9f11a7e65d1d345252e5c142551d922c5b05da3147b590739

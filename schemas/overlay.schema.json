@@ -1,0 +1,1254 @@
+{
+  "$defs": {
+    "A11yLocator": {
+      "additionalProperties": false,
+      "description": "Accessibility role plus accessible name.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "minLength": 1,
+          "title": "Role",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "a11y",
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "role",
+        "name"
+      ],
+      "title": "A11yLocator",
+      "type": "object"
+    },
+    "AllOf": {
+      "additionalProperties": false,
+      "properties": {
+        "all": {
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextPresent"
+              },
+              {
+                "$ref": "#/$defs/TextMatches"
+              },
+              {
+                "$ref": "#/$defs/ElementPresent"
+              },
+              {
+                "$ref": "#/$defs/FieldValue"
+              },
+              {
+                "$ref": "#/$defs/UrlMatches"
+              },
+              {
+                "$ref": "#/$defs/TitleMatches"
+              },
+              {
+                "$ref": "#/$defs/OutputPresent"
+              },
+              {
+                "$ref": "#/$defs/AllOf"
+              },
+              {
+                "$ref": "#/$defs/AnyOf"
+              },
+              {
+                "$ref": "#/$defs/Not"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "All",
+          "type": "array"
+        }
+      },
+      "required": [
+        "all"
+      ],
+      "title": "AllOf",
+      "type": "object"
+    },
+    "AnchorLocator": {
+      "additionalProperties": false,
+      "description": "A control in a geometric relation to visible text. Works wherever text has geometry: DOM\nranges on the web, OCR or UI Automation on desktop. `anchor_text` lists aliases.",
+      "properties": {
+        "anchor_text": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Anchor Text",
+          "type": "array"
+        },
+        "control": {
+          "enum": [
+            "textbox",
+            "button",
+            "link",
+            "select",
+            "checkbox",
+            "radio",
+            "image",
+            "text",
+            "any"
+          ],
+          "title": "Control",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "right_of",
+            "left_of",
+            "below",
+            "above"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "anchor",
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "anchor_text",
+        "relation",
+        "control"
+      ],
+      "title": "AnchorLocator",
+      "type": "object"
+    },
+    "AnyOf": {
+      "additionalProperties": false,
+      "properties": {
+        "any": {
+          "items": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextPresent"
+              },
+              {
+                "$ref": "#/$defs/TextMatches"
+              },
+              {
+                "$ref": "#/$defs/ElementPresent"
+              },
+              {
+                "$ref": "#/$defs/FieldValue"
+              },
+              {
+                "$ref": "#/$defs/UrlMatches"
+              },
+              {
+                "$ref": "#/$defs/TitleMatches"
+              },
+              {
+                "$ref": "#/$defs/OutputPresent"
+              },
+              {
+                "$ref": "#/$defs/AllOf"
+              },
+              {
+                "$ref": "#/$defs/AnyOf"
+              },
+              {
+                "$ref": "#/$defs/Not"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Any",
+          "type": "array"
+        }
+      },
+      "required": [
+        "any"
+      ],
+      "title": "AnyOf",
+      "type": "object"
+    },
+    "AppliesTo": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Capabilities",
+          "type": "array"
+        },
+        "profile": {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "title": "Profile",
+          "type": "string"
+        },
+        "versions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Versions"
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "title": "AppliesTo",
+      "type": "object"
+    },
+    "CssLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "selector": {
+          "minLength": 1,
+          "title": "Selector",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "css",
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "selector"
+      ],
+      "title": "CssLocator",
+      "type": "object"
+    },
+    "Dismiss": {
+      "additionalProperties": false,
+      "properties": {
+        "click": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "type": {
+          "const": "dismiss",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "click"
+      ],
+      "title": "Dismiss",
+      "type": "object"
+    },
+    "ElementArgs": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "ElementArgs",
+      "type": "object"
+    },
+    "ElementPresent": {
+      "additionalProperties": false,
+      "properties": {
+        "element_present": {
+          "$ref": "#/$defs/ElementArgs"
+        }
+      },
+      "required": [
+        "element_present"
+      ],
+      "title": "ElementPresent",
+      "type": "object"
+    },
+    "FailSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FailureCategory"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "category"
+      ],
+      "title": "FailSpec",
+      "type": "object"
+    },
+    "FailureCategory": {
+      "description": "The closed taxonomy. Nothing else crosses the replay boundary.",
+      "enum": [
+        "STATE_TIMEOUT",
+        "LOCATOR_NOT_FOUND",
+        "LOCATOR_AMBIGUOUS",
+        "UNKNOWN_STATE",
+        "APP_ERROR",
+        "APP_UNAVAILABLE",
+        "SESSION_LOST",
+        "OUTCOME_UNCERTAIN",
+        "RECOVERY_EXHAUSTED",
+        "OUTPUT_INVALID",
+        "POLICY_BLOCKED",
+        "APP_VERSION_UNSUPPORTED",
+        "HANDOFF_STATE_MISMATCH",
+        "ABORTED_BY_OPERATOR"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "FieldValue": {
+      "additionalProperties": false,
+      "properties": {
+        "field_value": {
+          "$ref": "#/$defs/FieldValueArgs"
+        }
+      },
+      "required": [
+        "field_value"
+      ],
+      "title": "FieldValue",
+      "type": "object"
+    },
+    "FieldValueArgs": {
+      "additionalProperties": false,
+      "properties": {
+        "equals": {
+          "title": "Equals",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "const": "self",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/TargetSpec"
+            }
+          ],
+          "title": "Target"
+        }
+      },
+      "required": [
+        "target",
+        "equals"
+      ],
+      "title": "FieldValueArgs",
+      "type": "object"
+    },
+    "GlobalState": {
+      "additionalProperties": false,
+      "description": "A state checked in every settle loop, in list order. It either recovers (within a budget,\nfalling back to `fail` when the handler is exhausted or not allowed), fails, or is a business\noutcome.",
+      "properties": {
+        "detect": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TextPresent"
+            },
+            {
+              "$ref": "#/$defs/TextMatches"
+            },
+            {
+              "$ref": "#/$defs/ElementPresent"
+            },
+            {
+              "$ref": "#/$defs/FieldValue"
+            },
+            {
+              "$ref": "#/$defs/UrlMatches"
+            },
+            {
+              "$ref": "#/$defs/TitleMatches"
+            },
+            {
+              "$ref": "#/$defs/OutputPresent"
+            },
+            {
+              "$ref": "#/$defs/AllOf"
+            },
+            {
+              "$ref": "#/$defs/AnyOf"
+            },
+            {
+              "$ref": "#/$defs/Not"
+            }
+          ],
+          "title": "Detect"
+        },
+        "fail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "max_per_run": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Per Run"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OutcomeSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "recover": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "dismiss": "#/$defs/Dismiss",
+                  "relogin_and_restart": "#/$defs/ReloginAndRestart",
+                  "retry_step_if_idempotent": "#/$defs/RetryStepIfIdempotent",
+                  "select_then_click": "#/$defs/SelectThenClick"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ReloginAndRestart"
+                },
+                {
+                  "$ref": "#/$defs/RetryStepIfIdempotent"
+                },
+                {
+                  "$ref": "#/$defs/Dismiss"
+                },
+                {
+                  "$ref": "#/$defs/SelectThenClick"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recover"
+        },
+        "source": {
+          "$ref": "#/$defs/Source",
+          "default": "authored"
+        }
+      },
+      "required": [
+        "id",
+        "detect"
+      ],
+      "title": "GlobalState",
+      "type": "object"
+    },
+    "LocatorListPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "append": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "a11y": "#/$defs/A11yLocator",
+                "anchor": "#/$defs/AnchorLocator",
+                "css": "#/$defs/CssLocator",
+                "point": "#/$defs/PointLocator",
+                "text": "#/$defs/TextLocator",
+                "xpath": "#/$defs/XPathLocator"
+              },
+              "propertyName": "strategy"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/A11yLocator"
+              },
+              {
+                "$ref": "#/$defs/AnchorLocator"
+              },
+              {
+                "$ref": "#/$defs/TextLocator"
+              },
+              {
+                "$ref": "#/$defs/CssLocator"
+              },
+              {
+                "$ref": "#/$defs/XPathLocator"
+              },
+              {
+                "$ref": "#/$defs/PointLocator"
+              }
+            ]
+          },
+          "title": "Append",
+          "type": "array"
+        },
+        "prepend": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "a11y": "#/$defs/A11yLocator",
+                "anchor": "#/$defs/AnchorLocator",
+                "css": "#/$defs/CssLocator",
+                "point": "#/$defs/PointLocator",
+                "text": "#/$defs/TextLocator",
+                "xpath": "#/$defs/XPathLocator"
+              },
+              "propertyName": "strategy"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/A11yLocator"
+              },
+              {
+                "$ref": "#/$defs/AnchorLocator"
+              },
+              {
+                "$ref": "#/$defs/TextLocator"
+              },
+              {
+                "$ref": "#/$defs/CssLocator"
+              },
+              {
+                "$ref": "#/$defs/XPathLocator"
+              },
+              {
+                "$ref": "#/$defs/PointLocator"
+              }
+            ]
+          },
+          "title": "Prepend",
+          "type": "array"
+        },
+        "replace": {
+          "anyOf": [
+            {
+              "items": {
+                "discriminator": {
+                  "mapping": {
+                    "a11y": "#/$defs/A11yLocator",
+                    "anchor": "#/$defs/AnchorLocator",
+                    "css": "#/$defs/CssLocator",
+                    "point": "#/$defs/PointLocator",
+                    "text": "#/$defs/TextLocator",
+                    "xpath": "#/$defs/XPathLocator"
+                  },
+                  "propertyName": "strategy"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/A11yLocator"
+                  },
+                  {
+                    "$ref": "#/$defs/AnchorLocator"
+                  },
+                  {
+                    "$ref": "#/$defs/TextLocator"
+                  },
+                  {
+                    "$ref": "#/$defs/CssLocator"
+                  },
+                  {
+                    "$ref": "#/$defs/XPathLocator"
+                  },
+                  {
+                    "$ref": "#/$defs/PointLocator"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replace"
+        }
+      },
+      "title": "LocatorListPatch",
+      "type": "object"
+    },
+    "Not": {
+      "additionalProperties": false,
+      "properties": {
+        "not": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TextPresent"
+            },
+            {
+              "$ref": "#/$defs/TextMatches"
+            },
+            {
+              "$ref": "#/$defs/ElementPresent"
+            },
+            {
+              "$ref": "#/$defs/FieldValue"
+            },
+            {
+              "$ref": "#/$defs/UrlMatches"
+            },
+            {
+              "$ref": "#/$defs/TitleMatches"
+            },
+            {
+              "$ref": "#/$defs/OutputPresent"
+            },
+            {
+              "$ref": "#/$defs/AllOf"
+            },
+            {
+              "$ref": "#/$defs/AnyOf"
+            },
+            {
+              "$ref": "#/$defs/Not"
+            }
+          ],
+          "title": "Not"
+        }
+      },
+      "required": [
+        "not"
+      ],
+      "title": "Not",
+      "type": "object"
+    },
+    "OutcomeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "OutcomeSpec",
+      "type": "object"
+    },
+    "OutputPresent": {
+      "additionalProperties": false,
+      "properties": {
+        "output_present": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Output Present",
+          "type": "string"
+        }
+      },
+      "required": [
+        "output_present"
+      ],
+      "title": "OutputPresent",
+      "type": "object"
+    },
+    "PatternArgs": {
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "title": "PatternArgs",
+      "type": "object"
+    },
+    "PatternInFrameArgs": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Frame",
+          "type": "array"
+        },
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "title": "PatternInFrameArgs",
+      "type": "object"
+    },
+    "PointLocator": {
+      "additionalProperties": false,
+      "description": "Last resort: a pixel. Valid only while the live app fingerprint equals the one recorded.",
+      "properties": {
+        "bound_to_fingerprint": {
+          "minLength": 1,
+          "title": "Bound To Fingerprint",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "point",
+          "title": "Strategy",
+          "type": "string"
+        },
+        "x": {
+          "minimum": 0,
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "minimum": 0,
+          "title": "Y",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "strategy",
+        "x",
+        "y",
+        "bound_to_fingerprint"
+      ],
+      "title": "PointLocator",
+      "type": "object"
+    },
+    "ReloginAndRestart": {
+      "additionalProperties": false,
+      "description": "Sign on again and restart the flow. Allowed only before an irreversible commit.",
+      "properties": {
+        "type": {
+          "const": "relogin_and_restart",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ReloginAndRestart",
+      "type": "object"
+    },
+    "RetryStepIfIdempotent": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "retry_step_if_idempotent",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "RetryStepIfIdempotent",
+      "type": "object"
+    },
+    "SelectChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "option": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Option"
+        },
+        "option_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Option Index"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "SelectChoice",
+      "type": "object"
+    },
+    "SelectThenClick": {
+      "additionalProperties": false,
+      "properties": {
+        "click": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "select": {
+          "$ref": "#/$defs/SelectChoice"
+        },
+        "type": {
+          "const": "select_then_click",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "select",
+        "click"
+      ],
+      "title": "SelectThenClick",
+      "type": "object"
+    },
+    "Source": {
+      "description": "Who contributed an element. Anything an LLM proposed stays `llm_proposed` until a\ndeterministic replay verifies it; humans' takeover patches start as `human_demonstrated`.",
+      "enum": [
+        "authored",
+        "llm_proposed",
+        "human_demonstrated",
+        "probed",
+        "probed_verified"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "StepPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "expect": {
+          "anyOf": [
+            {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/TextPresent"
+                },
+                {
+                  "$ref": "#/$defs/TextMatches"
+                },
+                {
+                  "$ref": "#/$defs/ElementPresent"
+                },
+                {
+                  "$ref": "#/$defs/FieldValue"
+                },
+                {
+                  "$ref": "#/$defs/UrlMatches"
+                },
+                {
+                  "$ref": "#/$defs/TitleMatches"
+                },
+                {
+                  "$ref": "#/$defs/OutputPresent"
+                },
+                {
+                  "$ref": "#/$defs/AllOf"
+                },
+                {
+                  "$ref": "#/$defs/AnyOf"
+                },
+                {
+                  "$ref": "#/$defs/Not"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expect"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TargetPatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeout_ms": {
+          "anyOf": [
+            {
+              "maximum": 600000,
+              "minimum": 100,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Ms"
+        }
+      },
+      "title": "StepPatch",
+      "type": "object"
+    },
+    "TargetPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "frame": {
+          "anyOf": [
+            {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Frame"
+        },
+        "locators": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocatorListPatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "TargetPatch",
+      "type": "object"
+    },
+    "TargetSpec": {
+      "additionalProperties": false,
+      "description": "What a step acts on: ranked locators, where replay takes the first unique match.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "fragile": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fragile"
+        },
+        "frame": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Frame",
+          "type": "array"
+        },
+        "locators": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "a11y": "#/$defs/A11yLocator",
+                "anchor": "#/$defs/AnchorLocator",
+                "css": "#/$defs/CssLocator",
+                "point": "#/$defs/PointLocator",
+                "text": "#/$defs/TextLocator",
+                "xpath": "#/$defs/XPathLocator"
+              },
+              "propertyName": "strategy"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/A11yLocator"
+              },
+              {
+                "$ref": "#/$defs/AnchorLocator"
+              },
+              {
+                "$ref": "#/$defs/TextLocator"
+              },
+              {
+                "$ref": "#/$defs/CssLocator"
+              },
+              {
+                "$ref": "#/$defs/XPathLocator"
+              },
+              {
+                "$ref": "#/$defs/PointLocator"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Locators",
+          "type": "array"
+        }
+      },
+      "required": [
+        "locators"
+      ],
+      "title": "TargetSpec",
+      "type": "object"
+    },
+    "TextArgs": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Frame",
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "TextArgs",
+      "type": "object"
+    },
+    "TextLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "exact": {
+          "default": true,
+          "title": "Exact",
+          "type": "boolean"
+        },
+        "strategy": {
+          "const": "text",
+          "title": "Strategy",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "text"
+      ],
+      "title": "TextLocator",
+      "type": "object"
+    },
+    "TextMatches": {
+      "additionalProperties": false,
+      "properties": {
+        "text_matches": {
+          "$ref": "#/$defs/PatternInFrameArgs"
+        }
+      },
+      "required": [
+        "text_matches"
+      ],
+      "title": "TextMatches",
+      "type": "object"
+    },
+    "TextPresent": {
+      "additionalProperties": false,
+      "properties": {
+        "text_present": {
+          "$ref": "#/$defs/TextArgs"
+        }
+      },
+      "required": [
+        "text_present"
+      ],
+      "title": "TextPresent",
+      "type": "object"
+    },
+    "TitleMatches": {
+      "additionalProperties": false,
+      "properties": {
+        "title_matches": {
+          "$ref": "#/$defs/PatternArgs"
+        }
+      },
+      "required": [
+        "title_matches"
+      ],
+      "title": "TitleMatches",
+      "type": "object"
+    },
+    "UrlMatches": {
+      "additionalProperties": false,
+      "description": "Web surfaces only: desktop apps have no URL.",
+      "properties": {
+        "url_matches": {
+          "$ref": "#/$defs/PatternArgs"
+        }
+      },
+      "required": [
+        "url_matches"
+      ],
+      "title": "UrlMatches",
+      "type": "object"
+    },
+    "XPathLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "strategy": {
+          "const": "xpath",
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strategy",
+        "expression"
+      ],
+      "title": "XPathLocator",
+      "type": "object"
+    }
+  },
+  "$id": "https://eagleview.local/schemas/overlay.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "applies_to": {
+      "$ref": "#/$defs/AppliesTo"
+    },
+    "global_states_add": {
+      "items": {
+        "$ref": "#/$defs/GlobalState"
+      },
+      "title": "Global States Add",
+      "type": "array"
+    },
+    "label_aliases": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Label Aliases",
+      "type": "object"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/Source",
+      "default": "authored"
+    },
+    "step_patches": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "$ref": "#/$defs/StepPatch"
+        }
+      },
+      "title": "Step Patches",
+      "type": "object"
+    },
+    "tenant": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tenant"
+    }
+  },
+  "required": [
+    "applies_to"
+  ],
+  "title": "Overlay",
+  "type": "object"
+}

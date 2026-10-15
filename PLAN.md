@@ -409,13 +409,14 @@ This app must feel like a real 2004-era core system:
   fault is reproducible by a test. *(Done: `tests/mock_bank/`.)*
 
 ### P2: Schema, policy, redaction, evidence writer (pure library)
-- [ ] Pydantic models from §3, YAML load and dump with key order preserved, the canonical content hash,
-      and JSON Schema export.
-- [ ] Policy engine with unit tests, including table tests over action × target × URL.
-- [ ] Redaction (typed, value-aware, pattern) plus property tests: generated PII never survives `writer`.
-- [ ] Evidence writer: `runs/<run_id>/run.jsonl`, `steps/NNNN_{before,after}.png` (redacted),
+- [x] Pydantic models from §3, YAML load and dump with key order preserved, the canonical content hash,
+      and JSON Schema export. *(`eagleview schema export` writes `schemas/`; a test fails if it is
+      stale. Unsupported `schema_version` majors are refused with a clear error.)*
+- [x] Policy engine with unit tests, including table tests over action × target × URL.
+- [x] Redaction (typed, value-aware, pattern) plus property tests: generated PII never survives `writer`.
+- [x] Evidence writer: `runs/<run_id>/run.jsonl`, `steps/NNNN_{before,after}.png` (redacted),
       `summary.json`.
-- [ ] `tests/test_import_boundaries.py`.
+- [x] `tests/test_import_boundaries.py`.
 
 ### P3: Web surface
 - [ ] `PlaywrightSurface`: observe (1280x800 viewport screenshot plus a state fingerprint of frame URLs,

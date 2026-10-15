@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "Credentials": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "pattern": "^secret://[a-z][a-z0-9_]*$",
+          "title": "Password",
+          "type": "string"
+        },
+        "username": {
+          "minLength": 1,
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "Credentials",
+      "type": "object"
+    }
+  },
+  "$id": "https://eagleview.local/schemas/tenant.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "app_profile": {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "title": "App Profile",
+      "type": "string"
+    },
+    "base_url": {
+      "pattern": "^https?://[^/@\\s]+$",
+      "title": "Base Url",
+      "type": "string"
+    },
+    "credentials": {
+      "$ref": "#/$defs/Credentials"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "pattern": "^1\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slug": {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "title": "Slug",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slug",
+    "name",
+    "app_profile",
+    "base_url",
+    "credentials"
+  ],
+  "title": "TenantProfile",
+  "type": "object"
+}

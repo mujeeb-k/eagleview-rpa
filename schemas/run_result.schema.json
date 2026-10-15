@@ -1,0 +1,509 @@
+{
+  "$defs": {
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FailureCategory"
+        },
+        "evidence": {
+          "$ref": "#/$defs/FailureEvidence"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
+        },
+        "observed": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        },
+        "step_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Id"
+        }
+      },
+      "required": [
+        "category"
+      ],
+      "title": "Failure",
+      "type": "object"
+    },
+    "FailureCategory": {
+      "description": "The closed taxonomy. Nothing else crosses the replay boundary.",
+      "enum": [
+        "STATE_TIMEOUT",
+        "LOCATOR_NOT_FOUND",
+        "LOCATOR_AMBIGUOUS",
+        "UNKNOWN_STATE",
+        "APP_ERROR",
+        "APP_UNAVAILABLE",
+        "SESSION_LOST",
+        "OUTCOME_UNCERTAIN",
+        "RECOVERY_EXHAUSTED",
+        "OUTPUT_INVALID",
+        "POLICY_BLOCKED",
+        "APP_VERSION_UNSUPPORTED",
+        "HANDOFF_STATE_MISMATCH",
+        "ABORTED_BY_OPERATOR"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "FailureEvidence": {
+      "additionalProperties": false,
+      "description": "Paths relative to the run directory. Every file was written through evidence.writer.",
+      "properties": {
+        "dom_snapshot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dom Snapshot"
+        },
+        "events": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Events"
+        },
+        "screenshot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot"
+        }
+      },
+      "title": "FailureEvidence",
+      "type": "object"
+    },
+    "FieldError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": [
+            "missing",
+            "unknown",
+            "type",
+            "pattern",
+            "enum",
+            "length",
+            "scale"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "code",
+        "message"
+      ],
+      "title": "FieldError",
+      "type": "object"
+    },
+    "InterventionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "human_actions": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Human Actions",
+          "type": "integer"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "takeover",
+            "approval"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolution": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "InterventionRecord",
+      "type": "object"
+    },
+    "LocatorReport": {
+      "additionalProperties": false,
+      "properties": {
+        "agreement": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agreement"
+        },
+        "rank": {
+          "minimum": 0,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "step_id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "strategy": {
+          "title": "Strategy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "strategy",
+        "rank"
+      ],
+      "title": "LocatorReport",
+      "type": "object"
+    },
+    "OutcomeResult": {
+      "additionalProperties": false,
+      "properties": {
+        "at_step": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Step"
+        },
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "OutcomeResult",
+      "type": "object"
+    },
+    "RecoveryRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "at_step": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Step"
+        },
+        "handler": {
+          "title": "Handler",
+          "type": "string"
+        }
+      },
+      "required": [
+        "handler"
+      ],
+      "title": "RecoveryRecord",
+      "type": "object"
+    },
+    "Rejection": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/RejectionCode"
+        },
+        "errors": {
+          "items": {
+            "$ref": "#/$defs/FieldError"
+          },
+          "title": "Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "Rejection",
+      "type": "object"
+    },
+    "RejectionCode": {
+      "enum": [
+        "INPUT_INVALID",
+        "CAPABILITY_NOT_APPROVED"
+      ],
+      "title": "RejectionCode",
+      "type": "string"
+    }
+  },
+  "$id": "https://eagleview.local/schemas/run_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability": {
+      "pattern": "^[a-z][a-z0-9_.]*@\\d+\\.\\d+\\.\\d+$",
+      "title": "Capability",
+      "type": "string"
+    },
+    "effective_hash": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Effective Hash"
+    },
+    "failure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Failure"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "interventions": {
+      "items": {
+        "$ref": "#/$defs/InterventionRecord"
+      },
+      "title": "Interventions",
+      "type": "array"
+    },
+    "locator_report": {
+      "items": {
+        "$ref": "#/$defs/LocatorReport"
+      },
+      "title": "Locator Report",
+      "type": "array"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OutcomeResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "outputs": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "pattern": "^-?\\d+(\\.\\d+)?$",
+                "type": "string"
+              },
+              {
+                "items": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outputs"
+    },
+    "recoveries": {
+      "items": {
+        "$ref": "#/$defs/RecoveryRecord"
+      },
+      "title": "Recoveries",
+      "type": "array"
+    },
+    "rejection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rejection"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "run_id": {
+      "pattern": "^r_[A-Za-z0-9_-]{1,64}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "success",
+        "outcome",
+        "rejected",
+        "failed",
+        "needs_human"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tenant": {
+      "title": "Tenant",
+      "type": "string"
+    },
+    "timing_ms": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Timing Ms",
+      "type": "object"
+    }
+  },
+  "required": [
+    "run_id",
+    "capability",
+    "tenant",
+    "status"
+  ],
+  "title": "RunResult",
+  "type": "object"
+}

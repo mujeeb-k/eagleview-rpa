@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "ActionTypes": {
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "items": {
+            "enum": [
+              "click",
+              "double_click",
+              "right_click",
+              "move",
+              "scroll",
+              "type",
+              "key",
+              "fill",
+              "select",
+              "navigate",
+              "drag",
+              "upload",
+              "download",
+              "screenshot",
+              "zoom",
+              "wait"
+            ],
+            "type": "string"
+          },
+          "title": "Allow",
+          "type": "array"
+        },
+        "deny": {
+          "items": {
+            "enum": [
+              "click",
+              "double_click",
+              "right_click",
+              "move",
+              "scroll",
+              "type",
+              "key",
+              "fill",
+              "select",
+              "navigate",
+              "drag",
+              "upload",
+              "download",
+              "screenshot",
+              "zoom",
+              "wait"
+            ],
+            "type": "string"
+          },
+          "title": "Deny",
+          "type": "array"
+        }
+      },
+      "required": [
+        "allow"
+      ],
+      "title": "ActionTypes",
+      "type": "object"
+    },
+    "IrreversibleHandling": {
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "default": "escalate",
+          "enum": [
+            "escalate",
+            "block"
+          ],
+          "title": "Discovery",
+          "type": "string"
+        },
+        "replay": {
+          "default": "require_approval",
+          "enum": [
+            "require_approval",
+            "block"
+          ],
+          "title": "Replay",
+          "type": "string"
+        }
+      },
+      "title": "IrreversibleHandling",
+      "type": "object"
+    },
+    "RouteRule": {
+      "additionalProperties": false,
+      "description": "`pattern` is a path glob: `*` matches within one segment, `/**` matches the path and\neverything below it. Matching is case-insensitive, on the percent-decoded, normalized path.",
+      "properties": {
+        "effect": {
+          "enum": [
+            "deny",
+            "irreversible"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "methods": {
+          "items": {
+            "enum": [
+              "*",
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Methods",
+          "type": "array"
+        },
+        "pattern": {
+          "pattern": "^/",
+          "title": "Pattern",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pattern",
+        "effect"
+      ],
+      "title": "RouteRule",
+      "type": "object"
+    },
+    "SensitivityPattern": {
+      "additionalProperties": false,
+      "description": "A regex for sensitive text. When the regex has a group named `v`, only that group is\nreplaced, so a label such as `Member #` survives while the number does not.",
+      "properties": {
+        "ignore_case": {
+          "default": false,
+          "title": "Ignore Case",
+          "type": "boolean"
+        },
+        "luhn": {
+          "default": false,
+          "title": "Luhn",
+          "type": "boolean"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "regex": {
+          "title": "Regex",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "regex"
+      ],
+      "title": "SensitivityPattern",
+      "type": "object"
+    }
+  },
+  "$id": "https://eagleview.local/schemas/policy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action_types": {
+      "$ref": "#/$defs/ActionTypes"
+    },
+    "allowed_keys": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Keys",
+      "type": "array"
+    },
+    "allowed_origins": {
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z][a-z0-9-]*$": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Allowed Origins",
+      "type": "object"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "irreversible_handling": {
+      "$ref": "#/$defs/IrreversibleHandling"
+    },
+    "irreversible_label_patterns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Irreversible Label Patterns",
+      "type": "array"
+    },
+    "routes": {
+      "items": {
+        "$ref": "#/$defs/RouteRule"
+      },
+      "title": "Routes",
+      "type": "array"
+    },
+    "schema_version": {
+      "pattern": "^1\\.\\d+$",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sensitivity_patterns": {
+      "items": {
+        "$ref": "#/$defs/SensitivityPattern"
+      },
+      "title": "Sensitivity Patterns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "allowed_origins",
+    "action_types"
+  ],
+  "title": "Policy",
+  "type": "object"
+}

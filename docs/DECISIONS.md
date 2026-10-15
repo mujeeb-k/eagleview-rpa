@@ -140,3 +140,106 @@ stays shared, so its output schema must not encode one tenant's codes: the suffi
 `COPPERHILL_TELLER_PASSWORD`; the operator IDs differ too. When either variable is missing,
 `make bank` generates a random value, appends it to the gitignored `.env`, and names the variable
 without printing it. A fresh clone needs no setup.
+
+## 2026-10-15 — P2 schema
+
+**Predicates are single-key mappings, and frames are always paths.** `{text_present: {...}}` is
+parsed with a callable discriminator on the one key, so the YAML in PLAN §3 loads as written,
+including a bare `output_present: share_accounts` and `not`. A predicate's `frame: main` and a
+target's `frame: [nav]` both become a list in memory and on disk, so there is one representation.
+
+**One way to write a target.** Recovery handlers (`dismiss`, `select_then_click`) take a full
+`TargetSpec` with ranked locators, not the `{text: "Continue"}` shorthand in PLAN §3.3. The
+overlay fixture under `tests/fixtures/` shows the full form.
+
+**`legacy_web` is a web surface.** css and xpath run on `web` and `legacy_web` and not on desktop.
+a11y, anchor, text and point run everywhere. PLAN's "web only" means "has a DOM".
+
+**Risk and approval rules are schema rules.** Step risk `read` maps to capability risk
+`read_only`, and the declared capability risk must equal the highest step risk. An irreversible
+step must carry `requires_approval: true` and `idempotent: false`. A `verified` or `approved`
+artifact may not contain an `llm_proposed`, `probed` or `human_demonstrated` outcome.
+
+**The content hash is canonical JSON with provenance excluded and None fields omitted.** Omitting
+None (rather than all defaults) means a new optional field leaves old hashes unchanged, but a
+changed default still changes the hash, because it changes behaviour. New optional fields must
+therefore default to None. Loading a verified or approved artifact whose hash doesn't match fails
+(it was edited after review). For a draft, the hash is recomputed.
+
+**YAML goes through the model.** Loading preserves key order, and dumping follows field
+declaration order. The round trip drops YAML comments. dump→load→dump is byte-identical, and
+number-like strings (`'1.0'`, `'10482'`) stay quoted. The ruamel code lives in
+`eagleview.artifacts`, outside the pyright-strict directories.
+
+**`schema_version` is a quoted `MAJOR.MINOR`, and only major 1 is read.** Any other major is
+refused before field validation, with `UnsupportedSchemaVersion` naming the file and the supported
+major. An unquoted version is rejected, because YAML turns `1.10` into a float.
+
+**Login macros may template credentials, and nothing else.** A capability may use only
+`{{ inputs.x }}`. The app profile's login macro may also use `{{ credentials.username }}` and
+`{{ credentials.password }}`. A `TenantProfile` supplies those values; its password is always a
+`secret://` reference.
+
+**Money is `Decimal`, and a string only in JSON.** Floats are refused at validation. The string
+serializer runs in JSON mode only, and it raises "unexpected value" for non-Decimals, so unions
+that contain Money still serialize lists and strings correctly.
+
+## 2026-10-15 — P2 policy engine
+
+**Two pure functions, one per enforcement layer.** `check()` (pre-action) and `check_request()`
+(network guard) share URL parsing but decide independently. The guard cannot wait for a human,
+so an irreversible request without an approval token is blocked, never escalated.
+
+**URLs are normalized before matching.** Paths are percent-decoded until stable, because the server
+decodes before routing, which makes `%5F%5Fadmin` `/__admin`. Paths are then slash-collapsed and
+dot-resolved, and routes are matched case-insensitively. URLs that contain userinfo are refused.
+Origins are per tenant and compared as scheme, host and port, so `localhost` does not count as
+`127.0.0.1`, and Lantern Bay never reaches Copperhill.
+
+**Approval tokens are bound to (run_id, step_id).** A token for one step authorizes no other step
+and no other run. Operators may act irreversibly; that is allowed but flagged with `audit`.
+Operators may never leave the allowlist or reach a denied route.
+
+**Irreversible labels match whole words, only on activating actions.** These are click,
+double-click, and Return/Enter/space. "Post" is irreversible; "Posted", "Postal Code" and
+"Closed Accounts" are not. Filling a field labelled "Post Date" is not an activation.
+
+## 2026-10-15 — P2 redaction and the evidence writer
+
+**Redaction walks the object tree before serialization.** JSON escaping (`José`) can't hide a
+value from it. Dict keys, ints and Decimals are checked as well as strings. Top-level event keys are
+redacted too: the property test caught a leak there.
+
+**Amounts are not PII.** Typed masking applies to strings only. Balances pass through, because once
+the identifiers next to them are masked they identify no one, and they are the evidence that
+typed extraction worked. Array item fields inherit the array's sensitivity unless they declare
+their own.
+
+**Value-aware scrubbing.** Every registered value is scrubbed case-insensitively in two passes:
+- Pass 1 removes whole values, wherever they appear, along with their HTML- and URL-encoded forms.
+- Pass 2 removes name tokens, as words only, so `Ann` does not hit `Annual`. It runs second
+  because removing a whole value can leave a glued-on token standing alone.
+
+Values shorter than 3 characters are ignored, and so are name tokens shorter than 3. Secrets are
+scrubbed at any length. A resolved `secret://` value is registered the moment it is read.
+
+**Patterns never over-redact ordinary teller text.** DOB and account numbers match only after a
+label ("DOB:", "Member #", "Acct Holder No."), so posting dates, transaction dates and transaction
+numbers survive. The writer's own structural fields (`ts`, `run_id`, `seq`, `actor`, `kind`) are
+never touched. There are two known limits:
+- A pattern-only value glued to more digits or letters is not caught, because a regex can't tell it
+  from a longer number.
+- A label and its value in separate DOM cells don't match a label-anchored pattern.
+
+The mock bank masks SSN and DOB at the source, and value-aware scrubbing covers every value the run
+knows.
+
+**Screenshots: whole text boxes are painted, and `text_boxes` is required.** The writer re-encodes
+every PNG, which drops metadata chunks, and fills any box the redactor flags with 2 px of padding.
+The API offers no way to write an unredacted image. DOM snapshots are scrubbed as whole strings,
+so hidden `value=` attributes are covered as well as text nodes.
+
+**Import boundaries are checked statically and at runtime.** The test walks the source import
+graph, including ancestor `__init__` files and relative imports, and also imports the guarded
+packages in a fresh interpreter. A self-test plants a two-hop `anthropic` import to prove the
+checker catches it. A missing guarded package fails the test rather than passing it.
