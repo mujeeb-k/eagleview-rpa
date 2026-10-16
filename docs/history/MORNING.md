@@ -1,5 +1,8 @@
 # Morning summary
 
+> **Historical.** A status note written during the build, for the person directing it. It is
+> kept for the record and no longer maintained: README.md and REPORT.md describe the project.
+
 Plain-language status, kept current: what is done, every judgment call for you to review, what
 is left for you, and the exact commands in order. Last updated after the demo video.
 

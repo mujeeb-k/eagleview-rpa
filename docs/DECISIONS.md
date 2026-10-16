@@ -1435,3 +1435,12 @@ does Copperhill, where it differs. The surprise starts just before GO, the not-f
 Member # field, and the approval beat at the Open Share form. The film is 1:48 (108.2 s), down
 from 1:50. On the Copperhill card, the Select Branch difference, at the top, now appears first
 rather than last, so all four differences are on screen together for about a second.
+
+## 2026-10-16 — The front-door docs
+
+**README.md and REPORT.md are the reviewed proposals from the audit.** README leads with the
+poster, the five-line thread and the two commands; REPORT keeps the seven headings within 1,600
+words. `docs/MORNING.md`, a status note for the person directing the build, moved to
+`docs/history/` with a note that it is no longer maintained. The discovery trace review stays
+where it is, retitled as REPORT's appendix, with its findings summarised in two sentences under
+Architecture. CLAUDE.md and PLAN.md stay at the root, because the README links them.

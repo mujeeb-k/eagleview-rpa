@@ -623,7 +623,7 @@ This app must feel like a real 2004-era core system:
 - [x] README shows the plain `uv run ...` command next to each `make` target.
 - [x] README notes that discovery spends the user's own Anthropic API credit, with an approximate cost
       per discovery run, measured from real runs.
-- [ ] Release checklist in §10. *(Partly; the user's items are in docs/MORNING.md.)*
+- [ ] Release checklist in §10. *(Partly; the user's items are in docs/history/MORNING.md.)*
 
 ## 8. Evidence scenarios
 | # | Scenario | Shows |

@@ -1,4 +1,4 @@
-# Discovery trace review
+# Appendix to REPORT.md: discovery trace review
 
 Before writing the compiler (P7), I recorded a real discovery trace and read it line by line. This
 is that review. The traces live under `runs/`, which is gitignored, so the relevant parts are
