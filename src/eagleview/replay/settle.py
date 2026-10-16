@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from eagleview.schema.app_profile import Dismiss, GlobalState, SelectThenClick
+from eagleview.schema.app_profile import ClickSequence, Dismiss, GlobalState, SelectThenClick
 from eagleview.schema.capability import Outcome
 from eagleview.schema.predicates import AnyPredicate
 from eagleview.surfaces.base import PredicateContext, Surface
@@ -32,7 +32,7 @@ async def pause() -> None:
 
 def is_interstitial(state: GlobalState) -> bool:
     """A state a handler clears in place, after which the step carries on settling."""
-    return isinstance(state.recover, Dismiss | SelectThenClick)
+    return isinstance(state.recover, Dismiss | SelectThenClick | ClickSequence)
 
 
 SeenKind = Literal["hard", "outcome", "interstitial", "expect", "nothing"]

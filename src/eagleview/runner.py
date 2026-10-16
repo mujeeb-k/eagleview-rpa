@@ -9,6 +9,11 @@ from pathlib import Path
 from dotenv import dotenv_values
 from playwright.async_api import Browser
 
+from eagleview.control.interventions import (
+    DEFAULT_HUMAN_TIMEOUT_S,
+    InterventionDesk,
+    InterventionStore,
+)
 from eagleview.evidence.writer import EvidenceWriter
 from eagleview.replay.engine import new_run_id, replay
 from eagleview.replay.preflight import RunOptions
@@ -47,10 +52,28 @@ async def run_replay(
     runs_root: Path = RUNS,
     environ: Mapping[str, str] | None = None,
     run_id: str | None = None,
+    desk: InterventionDesk | None = None,
+    console_port: int | None = None,
+    human_timeout_s: float = DEFAULT_HUMAN_TIMEOUT_S,
 ) -> RunResult:
-    """Replay once. Opens its own browser unless one is passed in."""
+    """Replay once. Opens its own browser unless one is passed in.
+
+    With `console_port`, a human can be brought in: an intervention desk (SQLite under
+    `runs_root`) and the operator console run in this process for the length of the run."""
     writer = EvidenceWriter(runs_root, run_id or new_run_id(), Redactor.from_policy(policy))
     async with AsyncExitStack() as stack:
+        if console_port is not None:
+            from eagleview.operator.console import create_console
+            from eagleview.operator.server import console_server
+
+            if desk is None:
+                store = InterventionStore(runs_root / "interventions.sqlite")
+                stack.callback(store.close)
+                desk = InterventionDesk(store, human_timeout_s=human_timeout_s)
+            url = await stack.enter_async_context(
+                console_server(create_console(desk, runs_root), port=console_port)
+            )
+            desk.console_url = url
         if browser is None:
             browser = await stack.enter_async_context(launched_browser(headed=headed))
         opener = surface_opener(browser, PolicyEngine(policy), sink=writer)
@@ -64,5 +87,6 @@ async def run_replay(
             environ=environ if environ is not None else environment(),
             options=options,
             modified=modified,
+            desk=desk,
         )
     raise AssertionError("unreachable")  # pragma: no cover

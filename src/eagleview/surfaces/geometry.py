@@ -224,7 +224,8 @@ def labelled_values(boxes: Sequence[TextBox], labels: Iterable[str]) -> list[tup
     - down, to the next text in the label's own column, so a two-line address is covered, but at
       most VALUE_LINES label heights.
     Boxes whose centre falls in that region are values; label-like text is never a value. Labels
-    are document text and must share a frame with their values."""
+    are document text and share a frame and a layer with their values: text a modal covers belongs
+    to covered labels, and the modal's own text is never the value of a label beneath it."""
     keys = {label_key(text) for text in labels}
 
     def label_like(b: TextBox) -> bool:
@@ -237,7 +238,11 @@ def labelled_values(boxes: Sequence[TextBox], labels: Iterable[str]) -> list[tup
         if lab.source != "text" or label_key(lab.text) not in keys:
             continue
         a = Box.of(i, lab)
-        peers = [(Box.of(j, b), b) for j, b in enumerate(boxes) if j != i and b.frame == lab.frame]
+        peers = [
+            (Box.of(j, b), b)
+            for j, b in enumerate(boxes)
+            if j != i and b.frame == lab.frame and b.covered == lab.covered
+        ]
         x_stops = [
             g.x
             for g, b in peers

@@ -61,7 +61,11 @@ def load_yaml(text: str) -> Any:
 
 def dump_model(model: BaseModel) -> str:
     """YAML for a model. Decimals and other non-YAML scalars are dumped as quoted strings."""
-    data = model.model_dump(mode="json", by_alias=True, exclude_none=True)
+    return dump_data(model.model_dump(mode="json", by_alias=True, exclude_none=True))
+
+
+def dump_data(data: object) -> str:
+    """YAML for JSON-like data, in the same style as `dump_model`."""
     stream = io.StringIO()
     _dumper().dump(_commented(data), stream)
     return stream.getvalue()

@@ -124,6 +124,7 @@ async def text_boxes_in(
             height=b["height"],
             frame="/".join(path) or None,
             source=b["source"],
+            covered=bool(b.get("covered", False)),
         )
         for b in raw
     ]

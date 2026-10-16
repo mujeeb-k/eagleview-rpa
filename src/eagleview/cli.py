@@ -91,6 +91,12 @@ def replay(
         Path | None, typer.Option(help="A tenant YAML to use instead of tenants/<slug>.yaml.")
     ] = None,
     runs_dir: Annotated[Path, typer.Option(help="Where run evidence is written.")] = Path("runs"),
+    console_port: Annotated[
+        int, typer.Option(help="Operator console port, started when a human may be needed.")
+    ] = 8700,
+    human_timeout: Annotated[
+        float, typer.Option(help="Seconds to wait for a human before parking the run.")
+    ] = 900.0,
 ) -> None:
     from eagleview.artifacts.loader import (
         app_profile_path,
@@ -134,19 +140,30 @@ def replay(
     options = RunOptions(
         unattended=unattended, approve_gates=approve_gates, escalate=escalate, deadline_s=deadline
     )
-    result = asyncio.run(
-        run_replay(
-            cap,
-            raw,
-            profile=profile,
-            tenant=tenant_profile,
-            policy=load_policy(policy),
-            options=options,
-            modified=loaded.modified,
-            headed=headed,
-            runs_root=runs_dir,
+    # A human may be needed: start the console. Gated steps ask it unless --approve-gates.
+    gated = any(step.requires_approval for step in cap.steps)
+    wants_console = escalate or (gated and not approve_gates)
+    from eagleview.operator.server import ConsolePortInUse
+
+    try:
+        result = asyncio.run(
+            run_replay(
+                cap,
+                raw,
+                profile=profile,
+                tenant=tenant_profile,
+                policy=load_policy(policy),
+                options=options,
+                modified=loaded.modified,
+                headed=headed,
+                runs_root=runs_dir,
+                console_port=console_port if wants_console else None,
+                human_timeout_s=human_timeout,
+            )
         )
-    )
+    except ConsolePortInUse as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from None
     typer.echo(result.model_dump_json(indent=2, exclude_none=True))
     typer.echo(_summary(result, runs_dir), err=True)
     raise typer.Exit(EXIT_CODES[result.status])

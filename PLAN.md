@@ -482,14 +482,17 @@ This app must feel like a real 2004-era core system:
   *(Done: `tests/replay/`.)*
 
 ### P5: Control and operator console
-- [ ] SessionController with lease and epoch. A state-machine test rejects every invalid transition.
-- [ ] Interventions store.
-- [ ] Console (FastAPI, port 8700): an interventions list, and a session page with a live screencast
+- [x] SessionController with lease and epoch. A state-machine test rejects every invalid transition.
+- [x] Interventions store.
+- [x] Console (FastAPI, port 8700): an interventions list, and a session page with a live screencast
       canvas. Clicks and keys relay through `Surface.act(actor=operator)`. Buttons: Take Control,
       Resume (with note), Approve, Deny, Abort. A banner shows the current holder and epoch.
-- [ ] Blocking escalation in replay, resume validation, recording of human actions, and the proposed
+- [x] Blocking escalation in replay, resume validation, recording of human actions, and the proposed
       patch output.
-- [ ] A test drives the operator path with a scripted "human" client over the same HTTP API.
+- [x] A test drives the operator path with a scripted "human" client over the same HTTP API.
+- **Done when:** a scripted operator drives every human path over the console's HTTP API against
+  the real mock bank. *(Done: `tests/operator/`, `tests/control/`. The plan was self-reviewed with
+  the advisor rather than approved; see DECISIONS, "P5 plan".)*
 
 ### P6: Discovery agent loop
 - [ ] **First, one real trace.** Before building the compiler (P7), record one raw discovery trace

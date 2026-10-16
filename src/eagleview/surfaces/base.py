@@ -48,28 +48,6 @@ class FixedHolder:
             )
 
 
-@dataclass
-class HandoffHolder:
-    """A lease that moves between actors, one at a time, and bumps the epoch on every move, so a
-    caller holding an old epoch is refused. Replay uses it to hand the session from the harness
-    (sign-on) to automation (the steps) and back. P5's SessionController replaces it with the full
-    lease, pause and takeover model."""
-
-    actor: str
-    epoch: int = 1
-
-    def assert_holder(self, actor: str, epoch: int) -> None:
-        if actor != self.actor or epoch != self.epoch:
-            raise NotHolder(
-                f"{actor}@{epoch} does not hold the session ({self.actor}@{self.epoch} does)"
-            )
-
-    def hand_to(self, actor: str) -> int:
-        self.actor = actor
-        self.epoch += 1
-        return self.epoch
-
-
 class EventSink(Protocol):
     """Where a surface reports what it did. `EvidenceWriter.event` fits, so everything a surface
     logs is redacted on its way to disk."""
@@ -204,6 +182,8 @@ class PredicateContext:
 
 class Surface(Protocol):
     kind: SurfaceKind
+    # Discovery and operator input set this so each act() also proposes verified locators.
+    record_candidates: bool
 
     @property
     def app_fingerprint(self) -> str | None:

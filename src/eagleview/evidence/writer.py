@@ -153,6 +153,18 @@ class EvidenceWriter:
         path.write_text(json.dumps(redacted, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return path
 
+    def write_yaml(self, name: str, model: BaseModel) -> Path:
+        """A reviewable artifact, such as a proposed overlay: written as `<name>.yaml`. The data is
+        redacted before it is serialized, so a placeholder can never break the YAML."""
+        from eagleview.artifacts.yaml_io import dump_data
+
+        path = self.run_dir / f"{self._checked(name)}.yaml"
+        data = self.redactor.redact_tree(
+            model.model_dump(mode="json", by_alias=True, exclude_none=True)
+        )
+        path.write_text(dump_data(data), encoding="utf-8")
+        return path
+
     def summary(self, data: BaseModel | Mapping[str, object]) -> Path:
         return self.write_json("summary", data)
 

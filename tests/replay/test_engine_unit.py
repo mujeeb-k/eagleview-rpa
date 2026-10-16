@@ -14,6 +14,7 @@ from eagleview.replay.engine import replay
 from eagleview.replay.preflight import RunOptions
 from eagleview.safety.redaction import Redactor
 from eagleview.schema.action import Action
+from eagleview.schema.app_profile import AppProfile, GlobalState
 from eagleview.schema.capability import Capability
 from eagleview.schema.result import RunResult
 from eagleview.schema.tenant import Credentials, TenantProfile
@@ -64,13 +65,14 @@ async def run(
     cap: Capability,
     scripts: dict[str, Script],
     options: RunOptions | None = None,
+    profile: AppProfile | None = None,
 ) -> tuple[RunResult, FakeSurface]:
     made: list[FakeSurface] = []
     writer = EvidenceWriter(tmp_path / "runs", "r_unit", Redactor())
     result = await replay(
         cap,
         {},
-        profile=load_app_profile(APP_PROFILE),
+        profile=profile or load_app_profile(APP_PROFILE),
         tenant=TENANT,
         open_surface=opener_for(scripts, made),
         writer=writer,
@@ -120,6 +122,40 @@ async def test_interstitials_are_cleared_before_expect_is_accepted(tmp_path: Pat
     assert result.status == "success", result.failure
     assert [r.handler for r in result.recoveries] == ["system_notice.dismiss"]
     assert ("go", "click") in surface.acts
+
+
+async def test_a_click_sequence_handler_clicks_each_target_in_order(tmp_path: Path) -> None:
+    base = load_app_profile(APP_PROFILE)
+    drawer = GlobalState.model_validate(
+        {
+            "id": "drawer_alert",
+            "detect": {"text_present": {"text": "Cash Drawer Alert"}},
+            "recover": {
+                "type": "click_sequence",
+                "clicks": [
+                    {"locators": [{"strategy": "text", "text": "Supervisor notified"}]},
+                    {"locators": [{"strategy": "text", "text": "Continue"}]},
+                ],
+            },
+            "max_per_run": 1,
+            "source": "human_demonstrated",
+        }
+    )
+    profile = base.model_copy(update={"global_states": [*base.global_states, drawer]})
+
+    def cleared(surface: FakeSurface, _action: Action) -> None:
+        surface.hide("Cash Drawer Alert")
+
+    result, surface = await run(
+        tmp_path,
+        capability([click("go")]),
+        {"go": shows("Cash Drawer Alert", "Done"), "Continue": cleared},
+        profile=profile,
+    )
+    assert result.status == "success", result.failure
+    assert [r.handler for r in result.recoveries] == ["drawer_alert.click_sequence"]
+    clicks = [a for a in surface.acts if a[0] == "go"]
+    assert len(clicks) == 3  # the step's own click, then the two handler clicks
 
 
 # --- after an irreversible step -------------------------------------------------------------------

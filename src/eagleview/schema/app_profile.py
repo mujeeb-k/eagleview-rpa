@@ -134,8 +134,17 @@ class SelectThenClick(BaseModel):
     click: TargetSpec
 
 
+class ClickSequence(BaseModel):
+    """Clicks, in order, that clear a state: a checkbox, then a button. `dismiss` is the one-click
+    case. Human-demonstrated handlers come out in this shape (P5)."""
+
+    model_config = _STRICT
+    type: Literal["click_sequence"]
+    clicks: list[TargetSpec] = Field(min_length=1, max_length=10)
+
+
 RecoveryHandler = Annotated[
-    ReloginAndRestart | RetryStepIfIdempotent | Dismiss | SelectThenClick,
+    ReloginAndRestart | RetryStepIfIdempotent | Dismiss | SelectThenClick | ClickSequence,
     Field(discriminator="type"),
 ]
 

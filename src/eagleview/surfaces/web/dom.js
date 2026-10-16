@@ -351,7 +351,8 @@
       const r0 = rects[0];
       const cx = Math.min(Math.max(r0.left + r0.width / 2, 0), W - 1);
       const cy = Math.min(Math.max(r0.top + r0.height / 2, 0), H - 1);
-      if (!every && !hitsAt(p, cx, cy, "text")) continue;
+      const onTop = hitsAt(p, cx, cy, "text");
+      if (!every && !onTop) continue;
       const lo = every ? -Infinity : 0;
       const left = Math.max(lo, Math.min(...rects.map((r) => r.left)));
       const top = Math.max(lo, Math.min(...rects.map((r) => r.top)));
@@ -360,7 +361,7 @@
       const bottom = every ? Math.max(...rects.map((r) => r.bottom))
         : Math.min(H, Math.max(...rects.map((r) => r.bottom)));
       boxes.push({
-        text, frame, source: "text", heading: isHeading(p),
+        text, frame, source: "text", heading: isHeading(p), covered: !onTop,
         x: Math.round(left + o.x), y: Math.round(top + o.y),
         width: Math.round(right - left), height: Math.round(bottom - top),
       });
@@ -373,8 +374,9 @@
       if (!r || !inView(r)) continue;
       const cx = Math.min(Math.max(r.left + r.width / 2, 0), W - 1);
       const cy = Math.min(Math.max(r.top + r.height / 2, 0), H - 1);
-      if (!every && !hitsAt(el, cx, cy, "element")) continue;
-      boxes.push({ text, frame, source: "control", heading: false, ...topBox(el, r) });
+      const onTop = hitsAt(el, cx, cy, "element");
+      if (!every && !onTop) continue;
+      boxes.push({ text, frame, source: "control", heading: false, covered: !onTop, ...topBox(el, r) });
       els.push(el);
     }
     return { boxes, els };

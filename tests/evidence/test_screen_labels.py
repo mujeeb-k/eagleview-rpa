@@ -135,3 +135,10 @@ def test_tenant_aliases_extend_the_labels(tmp_path: Path) -> None:
     boxes = [box("Acct Holder No.", 10, 50, 110), box("2210236", 130, 50)]
     path = w.screenshot(1, "after", white_png(), text_boxes=boxes)
     assert painted(path, boxes[1])
+
+
+def test_a_modal_over_the_screen_is_never_the_value_of_a_label_beneath_it() -> None:
+    covered = [b.model_copy(update={"covered": True}) for b in DETAIL]
+    modal = box("Drawer 04 is over its cash limit", 60, 48, 300)  # on top, beside "Name:"
+    found = values([*covered, modal], ["Name"])
+    assert found == {"Name": ["DOE, JANE Q"]}

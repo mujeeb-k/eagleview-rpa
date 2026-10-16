@@ -15,10 +15,11 @@ legacy screens hang validation and formatting on per-keystroke handlers. Setting
 directly would skip them."""
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any, Self
 from urllib.parse import urlsplit
@@ -229,6 +230,33 @@ class PlaywrightSurface:
 
     def navigation_count(self) -> int:
         return self._navigations
+
+    # --- screencast (the operator console's live view; observation only) ----------------------
+
+    async def start_screencast(self, on_frame: Callable[[str], Awaitable[None]]) -> None:
+        """Stream JPEG frames (base64) to `on_frame`, acknowledging each, as Spike B showed.
+        Frames go to the operator's browser only and never touch disk. Chromium sends a frame
+        only when the page repaints."""
+
+        async def frame(params: dict[str, Any]) -> None:
+            await self.cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
+            await on_frame(params["data"])
+
+        self._screencast_handler = lambda p: asyncio.ensure_future(frame(p))
+        self.cdp.on("Page.screencastFrame", self._screencast_handler)
+        await self.cdp.send(
+            "Page.startScreencast",
+            {"format": "jpeg", "quality": 70, "maxWidth": 1280, "maxHeight": 800},
+        )
+
+    async def stop_screencast(self) -> None:
+        handler = getattr(self, "_screencast_handler", None)
+        if handler is None:
+            return
+        self.cdp.remove_listener("Page.screencastFrame", handler)
+        self._screencast_handler = None
+        with contextlib.suppress(PlaywrightError):
+            await self.cdp.send("Page.stopScreencast")
 
     def _emit(self, kind: str, actor: str, **fields: object) -> None:
         if self.sink is not None:

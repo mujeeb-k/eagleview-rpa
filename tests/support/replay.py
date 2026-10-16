@@ -13,6 +13,7 @@ from playwright.async_api import Browser
 
 from eagleview.artifacts.loader import load_for_run
 from eagleview.artifacts.yaml_io import dump_capability, load_app_profile, load_model, load_policy
+from eagleview.control.interventions import InterventionDesk
 from eagleview.replay.preflight import RunOptions
 from eagleview.runner import run_replay
 from eagleview.schema.capability import Approval, Capability, Provenance, Verification
@@ -75,6 +76,7 @@ def make_replayer(browser: Browser, runs_root: Path) -> Replay:
         options: RunOptions | None = None,
         allow_modified: bool = False,
         environ: dict[str, str] | None = None,
+        desk: InterventionDesk | None = None,
     ) -> Replayed:
         loaded = load_for_run(capability, allow_modified=allow_modified)
         result = await run_replay(
@@ -88,6 +90,7 @@ def make_replayer(browser: Browser, runs_root: Path) -> Replay:
             browser=browser,
             runs_root=runs_root,
             environ=environ if environ is not None else {bank.tenant.password_env: bank.password},
+            desk=desk,
         )
         return Replayed(result, runs_root / result.run_id)
 

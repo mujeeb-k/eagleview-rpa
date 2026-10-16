@@ -67,6 +67,9 @@ class TextBox(BaseModel):
     height: int = Field(ge=0)
     frame: str | None = None
     source: Literal["text", "control"] = "text"
+    # Present but under something else, such as a translucent modal. Only `text_boxes(every=True)`
+    # reports covered text; it is still readable in a screenshot, so redaction needs it.
+    covered: bool = False
 
     @property
     def right(self) -> int:

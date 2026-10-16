@@ -50,4 +50,22 @@ The fixture above is hand-written for testing. Real capabilities come from disco
 
 The passwords come from `.env`, which `make bank` writes.
 
+## Operator console
+
+When a run may need a person (`--escalate`, or an irreversible step without `--approve-gates`),
+`eagleview replay` also starts the operator console at http://127.0.0.1:8700 for the length of the
+run. `--console-port` changes the port. A line on stderr says when a person is needed, and the
+session page shows the live screen. From the page, an operator can do any of these:
+
+- **Take control** of a stuck run, act in the live session, then **Resume** with a note.
+  Automation checks the screen before carrying on, and never assumes what the person did.
+- **Force take** or **Pause** a run that is still going.
+- **Approve** or **Deny** an irreversible step.
+- **Abort** the run.
+
+Nobody answering within `--human-timeout` (default 15 minutes) parks the run as `needs_human`. A
+takeover that resumed writes the person's clicks to `runs/<run_id>/proposed_overlay.yaml`, a draft
+for review that is never applied automatically. The console has no login: it binds to loopback,
+and its operators are trusted.
+
 All institutions, people, and data in this repository are fictional and synthetic.

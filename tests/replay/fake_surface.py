@@ -58,6 +58,7 @@ class FakeSurface:
     texts: set[str] = field(default_factory=lambda: {FOOTER})
     kind: SurfaceKind = "legacy_web"
     app_fingerprint: str | None = None
+    record_candidates: bool = False
     acts: list[tuple[str | None, str]] = field(default_factory=list[tuple[str | None, str]])
     approvals: set[ApprovalToken] = field(default_factory=set[ApprovalToken])
     navigations: int = 0

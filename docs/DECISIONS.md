@@ -535,3 +535,101 @@ value readable. A test fills the Member Detail screen with and without the unkno
 checks every personal value's box is solid black and absent from the DOM snapshot. Another test
 shows that a failure run's evidence no longer contains them, and it fails when the engine stops
 passing the labels to the writer.
+
+## 2026-10-16 — P5 plan (self-reviewed with the advisor, not with the user)
+
+**What gets built.**
+- `control/session_controller.py`: the lease (holder plus fencing epoch) and the state machine
+  from PLAN §5.
+- `control/interventions.py`: an SQLite store under `runs/`, plus in-process waiters.
+- `operator/`: a FastAPI console on port 8700 with an interventions list, a session page with a
+  live screencast canvas, and a JSON API (take, act, resume, approve, deny, abort, state, boxes).
+  The page and the scripted test operator use the same API.
+- Replay integration: blocking escalation, approval interventions, operator preemption, resume
+  validation, recording of human actions, and a proposed `human_demonstrated` overlay.
+
+**[REVIEW] Without a console, P4 behaviour is unchanged.** Interventions block only when a run has
+an intervention desk attached. The CLI attaches one, and starts the console on 8700, only when a
+human could be needed: `--escalate`, or a gated step without `--approve-gates`. Without a desk,
+`--escalate` parks the run as `needs_human` and a gated step fails POLICY_BLOCKED, as in P4. The
+P4 tests stay as they are.
+
+**[REVIEW] Waiting for a human does not count against the run deadline.** The deadline bounds what
+automation spends, so it is pushed back by however long a human wait took. A human wait has its own
+limit (`--human-timeout`, default 15 minutes). If nobody answers in time, the run returns
+`needs_human` with the failure attached; nothing is posted. The alternative, one deadline covering
+human time too, would make any real takeover fail at 120 s.
+
+**[REVIEW] An operator can take control in two ways.**
+- **Pause** is cooperative: automation finishes its current step and yields at the step boundary.
+- **Force take** moves the lease at once and bumps the epoch, so automation's next `act()` is
+  refused as `not_holder`.
+
+With a desk attached, `not_holder` now means "preempted": the engine waits for the human to hand
+back. Without a desk it is still POLICY_BLOCKED.
+
+**[REVIEW] Unattended runs ask a human through the console.** An unattended run never approves its
+own irreversible step. With a desk attached, it opens an approval intervention and blocks until a
+human approves, denies or times out. `--approve-gates` is still refused with `--unattended`. Deny
+gives POLICY_BLOCKED, and a timeout gives `needs_human`; neither posts.
+
+**The commit rule covers operator actions.** Operator input goes through `Surface.act` as
+`operator:<name>`, at the controller's current epoch. When an operator's action is irreversible and
+done (the policy allows it, audited), the run counts as committed. From then on every non-success
+is OUTCOME_UNCERTAIN, and resume never acts on that step again.
+
+**[REVIEW] Resume validation.** PLAN §5 is followed first:
+1. If a hard global state shows, the result is HANDOFF_STATE_MISMATCH.
+2. Otherwise, take the latest step, from the paused one onwards, whose `expect` holds, and resume
+   after it.
+
+One extension: if no `expect` holds, the paused step's target resolves uniquely again, and that
+step was never sent (or is idempotent and nothing is committed), the paused step runs again. This
+covers a human closing a modal that was covering the target. Anything else is
+HANDOFF_STATE_MISMATCH.
+
+**[REVIEW] Human-demonstrated patch.** After a takeover the human resumes from, the operator's
+clicks, each grounded into candidate locators as discovery does, are written to
+`runs/<run_id>/proposed_overlay.yaml` through the writer, redacted. The patch is a draft tenant
+overlay with `source: human_demonstrated`. It adds a global state:
+- detect: the first new text shown at the moment of escalation;
+- recover: a new `click_sequence` handler.
+
+Replay runs that handler type, and an engine test proves it. The patch is never applied
+automatically, and it can be replay-verified only once P8 resolves overlays.
+
+**Not built in P5:** authentication for the console, webhooks, and parked asynchronous runs (all
+in REPORT §7). Raw screencast frames go only to the operator's browser and never touch disk.
+
+## 2026-10-16 — P5 as built
+
+**[REVIEW] Intervention notices go to stderr, not stdout.** PLAN §5 says "a stdout line", but
+`eagleview replay` reserves stdout for the result JSON a caller parses. The line names the run, the
+reason and the console URL. Keeping stdout clean was preferred over following the PLAN wording.
+
+**[REVIEW] The console exposes what the operator sees as text: `GET /api/sessions/{run}/boxes`.** It
+returns the visible text with geometry, raw, over loopback, like the screencast. The scripted
+operator needs it to find what to click; a person uses the picture. Operators are trusted
+(PLAN §6), and nothing from it is written to disk.
+
+**[REVIEW] At most three takeovers per run.** Each needs a human. Without a cap, a screen that keeps
+failing would keep asking. After the third, a failure is final.
+
+**The layer rule for labelled values.** With covered text included, a modal's own text sits
+geometrically beside the labels beneath it. The first console test showed it: the drawer alert's
+words were being registered as the member's name. Text boxes now say whether they are `covered`,
+and a label's values come only from its own layer.
+
+**A proposed patch is redacted as data, then dumped.** Scrubbing the YAML text inserted `[name]`
+placeholders that broke the YAML syntax. The writer now redacts the data tree and then serializes
+it, so a placeholder is always a quoted string.
+
+**[REVIEW] What the human saw that automation did not.** The patch's `detect` is the first text
+visible at the takeover that was not visible before the paused step. Text that differs only in
+its digits doesn't count, which rules out the banner's session countdown, and the paused step's
+own frame is searched first. For the drawer alert that gives "Cash Drawer Alert". A reviewer
+checks it before the overlay is ever used (P8).
+
+**P4 behaviour holds without a desk.** All P4 replay tests pass unedited: `--escalate` without a
+console still parks, and a gated step without `--approve-gates` still fails POLICY_BLOCKED.
+`HandoffHolder` is gone; the SessionController's `hand_to` does that job.

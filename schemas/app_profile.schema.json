@@ -178,6 +178,32 @@
       "title": "AnyOf",
       "type": "object"
     },
+    "ClickSequence": {
+      "additionalProperties": false,
+      "description": "Clicks, in order, that clear a state: a checkbox, then a button. `dismiss` is the one-click\ncase. Human-demonstrated handlers come out in this shape (P5).",
+      "properties": {
+        "clicks": {
+          "items": {
+            "$ref": "#/$defs/TargetSpec"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "title": "Clicks",
+          "type": "array"
+        },
+        "type": {
+          "const": "click_sequence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "clicks"
+      ],
+      "title": "ClickSequence",
+      "type": "object"
+    },
     "CssLocator": {
       "additionalProperties": false,
       "properties": {
@@ -456,6 +482,7 @@
             {
               "discriminator": {
                 "mapping": {
+                  "click_sequence": "#/$defs/ClickSequence",
                   "dismiss": "#/$defs/Dismiss",
                   "relogin_and_restart": "#/$defs/ReloginAndRestart",
                   "retry_step_if_idempotent": "#/$defs/RetryStepIfIdempotent",
@@ -475,6 +502,9 @@
                 },
                 {
                   "$ref": "#/$defs/SelectThenClick"
+                },
+                {
+                  "$ref": "#/$defs/ClickSequence"
                 }
               ]
             },

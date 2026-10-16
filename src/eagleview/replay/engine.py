@@ -29,13 +29,16 @@ import asyncio
 import re
 import time
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import AsyncGenerator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from secrets import token_hex
 from typing import Literal
 from urllib.parse import urljoin, urlsplit
 
+from eagleview.control.interventions import HumanAction, InterventionDesk, LiveSession
+from eagleview.control.session_controller import ControlState, SessionController
 from eagleview.evidence.writer import EvidenceWriter
 from eagleview.replay.preflight import RunOptions, check_inputs, status_gate
 from eagleview.replay.render import Rendered, render
@@ -45,7 +48,9 @@ from eagleview.safety.secrets import SecretMissing, SecretResolver
 from eagleview.schema.action import Action, TextBox
 from eagleview.schema.app_profile import (
     AppProfile,
+    ClickSequence,
     Dismiss,
+    FailSpec,
     GlobalState,
     ReloginAndRestart,
     RetryStepIfIdempotent,
@@ -63,10 +68,11 @@ from eagleview.schema.capability import (
     Step,
     TableExtract,
 )
-from eagleview.schema.common import parse_version, version_in_range
+from eagleview.schema.common import Source, parse_version, version_in_range
 from eagleview.schema.contract import validate_outputs
 from eagleview.schema.hashing import content_hash
 from eagleview.schema.locators import TargetSpec
+from eagleview.schema.overlay import AppliesTo, Overlay
 from eagleview.schema.predicates import AnyPredicate
 from eagleview.schema.result import (
     Failure,
@@ -87,7 +93,6 @@ from eagleview.schema.tenant import TenantProfile
 from eagleview.surfaces.base import (
     ActionResult,
     Ambiguous,
-    HandoffHolder,
     PredicateContext,
     Surface,
     SurfaceOpener,
@@ -118,6 +123,26 @@ _CATEGORY_FOR_STATUS: dict[str, FailureCategory] = {
 }
 
 
+_DIGITS = re.compile(r"\d")
+
+
+def _new_text(now: list[TextBox], before: set[str], frame: str | None) -> str | None:
+    """The first text a person can read now that was not there before the step: what a human
+    saw that automation did not expect. Text that only changed its digits (a countdown, a date)
+    is not new. The paused step's own frame is searched first."""
+    seen = {_DIGITS.sub("#", t) for t in before}
+    fresh = [
+        b
+        for b in now
+        if b.source == "text"
+        and not b.covered
+        and any(c.isalpha() for c in b.text)
+        and _DIGITS.sub("#", b.text) not in seen
+    ]
+    fresh.sort(key=lambda b: (frame is not None and b.frame != frame,))
+    return fresh[0].text if fresh else None
+
+
 def new_run_id() -> str:
     return f"r_{datetime.now(UTC):%Y%m%dT%H%M%S}_{token_hex(3)}"
 
@@ -136,6 +161,22 @@ class _Restart(Exception):
 
 class _Retry(Exception):
     """Run the current step again (idempotent steps only)."""
+
+
+class _Preempted(Exception):
+    """An operator took the lease mid-step: wait for them to hand back."""
+
+
+# Takeovers per run: each needs a human, but a run should not loop through them forever.
+MAX_TAKEOVERS = 3
+# Failures a human cannot fix by taking over: policy refusals and the takeover's own outcomes.
+_NO_TAKEOVER = frozenset(
+    {
+        FailureCategory.POLICY_BLOCKED,
+        FailureCategory.ABORTED_BY_OPERATOR,
+        FailureCategory.HANDOFF_STATE_MISMATCH,
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -214,9 +255,13 @@ async def replay(
     environ: Mapping[str, str] | None = None,
     options: RunOptions | None = None,
     modified: bool = False,
+    desk: InterventionDesk | None = None,
 ) -> RunResult:
     """Run `capability` once on `tenant` and return its RunResult. Never raises for anything
-    that happens during the run; a misconfigured call (the wrong app profile) is a ValueError."""
+    that happens during the run; a misconfigured call (the wrong app profile) is a ValueError.
+
+    With a `desk`, a human can be brought in: `escalate` blocks on a takeover instead of parking,
+    and a gated step without `approve_gates` asks for an approval. Without one, P4 behaviour."""
     if capability.app.profile != profile.id:
         raise ValueError(f"{capability.ref} runs on {capability.app.profile!r}, not {profile.id!r}")
     if tenant.app_profile != profile.id:
@@ -257,12 +302,18 @@ async def replay(
         base.event("run.warning", detail=f"running a {capability.status} capability, attended")
     writer.redactor.register_inputs(inputs)
 
-    holder = HandoffHolder(HARNESS)
+    controller = SessionController(writer.run_id, sink=writer, actor=HARNESS)
     secrets = SecretResolver(environ, on_resolve=writer.redactor.register_secret)
     ctx = PolicyContext(tenant=tenant.slug, mode="replay", run_id=writer.run_id)
-    async with open_surface(holder, ctx) as surface:
-        engine = _Engine(base, profile, surface, holder, secrets, dict(inputs))
-        result = await engine.run()
+    async with open_surface(controller, ctx) as surface:
+        engine = _Engine(base, profile, surface, controller, secrets, dict(inputs), desk)
+        if desk is not None:
+            desk.attach(LiveSession(writer.run_id, capability.ref, surface, controller))
+        try:
+            result = await engine.run()
+        finally:
+            if desk is not None:
+                desk.detach(writer.run_id)
         engine.flush_evidence()
     return base.end(result)
 
@@ -273,9 +324,10 @@ class _Engine:
         base: _Run,
         profile: AppProfile,
         surface: Surface,
-        holder: HandoffHolder,
+        controller: SessionController,
         secrets: SecretResolver,
         inputs: dict[str, object],
+        desk: InterventionDesk | None = None,
     ) -> None:
         self.base = base
         self.cap = base.capability
@@ -283,7 +335,9 @@ class _Engine:
         self.options = base.options
         self.profile = profile
         self.surface = surface
-        self.holder = holder
+        self.ctl = controller
+        self.actor = HARNESS  # who the engine acts as: the harness signs on, automation runs steps
+        self.desk = desk
         self.secrets = secrets
         self.inputs = inputs
         self.rendered: Rendered = render(self.cap, inputs)
@@ -297,6 +351,11 @@ class _Engine:
         self.spent: Counter[str] = Counter()
         self.at_step: str | None = None
         self.committed: str | None = None  # the irreversible step whose action was sent
+        self.sent: set[str] = set()
+        self._visible_before: set[str] = set()
+        self._paused_frame: str | None = None  # steps whose action was dispatched at least once
+        self.takeovers = 0
+        self._deadline: asyncio.Timeout | None = None
         self.shots: list[_Shot] = []
         self.doms: list[tuple[str, str]] = []
         self._shot_no = 0
@@ -306,7 +365,8 @@ class _Engine:
     async def run(self) -> RunResult:
         remaining = self.options.deadline_s - (time.monotonic() - self.base.started)
         try:
-            async with asyncio.timeout(remaining):
+            async with asyncio.timeout(remaining) as deadline:
+                self._deadline = deadline
                 return await self._body()
         except _Done as done:
             return done.result
@@ -326,24 +386,41 @@ class _Engine:
         started = time.monotonic()
         await self._open_app()
         self.timing["sign_on"] = int((time.monotonic() - started) * 1000)
-        self._handoff(AUTOMATION)
+        self._hand_to(AUTOMATION)
         steps = self.rendered.steps
         i = 0
         while i < len(steps):
             try:
+                if self.ctl.state is ControlState.PAUSE_REQUESTED:
+                    i = await self._takeover(i, "OPERATOR_PAUSE", None)
+                    continue
                 await self._run_step(steps[i])
             except _Restart:
                 self.outputs.clear()
                 i = 0
                 continue
+            except _Preempted:
+                i = await self._takeover(i, "OPERATOR_TAKEOVER", None)
+                continue
+            except _Done as done:
+                failure = done.result.failure
+                if not self._may_take_over(done.result) or failure is None:
+                    raise
+                i = await self._takeover(i, failure.category.value, failure)
+                continue
             i += 1
-        return await self._finish()
+        result = await self._finish()
+        if self.ctl.state in (ControlState.AUTOMATION, ControlState.PAUSE_REQUESTED):
+            self.ctl.complete()
+        return result
 
     async def _run_step(self, step: Step) -> None:
         if step.when is not None and not evaluate_when(step.when, self.inputs):
             self._event("step.skip", step_id=step.id, when=step.when)
             return
         self.at_step = step.id
+        if self.desk is not None:
+            self.desk.session(self.base.run_id).at_step = step.id
         self._event("step.start", step_id=step.id, action=step.action.type, risk=step.risk)
         if step.requires_approval:
             await self._approve(step)
@@ -404,8 +481,10 @@ class _Engine:
 
     async def _act(self, action: Action, step: Step, target: Unique | None) -> ActionResult:
         result = await self.surface.act(
-            action, self.holder.actor, self.holder.epoch, target=target, step_id=step.id
+            action, self.actor, self.ctl.epoch, target=target, step_id=step.id
         )
+        if result.status in ("done", "error"):
+            self.sent.add(step.id)
         if target is not None:
             self.locators[step.id] = LocatorReport(
                 step_id=step.id,
@@ -421,6 +500,8 @@ class _Engine:
         return result
 
     async def _act_failed(self, step: Step, result: ActionResult) -> None:
+        if result.status == "not_holder" and self.desk is not None:
+            raise _Preempted()
         category = _CATEGORY_FOR_STATUS.get(result.status, FailureCategory.UNKNOWN_STATE)
         raise _Done(
             await self._fail(
@@ -470,7 +551,7 @@ class _Engine:
     async def _navigate_entry(self) -> None:
         url = urljoin(self.tenant.base_url + "/", self.profile.login.entry_path.lstrip("/"))
         result = await self.surface.act(
-            Action(type="navigate", url=url), self.holder.actor, self.holder.epoch
+            Action(type="navigate", url=url), self.actor, self.ctl.epoch
         )
         await self._check_blocked()
         if not result.ok:
@@ -518,8 +599,8 @@ class _Engine:
             before = await self._before(False, shot=False)
             result = await self.surface.act(
                 action,
-                self.holder.actor,
-                self.holder.epoch,
+                self.actor,
+                self.ctl.epoch,
                 target=None if action.type == "key" else target,
                 step_id=f"login.{macro.id}",
             )
@@ -543,16 +624,16 @@ class _Engine:
             login=True,
             what="sign-on did not reach its success state",
         )
-        self._event("session.signed_on", holder=self.holder.actor)
+        self._event("session.signed_on", holder=self.actor)
 
     async def _relogin(self) -> None:
-        self._handoff(HARNESS)
+        self._hand_to(HARNESS)
         await self._navigate_entry()
         await self._settle(
             self.profile.fingerprint.detect, None, None, timeout_ms=OPEN_TIMEOUT_MS, login=True
         )
         await self._sign_on()
-        self._handoff(AUTOMATION)
+        self._hand_to(AUTOMATION)
 
     # --- waiting ------------------------------------------------------------------------------
 
@@ -632,6 +713,9 @@ class _Engine:
 
     async def _before(self, expect_held: bool, *, shot: bool) -> Before:
         obs = await self.surface.observe()
+        if shot and self.desk is not None:
+            # What a person could read before this step, so a takeover can tell what is new.
+            self._visible_before = {b.text for b in await self.surface.text_boxes()}
         if shot:
             self._shot_no += 1
             self.shots.append(
@@ -703,6 +787,10 @@ class _Engine:
             ok = await self._handler_select(handler.select) and await self._handler_click(
                 handler.click
             )
+        elif isinstance(handler, ClickSequence):
+            ok = True
+            for spec in handler.clicks:
+                ok = ok and await self._handler_click(spec)
         if not ok or handler is None:
             raise _Done(await self._fail_state(state, "its handler could not act"))
         self._recovered(state, handler.type)
@@ -713,8 +801,8 @@ class _Engine:
             return False
         result = await self.surface.act(
             Action(type="click"),
-            self.holder.actor,
-            self.holder.epoch,
+            self.actor,
+            self.ctl.epoch,
             target=found,
             step_id=self.at_step,
         )
@@ -731,8 +819,8 @@ class _Engine:
             return False
         result = await self.surface.act(
             Action(type="select", option=choice.option),
-            self.holder.actor,
-            self.holder.epoch,
+            self.actor,
+            self.ctl.epoch,
             target=found,
             step_id=self.at_step,
         )
@@ -765,11 +853,14 @@ class _Engine:
     # --- gates, extraction, the end -----------------------------------------------------------
 
     async def _approve(self, step: Step) -> None:
+        if self.desk is not None and not self.options.approve_gates:
+            await self._ask_approval(step)
+            return
         if self.options.unattended or not self.options.approve_gates:
             why = (
                 "an unattended run never approves its own irreversible steps"
                 if self.options.unattended
-                else "pass --approve-gates to approve it (the operator console arrives in P5)"
+                else "pass --approve-gates to approve it, or run with the operator console"
             )
             raise _Done(
                 await self._fail(
@@ -785,6 +876,250 @@ class _Engine:
             )
         )
         self._event("approval.granted", step_id=step.id, source="approve_gates")
+
+    async def _ask_approval(self, step: Step) -> None:
+        """Block on a human's decision in the console. The run never approves itself."""
+        assert self.desk is not None
+        screenshot = await self._shot_now()
+        iv = self.desk.open(
+            kind="approval",
+            run_id=self.base.run_id,
+            capability=self.cap.ref,
+            step_id=step.id,
+            reason="APPROVAL_REQUIRED",
+            state_summary=(await self.surface.observe()).summary(),
+            screenshot=screenshot,
+            allowed=["approve", "deny"],
+        )
+        self._event("approval.requested", intervention=iv.id, step_id=step.id)
+        async with self._deadline_paused():
+            done = await self.desk.wait(iv.id)
+        by = done.resolved_by or "system"
+        self.interventions.append(
+            InterventionRecord(id=iv.id, kind="approval", resolution=f"{done.resolution} by {by}")
+        )
+        if done.resolution == "approved":
+            self.surface.grant_approval(ApprovalToken(self.base.run_id, step.id))
+            self._event("approval.granted", step_id=step.id, source=by)
+            return
+        if done.resolution == "timed_out":
+            waited = f"{self.desk.human_timeout_s:g}s"
+            raise _Done(
+                await self._park(
+                    FailureCategory.POLICY_BLOCKED,
+                    f"step {step.id!r} needs an approval and nobody answered within {waited}",
+                    "approval timed out",
+                    step_id=step.id,
+                )
+            )
+        note = f": {done.note}" if done.note else ""
+        raise _Done(
+            await self._fail(
+                FailureCategory.POLICY_BLOCKED,
+                f"step {step.id!r} was {done.resolution} by {by}{note}",
+                step_id=step.id,
+            )
+        )
+
+    # --- takeover -----------------------------------------------------------------------------
+
+    def _may_take_over(self, result: RunResult) -> bool:
+        failure = result.failure
+        return (
+            self.desk is not None
+            and self.options.escalate
+            and result.status == "failed"
+            and failure is not None
+            and failure.category not in _NO_TAKEOVER
+            and self.takeovers < MAX_TAKEOVERS
+        )
+
+    async def _takeover(self, i: int, reason: str, failure: Failure | None) -> int:
+        """Hand the session to a human and wait for it back. Returns the step index to continue
+        from, after resume validation; raises _Done when the run ends instead."""
+        assert self.desk is not None
+        self.takeovers += 1
+        steps = self.rendered.steps
+        paused = steps[min(i, len(steps) - 1)]
+        self._paused_frame = "/".join(paused.target.frame) if paused.target else None
+        visible_now = await self.surface.text_boxes()
+        screenshot = await self._shot_now()
+        summary = (await self.surface.observe()).summary()
+        if self.ctl.state is ControlState.PAUSE_REQUESTED:
+            self.ctl.yield_to_human()
+        elif self.ctl.state is ControlState.AUTOMATION:
+            self.ctl.escalate()
+        session = self.desk.session(self.base.run_id)
+        acted_before = len(session.actions)
+        iv = self.desk.open(
+            kind="takeover",
+            run_id=self.base.run_id,
+            capability=self.cap.ref,
+            step_id=paused.id,
+            reason=reason,
+            state_summary=summary,
+            screenshot=screenshot,
+            allowed=["take_control", "resume", "abort"],
+        )
+        self._event("takeover.requested", intervention=iv.id, reason=reason, step_id=paused.id)
+        async with self._deadline_paused():
+            ended = await self._wait_for_handback()
+        human_actions = session.actions[acted_before:]
+        if session.committed and not self.committed:
+            self.committed = "operator"
+            self._event("step.committed", step_id=paused.id, by="operator")
+        if ended is None:
+            if self.ctl.state is ControlState.HUMAN:
+                self.ctl.abort("system")
+            elif self.ctl.state is ControlState.AWAITING_HUMAN:
+                self.ctl.fail("system")
+            pending = self.desk.store.get(iv.id)
+            if pending is not None and pending.resolution is None:
+                self.desk.resolve(iv.id, "timed_out", "system")
+            self._record_takeover(iv.id, "timed_out", len(human_actions))
+            category = failure.category if failure else FailureCategory.UNKNOWN_STATE
+            raise _Done(
+                await self._park(
+                    category,
+                    (failure.message if failure and failure.message else reason)
+                    + f"; nobody handed back within {self.desk.human_timeout_s:g}s",
+                    "takeover timed out",
+                )
+            )
+        done = self.desk.store.get(iv.id)
+        by = (done.resolved_by if done else None) or "operator"
+        if ended is ControlState.ABORTED:
+            self._record_takeover(iv.id, f"aborted by {by}", len(human_actions))
+            raise _Done(await self._fail(FailureCategory.ABORTED_BY_OPERATOR, f"aborted by {by}"))
+        self.ctl.start_validation()
+        resume_at = await self._validate(i)
+        if resume_at is None:
+            self.ctl.fail()
+            self._record_takeover(iv.id, f"resumed by {by}; state mismatch", len(human_actions))
+            raise _Done(
+                await self._fail(
+                    FailureCategory.HANDOFF_STATE_MISMATCH,
+                    "after the handback, no step's expected state holds",
+                    step_id=paused.id,
+                )
+            )
+        self.ctl.resume_automation()
+        self.actor = AUTOMATION
+        self._record_takeover(iv.id, f"resumed by {by}", len(human_actions))
+        where = steps[resume_at].id if resume_at < len(steps) else "the end"
+        self._event("takeover.resumed", intervention=iv.id, resume_at=where)
+        self._propose_patch(human_actions, visible_now)
+        return resume_at
+
+    async def _wait_for_handback(self) -> ControlState | None:
+        assert self.desk is not None
+        try:
+            async with asyncio.timeout(self.desk.human_timeout_s):
+                return await self.ctl.wait_for(
+                    {ControlState.RESUME_REQUESTED, ControlState.ABORTED}
+                )
+        except TimeoutError:
+            return None
+
+    async def _validate(self, i: int) -> int | None:
+        """Where automation can carry on after a human hands back, or None (PLAN §5).
+
+        Never assume what the human did: look. A hard global state means a mismatch. Otherwise
+        continue after the latest step, from the paused one on, whose `expect` holds. Failing
+        that, run the paused step again if its target is back and running it again is safe: it
+        was never sent, or it is idempotent and nothing is committed."""
+        steps = self.rendered.steps
+        seen = await self.watch.look(self.surface, None, self._pctx(None), with_outcomes=False)
+        if seen.kind == "hard":
+            return None
+        for j in range(len(steps) - 1, i - 1, -1):
+            st = steps[j]
+            if st.expect is None or (st.when and not evaluate_when(st.when, self.inputs)):
+                continue
+            if await self.surface.check(st.expect, self._pctx(st)):
+                return j + 1
+        paused = steps[i]
+        safe = paused.id not in self.sent or (paused.idempotent and not self.committed)
+        if not safe:
+            return None
+        if paused.target is None:
+            return i if paused.action.type == "extract" else None
+        found = await self.surface.resolve(paused.target)
+        return i if isinstance(found, Unique) and not found.occluded else None
+
+    def _record_takeover(self, iv_id: str, resolution: str, human_actions: int) -> None:
+        self.interventions.append(
+            InterventionRecord(
+                id=iv_id, kind="takeover", resolution=resolution, human_actions=human_actions
+            )
+        )
+
+    def _propose_patch(self, actions: list[HumanAction], visible_then: list[TextBox]) -> None:
+        """Write what the human did as a draft overlay for a reviewer. Never applied here."""
+        clicks = [
+            TargetSpec(frame=a.grounded.frame, locators=a.grounded.candidates)
+            for a in actions
+            if a.action.type == "click" and a.grounded is not None and a.grounded.candidates
+        ]
+        new_text = _new_text(visible_then, self._visible_before, self._paused_frame)
+        if not clicks or new_text is None:
+            self._event("patch.skipped", clicks=len(clicks), detect=new_text is not None)
+            return
+        slug = re.sub(r"[^a-z0-9]+", "_", new_text.casefold()).strip("_")[:40] or "state"
+        state = GlobalState(
+            id=f"human_{slug}",
+            detect={"text_present": {"text": new_text}},  # type: ignore[arg-type]
+            recover=ClickSequence(type="click_sequence", clicks=clicks),
+            max_per_run=1,
+            fail=FailSpec(category=FailureCategory.RECOVERY_EXHAUSTED),
+            source=Source.human_demonstrated,
+        )
+        overlay = Overlay(
+            applies_to=AppliesTo(profile=self.profile.id, capabilities=["*"]),
+            tenant=self.tenant.slug,
+            global_states_add=[state],
+            source=Source.human_demonstrated,
+        )
+        path = self.base.writer.write_yaml("proposed_overlay", overlay)
+        self._event("patch.proposed", path=path.name, state=state.id, clicks=len(clicks))
+
+    @asynccontextmanager
+    async def _deadline_paused(self) -> AsyncGenerator[None]:
+        """Time spent waiting for a human does not count against the run deadline."""
+        deadline = self._deadline
+        when = deadline.when() if deadline is not None else None
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        if deadline is not None:
+            deadline.reschedule(None)
+        try:
+            yield
+        finally:
+            if deadline is not None and when is not None:
+                deadline.reschedule(when + (loop.time() - started))
+
+    async def _shot_now(self) -> str:
+        """A screenshot written at once (redacted), for an intervention the console shows now."""
+        number = await self._shot(new=True)
+        shot = self.shots[-1]
+        self.base.writer.screenshot(shot.number, shot.phase, shot.png, text_boxes=shot.boxes)
+        return f"steps/{number:04d}_after.png"
+
+    async def _park(
+        self, category: FailureCategory, message: str, why: str, *, step_id: str | None = None
+    ) -> RunResult:
+        """Stop and leave the run for a human: `needs_human`, carrying the failure."""
+        result = await self._fail(category, message, step_id=step_id, park=False)
+        failure = result.failure
+        assert failure is not None
+        self.interventions.append(
+            InterventionRecord(
+                id=f"takeover.{failure.step_id or 'run'}",
+                kind="takeover",
+                resolution=f"parked: {why}",
+            )
+        )
+        return self._result("needs_human", failure=failure)
 
     async def _extract(self, step: Step) -> None:
         assert step.extract is not None
@@ -854,6 +1189,7 @@ class _Engine:
         step_id: str | None = None,
         expected: str | None = None,
         retryable: bool = False,
+        park: bool = True,
     ) -> RunResult:
         if self.committed and category != FailureCategory.OUTCOME_UNCERTAIN:
             message = f"{category.value} after the irreversible step {self.committed!r}: {message}"
@@ -874,12 +1210,13 @@ class _Engine:
         self._event(
             "run.failure", category=category.value, step_id=failure.step_id, message=message
         )
-        if self.options.escalate:
+        if park and self.options.escalate and self.desk is None:
+            # No console attached: park the run for a human instead of blocking on one.
             self.interventions.append(
                 InterventionRecord(
                     id=f"takeover.{failure.step_id or 'run'}",
                     kind="takeover",
-                    resolution="parked; blocking escalation arrives in P5",
+                    resolution="parked: no operator console attached",
                 )
             )
             return self._result("needs_human", failure=failure)
@@ -937,9 +1274,9 @@ class _Engine:
             self_target=step.target if step is not None else None, outputs=self.outputs
         )
 
-    def _handoff(self, actor: str) -> None:
-        epoch = self.holder.hand_to(actor)
-        self._event("control.handoff", holder=actor, epoch=epoch)
+    def _hand_to(self, actor: str) -> None:
+        self.ctl.hand_to(actor)
+        self.actor = actor
 
     def _event(self, kind: str, **fields: object) -> None:
         self.base.event(kind, **fields)
