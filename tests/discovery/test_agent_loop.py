@@ -3,7 +3,6 @@ SDK client, so batches, tool-result shapes, recording and stop conditions are te
 
 import asyncio
 import json
-import time
 from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
@@ -282,13 +281,13 @@ async def _same(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 class Clock:
-    """The discovery clock, moved by hand: real time plus an offset."""
+    """The discovery clock, moved only by hand, so a slow machine can't move it past a limit."""
 
     def __init__(self) -> None:
         self.offset = 0.0
 
     def __call__(self) -> float:
-        return time.monotonic() + self.offset
+        return self.offset
 
 
 @pytest.fixture
@@ -316,7 +315,7 @@ async def test_the_limit_is_600_s_and_just_under_it_discovery_carries_on(
     browser: Browser, lantern: Bank, tmp_path: Path, clock: Clock
 ) -> None:
     assert DiscoveryConfig(goal=GOAL, model=MODEL).max_seconds == 600
-    turns = [click_menu, after(clock, 595, search), finish]
+    turns = [click_menu, after(clock, 599, search), finish]
     result, _, _ = await run(browser, lantern, tmp_path, turns)
     assert (result.status, result.stop_reason) == ("success", "declared_success")
 
