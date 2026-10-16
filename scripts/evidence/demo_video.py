@@ -237,9 +237,9 @@ class Recorder:
     def bank(self) -> BankClient:
         return self.banks["lantern-bay"]
 
-    def tenant(self) -> TenantProfile:
-        return load_tenant(REPO / "tenants" / "lantern-bay.yaml").model_copy(
-            update={"base_url": self.bank.url}
+    def tenant(self, slug: str = "lantern-bay") -> TenantProfile:
+        return load_tenant(REPO / "tenants" / f"{slug}.yaml").model_copy(
+            update={"base_url": self.banks[slug].url}
         )
 
     def policy(self) -> Policy:
@@ -256,13 +256,15 @@ class Recorder:
         options: RunOptions | None = None,
         desk: InterventionDesk | None = None,
         faults: dict[str, str] | None = None,
+        slug: str = "lantern-bay",
     ) -> tuple[RunResult, list[TextBox], Path]:
         """A replay, filmed, with the text on its final screen read just before the page
         closes: the run's own geometry for the zoom. Same engine and opener as run_replay."""
-        self.bank.reset()
+        bank = self.banks[slug]
+        bank.reset()
         if faults:
-            self.bank.set_faults(**faults)
-        policy, tenant = self.policy(), self.tenant()
+            bank.set_faults(**faults)
+        policy, tenant = self.policy(), self.tenant(slug)
         writer = EvidenceWriter(folder / "runs", new_run_id(), Redactor.from_policy(policy))
         effective = resolve(
             load_for_run(cap_path).capability, PROFILE, tenant, tenant_overlays(tenant.slug)
@@ -490,6 +492,18 @@ async def rec_agent(r: Recorder) -> None:
     )
 
 
+async def rec_copperhill(r: Recorder) -> None:
+    """The same approved lookup at the second credit union, with its reviewed overlays: the
+    footage for the narrated story's reuse beat. Free: no model."""
+    folder = fresh("copperhill")
+    member = str(r.banks["copperhill"].tenant.demo_member)
+    result, boxes, run_dir = await r.replay(
+        folder, APPROVED_LOOKUP, {"member_id": member}, slug="copperhill"
+    )
+    expect(result.status == "success", f"Copperhill replay ended {result.status}")
+    save(folder, {"zoom": table_region(boxes), "run_dir": str(run_dir), "member": member})
+
+
 RECORDERS = {
     "discovery": rec_discovery,
     "replay": rec_replay,
@@ -497,6 +511,7 @@ RECORDERS = {
     "gate": rec_gate,
     "handoff": rec_handoff,
     "agent": rec_agent,
+    "copperhill": rec_copperhill,  # recorded for video/ (the narrated story); not in this film
 }
 
 
@@ -1047,6 +1062,7 @@ def main() -> int:
     parser.add_argument("--segments", default="", help="comma-separated segments to record")
     parser.add_argument("--offline", action="store_true", help="record the free segments only")
     parser.add_argument("--build", action="store_true", help="only assemble from the raw clips")
+    parser.add_argument("--no-build", action="store_true", help="record only; don't assemble")
     args = parser.parse_args()
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None or shutil.which("ffprobe") is None:
@@ -1060,7 +1076,7 @@ def main() -> int:
             chosen = [s for s in SEGMENTS if s not in PAID]
         else:
             chosen = [s for s in args.segments.split(",") if s] or list(SEGMENTS)
-        unknown = sorted(set(chosen) - set(SEGMENTS))
+        unknown = sorted(set(chosen) - set(RECORDERS))
         if unknown:
             print(f"unknown segments: {unknown}", file=sys.stderr)
             return 2
@@ -1069,6 +1085,8 @@ def main() -> int:
         except Mismatch as exc:
             print(f"recording stopped: {exc}", file=sys.stderr)
             return 1
+        if args.no_build:
+            return 0
     try:
         out = asyncio.run(assemble(ffmpeg))
     except Mismatch as exc:

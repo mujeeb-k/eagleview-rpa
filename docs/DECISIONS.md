@@ -1278,3 +1278,36 @@ replayed by a person at the CLI. The redaction beat names what is painted out, s
 stay readable on the training tenant (`redact_amounts: false`). The opening was tightened and
 its disclaimer became a footnote, to bring the film to 3:00. Step 4's bracketed sentence is
 accurate (with a console attached, a gated step waits for approval) and is kept.
+
+## 2026-10-16 — The narrated demo, in Remotion
+
+**[REVIEW] The narrated story is built with Remotion, in its own `video/` folder.** Remotion
+renders React components frame by frame, so the cursor, ripples, labels, zooms and the "driving"
+token can be drawn exactly from the run logs' coordinates and timestamps, and every scene's length
+can follow its narration. It is free for individuals under its company license (a team of four or
+more would need a company license). It lives in `video/` with its own `package.json`, pinned to
+4.0.532; the Python package, `pyproject.toml` and CI are untouched. Alternatives: **Manim**
+(3Blue1Brown's own library) draws the diagrams beautifully but is built for vector animation,
+not for compositing screen recordings with timed overlays; **the existing ffmpeg pipeline** can
+overlay PNGs but every moving element (a cursor easing between clicks, a label following a zoom)
+would be hand-built filter expressions.
+
+**Narration is a macOS voice, one cue at a time.** Each subtitle cue is spoken separately with
+`say` and joined into one file per beat, so subtitles and labels can be timed to the exact cue
+that mentions them. Footage plays at its recorded speed and then holds its last frame while the
+narration finishes; discovery's thinking time and the handoff's wait for help are jump cuts,
+marked "thinking…" or "waiting…". The alternative, one file per beat with estimated cue times,
+would drift by a second or more.
+
+**[REVIEW] Overlays are timed from the footage, and held at each action.** The first draft drew
+each ripple from an action's logged time onwards. That time is written as the action finishes,
+and the mock bank paints the next screen within a frame or two, so ripples, typed values and
+labels played on the screen each action produced, which read as one action late; thoughts also
+lasted until the AI's next turn, across every action in its batch. The video/sync clock itself
+was right (within about 10 ms), and zoom, cuts and trims already applied to both. Now each
+action's moment is the first frame of its effect, found in the footage around its logged time;
+the footage holds the frame before it for half a second while the ripple plays, and labels and
+thoughts end before the next action. One timeline drives both footage and overlays, and a sync
+check fails the build unless every overlaid action's held frame is the screen before it. The
+alternative, shifting overlays earlier by a fixed amount, would still put most of each ripple on
+the next screen, because the screen changes almost at once. The holds lengthen the story to 2:08.

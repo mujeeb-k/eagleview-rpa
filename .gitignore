@@ -9,3 +9,8 @@ runs/
 
 # macOS Finder metadata
 .DS_Store
+
+# video/: Remotion dependencies and media prepared from runs/demo_video/ (never committed)
+video/node_modules/
+video/public/media/
+video/out/
