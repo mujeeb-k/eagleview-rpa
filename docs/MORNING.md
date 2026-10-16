@@ -42,7 +42,7 @@ bottom).
 - `capabilities/drafts/member.lookup_share_balances.yaml`
 - `capabilities/drafts/member.open_share_account.yaml`, the post flow, where Post needs approval
 
-**Spend.** About $0.55 over 11 real runs, out of your $25 / 30-run budget, so 19 runs remain.
+**Spend.** About $0.91 over 18 real runs, out of your $25 / 30-run budget, so 12 runs remain.
 A full `make evidence` uses 4 runs (about $0.25), and 6 once scenario 14 can run (its two
 agent questions), about $0.30. The cap lives
 in your local ledger, `runs/discovery_ledger.jsonl`. It is unchanged; to reset it, move that file
@@ -189,4 +189,12 @@ out, by design.
 
 ## CI
 
-CI_STATUS
+- **P4 to P9:** green on every phase commit.
+- **P10+P11 (`3185db1`): failed**, in `make demo-offline`, scenario 11, on the Linux runner
+  (run 38860309441). Enter on a focused list submits its form in macOS Chromium but opens the
+  list in Linux Chromium. Discovery ran on macOS, so the recorded "press Return" stalled on
+  Linux. The driver also hid the failing step behind a 120 s timeout.
+- **The fix (`06fbb62`): green** (run 38863367145). The surface now applies the HTML
+  implicit-submission rule on every host (#39), and all ten offline scenarios pass on Linux.
+- This file is in a later, docs-and-evidence commit; its CI result is in my closing message, not
+  here, because a file can't report the CI run of the commit that contains it.

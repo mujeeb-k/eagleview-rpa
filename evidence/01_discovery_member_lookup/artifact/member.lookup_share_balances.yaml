@@ -3,9 +3,8 @@ id: member.lookup_share_balances
 version: 1.0.0
 title: Look up a member by number and read their share account balances.
 description: Opens Member Inquiry in the teller application, searches for a member by member number,
-  and reads the share accounts listed for that member. Returns each share account's suffix, 
-  description, nickname, balance, and available balance. It is read-only and does not change any 
-  member or account data.
+  and extracts the member's share accounts. Returns each share account's suffix, description, 
+  nickname, balance, and available balance. It is read-only and does not change any member data.
 status: verified
 app:
   profile: ironbridge-teller
@@ -25,8 +24,7 @@ outputs:
     type: array
     sensitivity: pii
     required: true
-    description: List of share accounts belonging to the member, as shown on the Member Inquiry 
-      screen.
+    description: List of the member's share accounts with their balances.
     items:
       description:
         type: string
@@ -45,11 +43,10 @@ outcomes:
     kind: business
     detect:
       text_matches:
-        frame:
-          - main
+        frame: []
         pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
-    message: The teller system reported that no member exists for the member number that was 
-      searched (IBT-1004), so no member record is available.
+    message: No member exists for the member number that was searched, so the lookup returned no 
+      result.
     source: probed_verified
 steps:
   - id: open_member_inquiry
@@ -78,7 +75,7 @@ steps:
           expression: //a[normalize-space(.)='Member Inquiry']
         - strategy: point
           x: 55
-          y: 82
+          y: 83
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -112,7 +109,7 @@ steps:
                   expression: "//tr[normalize-space(*[1])='Member #']//input"
                 - strategy: point
                   x: 295
-                  y: 134
+                  y: 135
                   bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
               fragile: false
     timeout_ms: 8000
@@ -142,7 +139,7 @@ steps:
           expression: "//tr[normalize-space(*[1])='Member #']//input"
         - strategy: point
           x: 295
-          y: 134
+          y: 135
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -154,7 +151,7 @@ steps:
         equals: '{{ inputs.member_id }}'
     timeout_ms: 8000
   - id: submit_member_search
-    intent: Click the search button to run the member lookup and display the member's accounts.
+    intent: Click GO to run the member search and display the member's accounts.
     action:
       type: click
     target:
@@ -218,12 +215,12 @@ success:
     - output_present: share_accounts
 provenance:
   discovered_by:
-    run_id: r_20261016T060025_7ba527
+    run_id: r_20261016T065530_773c3e
     model: claude-sonnet-5-5
-    at: '2026-10-16T06:00:53.871500Z'
+    at: '2026-10-16T06:55:47.163148Z'
   verified_by:
-    - run_id: r_20261016T060058_09a99d
-      at: '2026-10-16T06:01:26.444344Z'
-    - run_id: r_20261016T060124_188f64
-      at: '2026-10-16T06:01:26.444344Z'
-  content_hash: sha256:24ab4fc46a9d3c662ce92976dc10329167220118ac4a53e0287758f0671dd0e2
+    - run_id: r_20261016T065555_e6cbf8
+      at: '2026-10-16T06:56:34.099394Z'
+    - run_id: r_20261016T065632_144d6a
+      at: '2026-10-16T06:56:34.099394Z'
+  content_hash: sha256:cdbb743a374ae2aeea4a8ca21f1f18f8067106f8c0f3621904fbcdff14f86089

@@ -1188,3 +1188,7 @@ text. A test builds a scenario-14 record and scans it.
 **A run that ends before the operator's plan is a mismatch.** In scenarios 03, 10 and 11, once
 the run returns, the operator gets 5 s to finish its plan; otherwise the scenario fails with how
 the run ended, instead of a timeout.
+
+**The four model scenarios were regenerated too.** 01, 02, 03 and 12a ran again so their records
+go through the redactor and name `evidence/`, not the staging folder; 02 and 03 exercised the new
+Enter rule in real discovery. Spend is now about $0.91 over 18 real runs.

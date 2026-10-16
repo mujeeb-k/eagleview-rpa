@@ -64,3 +64,19 @@ def test_a_scenario_record_is_written_redacted(tmp_path: Path) -> None:
     write_record(tmp_path, record)
     assert scan(tmp_path) == []
     assert "10482" not in (tmp_path / "result.json").read_text()
+
+
+def test_a_record_names_where_its_folder_ends_up(tmp_path: Path) -> None:
+    from scripts.evidence.driver import REPO as ROOT
+    from scripts.evidence.driver import write_record
+
+    staging = ROOT / "runs" / "evidence_staging" / "01_x"
+    final = ROOT / "evidence" / "01_x"
+    staging.mkdir(parents=True, exist_ok=True)
+    try:
+        record = {"review": f"written to {staging}/a.yaml and runs/evidence_staging/01_x/b.yaml"}
+        written = write_record(staging, record, moved_to=final)
+    finally:
+        (staging / "result.json").unlink(missing_ok=True)
+        staging.rmdir()
+    assert written["review"] == "written to evidence/01_x/a.yaml and evidence/01_x/b.yaml"

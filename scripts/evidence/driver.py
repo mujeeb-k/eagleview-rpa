@@ -612,17 +612,14 @@ async def run(numbers: list[str], *, offline: bool, out_root: Path = EVIDENCE) -
                 record["seconds"] = round(time.monotonic() - started, 1)
                 for run_dir in sorted(p for p in out.glob("r_*") if p.is_dir()):
                     render(run_dir, label=LABEL if "operator" in record else None)
-                written = write_record(out, record)
-                if record["status"] in ("pass", "pending"):
-                    shutil.rmtree(final, ignore_errors=True)
-                    final.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(out), str(final))
-                else:
-                    kept = REPO / "runs" / "evidence_failed" / s.folder
-                    shutil.rmtree(kept, ignore_errors=True)
-                    kept.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(out), str(kept))
-                    print(f"[{s.number}] previous evidence kept; this attempt is in {kept}")
+                ok = record["status"] in ("pass", "pending")
+                dest = final if ok else REPO / "runs" / "evidence_failed" / s.folder
+                written = write_record(out, record, moved_to=dest)
+                shutil.rmtree(dest, ignore_errors=True)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(out), str(dest))
+                if not ok:
+                    print(f"[{s.number}] previous evidence kept; this attempt is in {dest}")
                 print(
                     f"[{s.number}] {record['status']}: {s.name} ({record['seconds']}s)", flush=True
                 )
@@ -662,14 +659,21 @@ async def held_out() -> int:
     return 0
 
 
-def write_record(out: Path, record: dict[str, Any]) -> dict[str, Any]:
+def write_record(
+    out: Path, record: dict[str, Any], *, moved_to: Path | None = None
+) -> dict[str, Any]:
     """result.json, redacted like everything else on disk: the evidence redactor, with every
-    member number the scenarios type registered as an identifier (invariant 4)."""
+    member number the scenarios type registered as an identifier (invariant 4). Paths name
+    `moved_to`, where the folder ends up, not the staging folder it was built in."""
     redactor = Redactor.from_policy(POLICY)
     for number in KNOWN_INPUTS:
         redactor.register(number, Sensitivity.identifier, "member")
     clean = redactor.redact_tree(json.loads(json.dumps(record, default=str)))
-    text = json.dumps(clean, indent=2).replace(f"{REPO}/", "")
+    text = json.dumps(clean, indent=2)
+    if moved_to is not None:
+        for here, there in ((out, moved_to), (out.relative_to(REPO), moved_to.relative_to(REPO))):
+            text = text.replace(f"{here}/", f"{there}/")
+    text = text.replace(f"{REPO}/", "")
     (out / "result.json").write_text(text + "\n")
     return json.loads(text)
 

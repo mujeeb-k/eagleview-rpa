@@ -4,8 +4,8 @@
   "shows": "write flow, staged risk",
   "command": "scripts/evidence/02_discovery_open_share_review.sh",
   "risk": "write_staged",
-  "review": "discovery success (declared_success)\nshare.stage_open_share_review@1.0.0: verified, risk write_staged\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_lookup: click\n  open_share_form: click\n  select_share_type: select\n  validate_open_share: click\n  outputs: (none)\n  outcomes: MEMBER_NOT_FOUND [probed_verified]\n  written to evidence/02_discovery_open_share_review/artifact/share.stage_open_share_review.yaml\n  model spend this pipeline: $0.069163",
-  "usd": "0.069163",
+  "review": "discovery success (declared_success)\nshare.stage_open_share_validation@1.0.0: verified, risk write_staged\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_search: click\n  open_share_form: click\n  select_share_type: select\n  validate_open_share: press\n  outputs: (none)\n  outcomes: MEMBER_NOT_FOUND [probed_verified]\n  written to evidence/02_discovery_open_share_review/artifact/share.stage_open_share_validation.yaml\n  note: probe 2: ok\n  model spend this pipeline: $0.051663",
+  "usd": "0.051663",
   "status": "pass",
-  "seconds": 101.9
+  "seconds": 71.1
 }

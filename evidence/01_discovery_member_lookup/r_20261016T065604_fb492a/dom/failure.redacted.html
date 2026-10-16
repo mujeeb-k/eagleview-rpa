@@ -1,0 +1,94 @@
+<!-- frame: top -->
+<html><head><title>Ironbridge Teller 7 - LANTERN BAY FCU</title></head>
+<frameset rows="56,*" border="0" frameborder="0" framespacing="0">
+  <frame name="banner" src="/banner" scrolling="no" noresize="">
+  <frameset cols="170,*" border="1" frameborder="1">
+    <frame name="nav" src="/nav" scrolling="auto">
+    <frame name="main" src="/home" scrolling="auto">
+  </frameset>
+</frameset>
+</html>
+<!-- frame: banner -->
+<html><head><title>banner</title></head>
+<body bgcolor="#003366" topmargin="0" leftmargin="0" marginheight="0" marginwidth="0">
+<table width="100%" height="56" border="0" cellspacing="0" cellpadding="4"><tbody><tr>
+<td width="200" valign="middle"><img src="/img/logo.svg" width="190" height="40" border="0"></td>
+<td valign="middle"><font face="Arial" size="1" color="#FFFFFF">
+Teller: <b>teller01</b> (TLR-0417) &nbsp; Drawer 04<br>
+Branch: Main Office &nbsp; Business Date: 10/15/2026</font></td>
+<td align="right" valign="middle"><font face="Arial" size="1" color="#FFFFFF">
+Session <b class="cd">14:52</b> &nbsp;
+<a href="/signoff" target="_top"><font color="#FFFFFF">Sign Off</font></a></font></td>
+</tr></tbody></table>
+<script>
+// Client-side only: no polling, no refresh, so it never touches the server or the request count.
+var left = 900;
+setInterval(function () {
+  if (left > 0) { left--; }
+  var m = Math.floor(left / 60), s = left % 60;
+  document.getElementsByClassName('cd')[0].innerHTML = m + ':' + (s < 10 ? '0' : '') + s;
+}, 1000);
+</script>
+
+</body></html>
+<!-- frame: nav -->
+<html><head><title>nav</title>
+<style>td.mnu { padding: 4px 6px; border-bottom: 1px solid #FFFFFF; }</style></head>
+<body bgcolor="#C0C0C0" topmargin="4" leftmargin="4">
+<table width="100%" border="0" cellspacing="0" cellpadding="0">
+<tbody><tr><td><font face="Arial" size="1" color="#555555"><b>FUNCTIONS</b></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/inq" target="main"><font color="#000080">Member Inquiry</font></a></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/na?f=TTOT" target="main" onclick="top.main.location.href='/na?f=TTOT';return false;"><font color="#000080">Teller Totals</font></a></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/na?f=CDRW" target="main" onclick="top.main.location.href='/na?f=CDRW';return false;"><font color="#000080">Cash Drawer</font></a></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/na?f=RPTS" target="main" onclick="top.main.location.href='/na?f=RPTS';return false;"><font color="#000080">Reports</font></a></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/na?f=HELP" target="main"><font color="#000080">Help</font></a></font></td></tr>
+
+<tr><td class="mnu"><font face="Arial, Helvetica" size="2"><a href="/signoff" target="_top"><font color="#000080">Sign Off</font></a></font></td></tr>
+
+</tbody></table>
+
+</body></html>
+<!-- frame: main -->
+<html><head><title>Ironbridge Teller - Member Inquiry</title></head>
+<body bgcolor="#FFFFFF" topmargin="6" leftmargin="8" marginheight="6" marginwidth="8">
+<table width="100%" border="0" cellspacing="0" cellpadding="0"><tbody><tr>
+<td><font face="Arial, Helvetica" size="4" color="#000000"><b>Member Search</b></font></td>
+<td align="right" valign="top"><font face="Courier New" size="1" color="#888888">INQ001</font></td>
+</tr></tbody></table>
+<br>
+
+
+<table border="1" cellspacing="0" cellpadding="4" bordercolor="#CC0000" bgcolor="#FFEEEE" width="100%"><tbody><tr><td>
+<font face="Arial, Helvetica" size="2" color="#CC0000"><b>IBT-1004 NO MEMBER FOUND FOR NUMBER [member]</b></font><br>
+</td></tr></tbody></table><br>
+
+<table width="100%" border="0" cellspacing="0" cellpadding="2"><tbody><tr>
+<td bgcolor="#336699"><font face="Arial, Helvetica" size="2" color="#FFFFFF"><b>Search Criteria</b></font></td>
+</tr></tbody></table>
+<form method="post" action="/inq">
+<table border="0" cellspacing="0" cellpadding="4">
+<tbody><tr>
+<td><font face="Arial, Helvetica" size="2">Member #</font></td>
+<td><input type="text" name="txtA" size="10" maxlength="10" value="[member]" style=""></td>
+<td><img src="/img/go.svg" width="36" height="20" border="0" style="cursor:pointer" onclick="document.forms[0].submit();"></td>
+</tr>
+<tr>
+<td><font face="Arial, Helvetica" size="2">Last Name</font></td>
+<td><input type="text" name="txtB" size="18" value="" style=""></td>
+<td></td>
+</tr>
+</tbody></table>
+</form>
+<font face="Arial, Helvetica" size="1" color="#666666">Enter a member number, or a last name where name search is enabled.</font>
+
+<br><hr size="1" noshade="">
+<font face="Arial, Helvetica" size="1" color="#666666">Ironbridge Teller v7.2.3 — TRAINING REGION — synthetic data</font>
+
+
+
+</body></html>
