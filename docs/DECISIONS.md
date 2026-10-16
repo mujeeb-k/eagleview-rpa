@@ -740,3 +740,157 @@ and adds `.2`, `.3`, … when the name is taken. P7's compiler writes through it
 
 **The intervention store accepts a discovery goal.** `request_human` during discovery opens a
 takeover naming the goal rather than a capability, and it waits at most `human_timeout_s`.
+
+## 2026-10-16 — P7 plan (self-reviewed with the advisor)
+
+**What gets built.** A `compiler/` package:
+- **segment:** trace to steps;
+- **prune:** shortest path over state fingerprints;
+- **derive:** expects, success, outputs, input patterns;
+- **name:** Claude, structured output;
+- **assemble:** a Pydantic `Capability`;
+- **verify** and **probe:** replays;
+- **pipeline:** discover, compile, verify, probe, `write_draft`.
+
+Plus the CLI: `eagleview discover` runs the whole pipeline, and `eagleview approve` exists but is
+never run by me.
+
+Scenarios 02, 03 and 11 need write flows, so the compiler handles fill, select, click, press and
+irreversible steps, not only the lookup.
+
+**The recorder learns what the compiler needs, so new traces are recorded.** For each
+screen-changing action the trace gains:
+- the text that appeared (visible after, not before), with its frame and whether it is a heading;
+- for selects, the chosen option's label, read after the action.
+
+Traces from P6 lack these, so the P7 pipeline re-runs discovery, and those runs count against the
+budget.
+
+**[REVIEW] Discovery can get an approval.** An irreversible action in discovery returns
+`escalate`. With a desk attached, discovery opens an approval intervention, and the scripted
+operator answers it in evidence scenario 03. On approval it grants a token bound to (run, action)
+and acts again. Without a desk, the action is refused as in P6.
+
+This needs one policy change: an approval token for the step now allows the action in discovery
+mode too. Before, discovery always escalated, so nothing could ever be approved. Every actor except
+an operator still needs the token, and only a person resolves the intervention that grants it.
+
+**Segmenting.** A click on a field followed by `fill_input` or a bound `type` becomes one `fill`
+step on the clicked target. A click on a select followed by keys or typing becomes a `select`
+step with the recorded option label. Return or Enter becomes `press`. Screenshot, zoom, wait,
+scroll and mouse moves are dropped.
+
+**[REVIEW] Pruning.** Screen-changing steps are pruned by the shortest path over the fingerprint
+graph, from the first state to the success state. Value-setting steps (fill, select) don't change
+the fingerprint, so they are kept when their state is on that path, and only the last one per
+field. Pruning them by the graph was rejected: every fill is a self-loop and would be lost.
+
+**Expects.** A click's `expect` is text that appeared after it: a heading first, otherwise the
+first new text in the frame that changed. Text containing a redaction placeholder or only digits
+is skipped. When the next step has a target, `element_present` of that target is added under
+`all`. A fill or select expects its own value (`field_value: self`).
+
+**[REVIEW] Outputs fail closed.**
+- A marked value becomes a string output, or a decimal when it parses as money.
+- A marked table becomes an array: one item field per non-empty header, decimal where every cell
+  parses as money.
+- Sensitivity is `pii` for every output, and item fields inherit it.
+
+The fixture's `sensitivity: none` for suffix and description was a reviewer's choice, and a
+reviewer can make it again.
+
+**[REVIEW] What the naming pass may change.** It proposes:
+- the capability id, title and description;
+- step ids and intents;
+- output and item field names;
+- input descriptions, examples and patterns;
+- raising a step's risk from `read` to `write_staged`.
+
+It may not touch locators, predicates or order, and it may never lower a risk. An irreversible
+risk comes only from the policy decision recorded in the trace. A proposed input pattern must
+match the discovery value. The prompt asks for the shape of the value, not this tenant's length,
+so the same contract works at a tenant with longer member numbers (P8).
+
+**Verify and probe.**
+- **Verify:** replay the draft with the discovery inputs, normalized as P4 does. Success makes it
+  `verified`, with the run recorded in provenance.
+- **Probe:** Claude proposes 3 inputs that are valid in shape but unlikely to exist. Each runs in
+  probe mode: on a terminal UNKNOWN_STATE or STATE_TIMEOUT, the engine writes the visible text,
+  redacted, to `probe.json`.
+- **Classify:** Claude turns each distinct state into an outcome code, a message and a regex. The
+  regex must compile and match the captured text, or it is rejected.
+- **Confirm:** the probe runs again with the outcome added. If it now returns that outcome, its
+  source becomes `probed_verified`.
+- **Final verify:** the success replay runs again with the outcomes in place, so no outcome fires
+  falsely.
+
+Artifacts stay `verified`. I never approve.
+
+**P7 plan addendum, from the advisor's review.**
+- **[REVIEW] Verifying an irreversible capability needs a person.** The verify replay of a post flow
+  runs with a desk attached, and a person approves the post in the console. In evidence that is
+  the scripted operator, labelled as such, on the synthetic training tenant after a bank reset.
+  Verify never passes `--approve-gates` behind anyone's back. **Probe replays never get a desk or
+  an approval**, so a "nonexistent" member that does exist stops at the gate; a test proves it.
+- **Checkbox and radio clicks set values.** They count as value-setting steps and survive
+  pruning. A graph edge is the recorded `changed` flag (a new fingerprint or a new document), not
+  the fingerprint alone.
+- **Values bind to inputs by equality, for selects too.** An option label equal to an input value
+  compiles to `{{ inputs.<name> }}`.
+- **Probe regexes are checked hard.** A regex containing a redaction placeholder or the probe value
+  is rejected. Probe inputs must pass the input schema before they run. An outcome whose confirm
+  run fails is dropped, never left as `probed`.
+- **Every compiler call (naming, probe proposal, classification) is metered under the discovery run's
+  id**, so one pipeline counts as one run.
+- **Predicates never depend on inputs.** Expects and the success predicate skip any text with a
+  placeholder, and a marked value's text never becomes a predicate.
+- `eagleview discover` starts the console when an approval may be needed, so scenario 03 runs from
+  the CLI.
+
+**[REVIEW] Correction to the P7 plan: discovery never commits, a person does.** I had planned to let
+an approval token allow an irreversible action in discovery mode. A P2 policy test pins the
+opposite: discovery never commits, even with a token. Changing that expectation would weaken a
+safety test, so the policy is unchanged.
+
+Instead, when the model reaches an irreversible action, discovery opens a takeover with reason
+`APPROVAL_REQUIRED` and hands the session to a person. The person performs the action in the
+console; an operator may act irreversibly, audited (PLAN §5). Their clicks are grounded and
+recorded in the trace as `operator:<name>` steps, the same way the model's are, and the model is
+told a person did it. The compiler turns that recorded irreversible click into an irreversible
+step with `requires_approval`. Replay then needs an approval for it, as before.
+
+## 2026-10-16 — P7 as built
+
+**The first real probe proposal was declined before any output.** It billed 528 input tokens
+and returned nothing. The prompt asked for values "unlikely to exist in the institution's
+records", which reads like probing a real bank.
+- The prompt now says plainly that this is testing on a synthetic training tenant, and why the
+  values are wanted.
+- Every structured call checks the stop reason and raises a typed `StructuredRefused` instead
+  of crashing.
+- **[REVIEW]** If Claude still proposes nothing usable, the pipeline falls back to deterministic
+  probes of the same shape: all nines, then all zeros, kept only if the input schema accepts them.
+
+The second real pipeline succeeded: verified, with MEMBER_NOT_FOUND `probed_verified`, for $0.04.
+
+**[REVIEW] A select bound to an input chooses that input's option by provenance.** In Chromium,
+typing into an open list only highlights an option; the choice commits when the list closes. So
+the value read just after typing can be stale. When the model types a declared input into a
+select, the option binds to that input, as a fill does.
+
+**A key that changes the screen is a step, even while a select is being worked.** Enter on this
+app's select submits the form. Folding that key into the select had broken the shortest path.
+The prompt no longer suggests pressing Enter to confirm a choice.
+
+**Probe regexes are checked semantically too.** A regex that escaped the brackets around a
+placeholder (`\[member_id\]`) passed the first check. Escapes are now stripped before the
+placeholder check, and the regex must still match once every placeholder is replaced by another
+value.
+
+**[REVIEW] The final verify runs only when probing added outcomes.** Without new outcomes the first
+verify stands, so an irreversible flow is not posted a third time just to re-prove itself.
+
+**The import boundary is stricter.** `eagleview.control` joins the guarded packages, and
+`eagleview.compiler` joins the forbidden imports, beside `anthropic` and `eagleview.discovery`.
+
+**Real spend so far: $0.16 over 4 runs.**

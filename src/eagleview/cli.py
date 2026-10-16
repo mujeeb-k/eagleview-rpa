@@ -197,9 +197,11 @@ def _summary(result: RunResult, runs_dir: Path) -> str:
 
 @app.command(
     help=(
-        "Discover a task with Claude: it drives the app once through the screen, and every "
-        "action is grounded and recorded to runs/<run_id>/trace.jsonl. Needs ANTHROPIC_API_KEY. "
-        "Spend is ledgered in runs/discovery_ledger.jsonl and capped at $25 and 30 runs."
+        "Discover a task with Claude, then compile, verify and probe it: Claude drives the app "
+        "once through the screen, every action is grounded and recorded, and the trace becomes a "
+        "capability under capabilities/drafts/ (never overwriting a file). Needs "
+        "ANTHROPIC_API_KEY. Spend is ledgered in runs/discovery_ledger.jsonl and capped at $25 "
+        "and 30 runs. The operator console runs while it works, for hand-overs and approvals."
     )
 )
 def discover(
@@ -216,14 +218,24 @@ def discover(
         Path | None, typer.Option(help="A tenant YAML to use instead of tenants/<slug>.yaml.")
     ] = None,
     runs_dir: Annotated[Path, typer.Option(help="Where run evidence is written.")] = Path("runs"),
+    drafts_dir: Annotated[Path, typer.Option(help="Where compiled drafts go.")] = Path(
+        "capabilities/drafts"
+    ),
+    console_port: Annotated[int, typer.Option(help="Operator console port.")] = 8700,
+    human_timeout: Annotated[
+        float, typer.Option(help="Seconds to wait for a person at the console.")
+    ] = 900.0,
     headed: Annotated[bool, typer.Option(help="Show the browser.")] = False,
 ) -> None:
     from eagleview.artifacts.loader import app_profile_path, tenant_path
     from eagleview.artifacts.yaml_io import load_app_profile, load_policy, load_tenant
-    from eagleview.discovery.agent_loop import DiscoveryConfig, DiscoveryResult
-    from eagleview.discovery.agent_loop import discover as run_discovery
+    from eagleview.compiler.pipeline import PipelineResult, discover_and_compile
+    from eagleview.control.interventions import InterventionDesk, InterventionStore
+    from eagleview.discovery.agent_loop import DiscoveryConfig
     from eagleview.discovery.client import model_from
     from eagleview.discovery.meter import Ledger, LedgerMeter
+    from eagleview.operator.console import create_console
+    from eagleview.operator.server import ConsolePortInUse, console_server
     from eagleview.runner import environment
     from eagleview.surfaces.web.launch import launched_browser
 
@@ -232,10 +244,16 @@ def discover(
     profile = load_app_profile(app_profile_path(tenant_profile.app_profile))
     config = DiscoveryConfig(goal=goal, model=model_from(env, model), effort=effort)
     meter = LedgerMeter(Ledger(runs_dir / "discovery_ledger.jsonl"))
+    store = InterventionStore(runs_dir / "interventions.sqlite")
+    desk = InterventionDesk(store, human_timeout_s=human_timeout)
 
-    async def go() -> DiscoveryResult:
-        async with launched_browser(headed=headed) as browser:
-            return await run_discovery(
+    async def go() -> PipelineResult:
+        async with (
+            console_server(create_console(desk, runs_dir), port=console_port) as url,
+            launched_browser(headed=headed) as browser,
+        ):
+            desk.console_url = url
+            return await discover_and_compile(
                 config,
                 profile=profile,
                 tenant=tenant_profile,
@@ -244,14 +262,62 @@ def discover(
                 meter=meter,
                 environ=env,
                 runs_root=runs_dir,
+                drafts_root=drafts_dir,
+                desk=desk,
             )
 
-    result = asyncio.run(go())
-    typer.echo(result.model_dump_json(indent=2))
+    try:
+        result = asyncio.run(go())
+    except ConsolePortInUse as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from None
+    finally:
+        store.close()
+    typer.echo(result.discovery.model_dump_json(indent=2))
     spend = meter.ledger.spend()
-    typer.echo(
-        f"discovery {result.status} ({result.stop_reason}); "
-        f"this run ${result.usd}; all discovery ${spend.usd:.2f} over {spend.runs} runs",
-        err=True,
+    typer.echo(result.review(), err=True)
+    typer.echo(f"all discovery so far: ${spend.usd:.2f} over {spend.runs} runs", err=True)
+    raise typer.Exit(0 if result.status == "verified" else 5)
+
+
+@app.command(
+    help=(
+        "Approve a verified capability after reviewing it: sets status approved, records the "
+        "reviewer in provenance, and promotes it from capabilities/drafts/ into capabilities/. "
+        "A person's step: unattended runs and the agent catalog only use approved capabilities."
     )
-    raise typer.Exit(0 if result.status == "success" else 5)
+)
+def approve(
+    capability: Annotated[Path, typer.Argument(help="The verified draft YAML.")],
+    reviewer: Annotated[str, typer.Option(help="Who reviewed it.")],
+    into: Annotated[Path, typer.Option(help="Where approved capabilities live.")] = Path(
+        "capabilities"
+    ),
+) -> None:
+    from datetime import UTC, datetime
+
+    from eagleview.artifacts.yaml_io import ArtifactHashMismatch, dump_capability, load_capability
+    from eagleview.schema.capability import Approval, Capability
+
+    try:
+        cap = load_capability(capability)
+    except ArtifactHashMismatch as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from None
+    if cap.status != "verified":
+        typer.echo(f"error: only a verified capability can be approved ({cap.status})", err=True)
+        raise typer.Exit(2)
+    target = into / f"{cap.id}.yaml"
+    if target.exists():
+        typer.echo(
+            f"error: {target} exists; review the difference and move it aside first", err=True
+        )
+        raise typer.Exit(2)
+    provenance = cap.provenance.model_copy(
+        update={"approved_by": Approval(reviewer=reviewer, at=datetime.now(UTC))}
+    )
+    approved = Capability.model_validate(
+        cap.model_copy(update={"provenance": provenance}).model_dump() | {"status": "approved"}
+    )
+    written = dump_capability(approved, target)
+    typer.echo(f"approved {written.ref} by {reviewer}: {target}")

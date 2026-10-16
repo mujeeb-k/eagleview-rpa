@@ -126,3 +126,46 @@ async def test_unmodified_runs_record_no_modified_flag(replay: Replay, lantern: 
     run = await replay(lantern, {"member_id": "99999"})
     assert run.result.modified is None
     assert "modified" not in run.result.model_dump(exclude_none=True)
+
+
+# --- probe runs ---------------------------------------------------------------------------------
+
+
+def test_a_probe_run_can_never_be_approved() -> None:
+    with pytest.raises(ValueError, match="never approves"):
+        RunOptions(probe=True, approve_gates=True)
+    with pytest.raises(ValueError, match="never approves"):
+        RunOptions(probe=True, escalate=True)
+
+
+async def test_a_probe_run_refuses_a_desk(tmp_path: Path) -> None:
+    from eagleview.artifacts.yaml_io import load_app_profile
+    from eagleview.control.interventions import InterventionDesk, InterventionStore
+    from eagleview.evidence.writer import EvidenceWriter
+    from eagleview.replay.engine import replay
+    from eagleview.safety.redaction import Redactor
+    from tests.fixtures import APP_PROFILE, OPEN_SHARE
+    from tests.support.replay import tenant_for
+
+    desk = InterventionDesk(InterventionStore(tmp_path / "iv.sqlite"), notify=lambda _l: None)
+    with pytest.raises(ValueError, match="probe run never has an intervention desk"):
+        await replay(
+            load_for_run(OPEN_SHARE).capability,
+            {"member_id": "99999", "share_type": "Money Market"},
+            profile=load_app_profile(APP_PROFILE),
+            tenant=tenant_for(_FakeBank()),  # type: ignore[arg-type]
+            open_surface=None,  # type: ignore[arg-type]
+            writer=EvidenceWriter(tmp_path / "runs", "r_probe", Redactor()),
+            options=RunOptions(probe=True),
+            desk=desk,
+        )
+
+
+class _FakeBank:
+    url = "http://127.0.0.1:1"
+
+    class tenant:  # noqa: N801
+        slug = "lantern-bay"
+        name = "Lantern Bay Federal Credit Union"
+        username = "teller01"
+        password_secret = "lantern_bay_teller_password"

@@ -25,6 +25,9 @@ class RunOptions:
     approve_gates: bool = False
     escalate: bool = False
     deadline_s: float = DEFAULT_DEADLINE_S
+    # Outcome probing (P7): on an unrecognized terminal screen, write its visible text to
+    # probe.json. A probe never approves anything, so it can never commit.
+    probe: bool = False
 
     def __post_init__(self) -> None:
         if self.unattended and self.approve_gates:
@@ -34,6 +37,8 @@ class RunOptions:
             )
         if self.deadline_s <= 0:
             raise ValueError("deadline_s must be positive")
+        if self.probe and (self.approve_gates or self.escalate):
+            raise ValueError("a probe run never approves or escalates")
 
 
 def normalize_inputs(raw: Mapping[str, object]) -> dict[str, object]:

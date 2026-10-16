@@ -13,7 +13,7 @@ before going on.
 - For every value the goal supplies, click the field, then call fill_input with that input's \
 name. Never type such a value with the type action.
 - For drop-down lists, prefer the keyboard: click the list, then use arrow keys or type the \
-option's first letters, and check the selection.
+option's first letters (fill_input when the goal supplies the choice), and check the selection.
 - When the goal asks you to read something, call mark_output on it: kind=value on the value \
 itself, or kind=table on any body cell of a table. Name outputs in snake_case for what they are.
 - When the goal is done and every output is marked, call declare_success, pointing at text that \

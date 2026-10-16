@@ -16,6 +16,7 @@ person; a turn that ends without declare_success; a refusal; the spend limits.""
 
 import asyncio
 import base64
+import re
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -25,9 +26,9 @@ from typing import Any, Literal
 import anthropic
 import httpx2
 from playwright.async_api import Browser
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from eagleview.control.interventions import InterventionDesk, LiveSession
+from eagleview.control.interventions import HumanAction, InterventionDesk, LiveSession
 from eagleview.control.session_controller import ControlState
 from eagleview.discovery.client import DEFAULT_EFFORT, make_client
 from eagleview.discovery.inputs import GoalInputs, extract_inputs
@@ -43,13 +44,15 @@ from eagleview.discovery.tools import (
 )
 from eagleview.evidence.writer import EvidenceWriter
 from eagleview.replay.engine import OpenSession, SessionNotReady, new_run_id, open_session
-from eagleview.safety.policy_engine import PolicyEngine
+from eagleview.safety.policy_engine import Decision, PolicyEngine
 from eagleview.safety.redaction import Redactor
 from eagleview.schema.action import Action, TextBox
 from eagleview.schema.app_profile import AppProfile
-from eagleview.schema.capability import InputSpec, TableSpec
+from eagleview.schema.capability import InputSpec, ScalarExtract, TableSpec
 from eagleview.schema.common import Sensitivity
+from eagleview.schema.locators import TargetSpec
 from eagleview.schema.policy import Policy
+from eagleview.schema.surface import GroundedTarget
 from eagleview.schema.tenant import TenantProfile
 from eagleview.surfaces.base import ActionResult, Surface
 from eagleview.surfaces.capture import capture
@@ -99,6 +102,8 @@ class DiscoveryResult(BaseModel):
     policy_blocks: int = 0
     usd: Decimal = Decimal(0)
     seconds: float = 0.0
+    # The goal's input values, for the compiler's verify replay. Never serialized or written.
+    values: dict[str, str] = Field(default_factory=dict[str, str], exclude=True, repr=False)
 
 
 class _Stop(Exception):
@@ -120,6 +125,41 @@ def _result(block: Any, content: Any, *, error: bool = False) -> dict[str, Any]:
         out["toolset_name"] = TOOLSET_NAME
     if error:
         out["is_error"] = True
+    return out
+
+
+def _decision(decision: Decision | None) -> dict[str, Any] | None:
+    if decision is None:
+        return None
+    return {
+        "verdict": decision.verdict,
+        "reason": decision.reason,
+        "irreversible": decision.irreversible,
+        "audit": decision.audit,
+    }
+
+
+_DIGIT = re.compile(r"\d")
+
+
+def _appeared(
+    before: list[TextBox], after: list[TextBox], headings: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """Text a person can read after the action that was not there before, with its frame and
+    whether it is a heading. The compiler derives expects from it."""
+    seen = {(b.text, b.frame) for b in before if not b.covered}
+    shapes = set(headings)
+    out: list[dict[str, Any]] = []
+    for b in after:
+        if b.covered or b.source != "text" or (b.text, b.frame) in seen:
+            continue
+        if not any(c.isalpha() for c in b.text):
+            continue
+        shape = _DIGIT.sub("#", " ".join(b.text.split()))
+        out.append({"text": b.text, "frame": b.frame, "heading": shape in shapes})
+        seen.add((b.text, b.frame))
+        if len(out) >= 25:
+            break
     return out
 
 
@@ -159,6 +199,7 @@ async def discover(
         client = make_client(environ, writer.redactor, http_client=http_client)
         goal = await extract_inputs(client, config.model, config.goal, meter, rid)
         result.inputs = goal.specs
+        result.values = dict(goal.values)
         writer.redactor.input_sensitivity = {k: v.sensitivity for k, v in goal.specs.items()}
         writer.redactor.register_inputs(goal.values)
         writer.event(
@@ -226,6 +267,7 @@ class _Loop:
     _seq: int = 0
     _shot: int = 0
     _rationale: str | None = None
+    _select: GroundedTarget | None = None
 
     @property
     def surface(self) -> Surface:
@@ -373,54 +415,80 @@ class _Loop:
     ) -> tuple[dict[str, Any], bool]:
         looking = tool in LOOKING
         nav_before = self.surface.navigation_count()
-        boxes: list[TextBox] = []
+        boxes_before: list[TextBox] = []
         if looking:
             before = await self.surface.observe()
             shot_before = None
         else:
-            before, boxes = await capture(self.surface)
-            shot_before = self._write_shot("before", before.screenshot, boxes)
+            before, boxes_before = await capture(self.surface)
+            shot_before = self._write_shot("before", before.screenshot, boxes_before)
         last: ActionResult | None = None
         for action in planned:
             last = await self.surface.act(action, LLM, self.session.controller.epoch)
             if not last.ok:
                 break
         assert last is not None
-        decision = last.decision
-        if last.status in _POLICY:
+        handed: list[HumanAction] | None = None
+        if last.status == "escalate" and self.desk is not None:
+            # Discovery never commits. A person performs the irreversible action (PLAN §5).
+            handed = await self._hand_over("APPROVAL_REQUIRED", last.reason)
+        elif last.status in _POLICY:
             self.policy_blocks += 1
-        after = before
+        after, boxes_after = before, boxes_before
         if not looking:
             await self._quiet()
-            after, boxes = await capture(self.surface)
+            after, boxes_after = await capture(self.surface)
+        ok = last.ok or handed is not None
         changed = (
             after.fingerprint != before.fingerprint
             or self.surface.navigation_count() != nav_before
-            or (last.ok and planned[-1].type == "type")
+            or (ok and planned[-1].type == "type")
         )
         if not looking:
             self.actions += 1
             self._changes.append(changed)
-        shot_after = None if looking else self._write_shot("after", after.screenshot, boxes)
+        shot_after = None if looking else self._write_shot("after", after.screenshot, boxes_after)
+        grounded = last.grounded
+        if grounded is not None and grounded.tag == "select":
+            self._select = grounded
+        elif tool in ("left_click", "double_click"):
+            self._select = None
         self._record(
             tool,
             "computer" if tool != "fill_input" else "custom",
             data,
-            status=last.status,
+            status="handed_over" if handed is not None else last.status,
             reason=last.reason,
-            grounded=last.grounded.model_dump(mode="json") if last.grounded else None,
-            decision=None
-            if decision is None
-            else {
-                "verdict": decision.verdict,
-                "reason": decision.reason,
-                "irreversible": decision.irreversible,
-            },
+            grounded=grounded.model_dump(mode="json") if grounded else None,
+            decision=_decision(last.decision),
             fingerprint={"before": before.fingerprint, "after": after.fingerprint},
             changed=changed,
             bound=bound,
+            appeared=None if looking else _appeared(boxes_before, boxes_after, after.headings),
+            select_value=await self._select_value() if not looking else None,
             shots={"before": shot_before, "after": shot_after},
         )
+        for human in handed or []:
+            self._record(
+                {"click": "left_click", "double_click": "double_click"}.get(
+                    human.action.type, human.action.type
+                ),
+                "operator",
+                human.action.model_dump(exclude_none=True),
+                actor=human.actor,
+                status="done",
+                grounded=human.grounded.model_dump(mode="json") if human.grounded else None,
+                decision=_decision(human.decision),
+                fingerprint={"before": before.fingerprint, "after": after.fingerprint},
+                changed=changed,
+                appeared=_appeared(boxes_before, boxes_after, after.headings),
+            )
+        if handed is not None:
+            done = (
+                f"A person performed {len(handed)} action(s) for you, including the one that "
+                "needed approval. Look at the screen and carry on."
+            )
+            return _result(block, done), True
         if not last.ok:
             why = last.reason
             if last.status == "escalate":
@@ -429,6 +497,54 @@ class _Loop:
         if last.image is not None:
             return _result(block, [_image(last.image)]), True
         return _result(block, "OK"), True
+
+    async def _select_value(self) -> str | None:
+        """The option a select now shows, when the model is working a select."""
+        g = self._select
+        if g is None or not g.candidates:
+            return None
+        try:
+            value = await self.surface.extract(
+                ScalarExtract(target=TargetSpec(frame=g.frame, locators=g.candidates))
+            )
+        except ExtractError:
+            return None
+        return value if isinstance(value, str) else None
+
+    async def _hand_over(self, reason: str, detail: str) -> list[HumanAction] | None:
+        """Give the session to a person and wait for it back. Their actions come back recorded;
+        None when nobody answered or they aborted (the run then stops)."""
+        assert self.desk is not None
+        ctl = self.session.controller
+        session = self.desk.session(self.run_id)
+        acted_before = len(session.actions)
+        self.desk.open(
+            kind="takeover",
+            run_id=self.run_id,
+            capability=None,
+            goal=self.cfg.goal,
+            step_id=None,
+            reason=reason,
+            state_summary=(await self.surface.observe()).summary(),
+            screenshot=None,
+            allowed=["take_control", "resume", "abort"],
+        )
+        self.writer.event("discovery.handover", "system", reason=reason, detail=detail)
+        ctl.escalate()
+        try:
+            async with asyncio.timeout(self.desk.human_timeout_s):
+                state = await ctl.wait_for({ControlState.RESUME_REQUESTED, ControlState.ABORTED})
+        except TimeoutError:
+            for iv in self.desk.open_for(self.run_id):
+                self.desk.resolve(iv.id, "timed_out", "system")
+            ctl.fail("system")
+            raise _Stop("needs_human", "no_human", reason) from None
+        if state is ControlState.ABORTED:
+            raise _Stop("needs_human", "aborted_by_operator", reason)
+        ctl.start_validation()
+        ctl.resume_automation()
+        ctl.hand_to(LLM)
+        return session.actions[acted_before:]
 
     async def _custom(self, block: Any) -> tuple[dict[str, Any], bool]:
         data: dict[str, Any] = dict(block.input or {})
@@ -471,7 +587,9 @@ class _Loop:
                 self._record("mark_output", "custom", data, status="error", reason="no table")
                 return _result(block, "There is no table at that point.", error=True), False
         self.outputs.append(name)
-        await self._register_marked(grounded, table)
+        money = await self._register_marked(grounded, table)
+        if table is not None:
+            table = {**table, "money": money}
         self._record(
             "mark_output",
             "custom",
@@ -479,21 +597,30 @@ class _Loop:
             status="done",
             grounded=grounded.model_dump(mode="json"),
             table=table,
+            money=bool(money) if table is None else None,
         )
         return _result(block, f"Marked {name}."), True
 
-    async def _register_marked(self, grounded: Any, table: dict[str, Any] | None) -> None:
+    async def _register_marked(self, grounded: Any, table: dict[str, Any] | None) -> list[str]:
         """A marked output is what the goal asked for, so it is personal: register it before the
         model can repeat it in prose. Amounts go through the redactor's amount rule, so they
         follow the policy's `redact_amounts` switch like extracted outputs do."""
+        """Returns the headers of the columns whose every non-empty cell is money, so the
+        compiler can type them as decimals."""
         redactor = self.writer.redactor
         if table is None:
-            if grounded.text:
+            if not grounded.text:
+                return []
+            try:
+                amount = money_us(grounded.text)
+            except ExtractError:
                 redactor.register(grounded.text, Sensitivity.pii, "marked_value")
-            return
+                return []
+            redactor.register(amount, Sensitivity.pii, "marked_amount")
+            return ["value"]
         headers = [h for h in table["headers"] if h]
         if not table.get("caption") or not headers:
-            return
+            return []
         spec = TableSpec(
             anchor_text=table["caption"],
             frame=list(grounded.frame),
@@ -502,45 +629,39 @@ class _Loop:
         try:
             rows = await self.surface.extract(spec)
         except ExtractError:
-            return
-        for row in rows if isinstance(rows, list) else []:
-            for cell in row.values():
+            return []
+        rows = rows if isinstance(rows, list) else []
+        parsed = dict.fromkeys(spec.columns, 0)
+        refused: set[str] = set()
+        for row in rows:
+            for key, cell in row.items():
+                if not cell:
+                    continue
                 try:
                     redactor.register(money_us(cell), Sensitivity.pii, "marked_amount")
+                    parsed[key] += 1
                 except ExtractError:
-                    continue
+                    refused.add(key)
+        # Money: at least one amount, and every non-empty cell one. An empty column is text.
+        return [spec.columns[k] for k, n in parsed.items() if n and k not in refused]
 
     async def _ask_human(self, block: Any, reason: str) -> tuple[dict[str, Any], bool]:
         self._record("request_human", "custom", {"reason": reason}, status="requested")
         if self.desk is None:
             raise _Stop("needs_human", "request_human", reason)
-        ctl = self.session.controller
-        iv = self.desk.open(
-            kind="takeover",
-            run_id=self.run_id,
-            capability=None,
-            goal=self.cfg.goal,
-            step_id=None,
-            reason="MODEL_REQUEST",
-            state_summary=(await self.surface.observe()).summary(),
-            screenshot=None,
-            allowed=["take_control", "resume", "abort"],
-        )
-        ctl.escalate()
-        try:
-            async with asyncio.timeout(self.desk.human_timeout_s):
-                state = await ctl.wait_for({ControlState.RESUME_REQUESTED, ControlState.ABORTED})
-        except TimeoutError:
-            self.desk.resolve(iv.id, "timed_out", "system")
-            ctl.fail("system")
-            raise _Stop("needs_human", "no_human", reason) from None
-        if state is ControlState.ABORTED:
-            raise _Stop("needs_human", "aborted_by_operator", reason)
-        ctl.start_validation()
-        ctl.resume_automation()
-        ctl.hand_to(LLM)
-        done = self.desk.store.get(iv.id)
-        note = (done.note if done else None) or "no note"
+        handed = await self._hand_over("MODEL_REQUEST", reason)
+        for human in handed or []:
+            self._record(
+                human.action.type,
+                "operator",
+                human.action.model_dump(exclude_none=True),
+                actor=human.actor,
+                status="done",
+                grounded=human.grounded.model_dump(mode="json") if human.grounded else None,
+                decision=_decision(human.decision),
+            )
+        done = self.desk.store.list(run_id=self.run_id)
+        note = (done[-1].note if done else None) or "no note"
         return _result(block, f"A person handed control back. Their note: {note}"), True
 
     # --- the trace ----------------------------------------------------------------------------
@@ -571,7 +692,7 @@ class _Loop:
         record = {
             "seq": self._seq,
             "turn": self.turns,
-            "actor": LLM,
+            "actor": fields.pop("actor", LLM),
             "tool": tool,
             "kind": kind,
             "input": data,

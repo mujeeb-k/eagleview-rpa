@@ -1,7 +1,8 @@
 """Invariant 1: no LLM on the replay path.
 
-`eagleview.replay`, `eagleview.surfaces` and `eagleview.safety` must never import `anthropic` or
-`eagleview.discovery`, directly or through anything they import. Checked two ways: statically, by
+`eagleview.replay`, `eagleview.surfaces`, `eagleview.safety` and `eagleview.control` must never
+import `anthropic`, `eagleview.discovery` or `eagleview.compiler`, directly or through anything
+they import. Checked two ways: statically, by
 walking the import graph of the source tree (including package `__init__` files, which run on
 import), and dynamically, by importing the packages in a fresh interpreter."""
 
@@ -15,8 +16,8 @@ from pathlib import Path
 import pytest
 
 SRC = Path(__file__).resolve().parent.parent / "src"
-GUARDED = ("eagleview.replay", "eagleview.surfaces", "eagleview.safety")
-FORBIDDEN = ("anthropic", "eagleview.discovery")
+GUARDED = ("eagleview.replay", "eagleview.surfaces", "eagleview.safety", "eagleview.control")
+FORBIDDEN = ("anthropic", "eagleview.discovery", "eagleview.compiler")
 
 
 def _module_name(path: Path, root: Path) -> str:

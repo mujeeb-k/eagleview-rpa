@@ -1,13 +1,13 @@
 """Before the loop: turn the goal into a typed input schema plus values, with structured output.
 "look up member 10482 and read their share balances" -> member_id: string, "10482"."""
 
-import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
 
+from eagleview.discovery.client import structured
 from eagleview.discovery.meter import Meter
 from eagleview.schema.capability import InputSpec
 from eagleview.schema.common import Sensitivity
@@ -67,10 +67,9 @@ async def extract_inputs(
         messages=[{"role": "user", "content": PROMPT.format(goal=goal)}],
     )
     meter.after_response(run_id, model, response, "input_extraction")
-    text = next(b.text for b in response.content if b.type == "text")
     specs: dict[str, InputSpec] = {}
     values: dict[str, str] = {}
-    for item in json.loads(text)["inputs"]:
+    for item in structured(response, "input extraction")["inputs"]:
         name = str(item["name"])
         if not _SLUG.fullmatch(name) or name in specs:
             raise ValueError(f"input name {name!r} is not a usable snake_case slug")

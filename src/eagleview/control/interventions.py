@@ -19,6 +19,7 @@ from secrets import token_hex
 from typing import Literal
 
 from eagleview.control.session_controller import SessionController
+from eagleview.safety.policy_engine import Decision
 from eagleview.schema.action import OBSERVE_ACTIONS, Action
 from eagleview.schema.intervention import Intervention, OperatorAction, Resolution
 from eagleview.schema.surface import GroundedTarget
@@ -103,11 +104,13 @@ class InterventionStore:
 
 @dataclass(frozen=True)
 class HumanAction:
-    """One operator action that changed something, with what grounding found under it."""
+    """One operator action that changed something, with what grounding found under it and how
+    the policy judged it."""
 
     action: Action
     actor: str
     grounded: GroundedTarget | None
+    decision: Decision | None = None
 
 
 @dataclass
@@ -230,7 +233,7 @@ class InterventionDesk:
         finally:
             s.surface.record_candidates = False
         if result.ok and action.type not in OBSERVE_ACTIONS:
-            s.actions.append(HumanAction(action, actor, result.grounded))
+            s.actions.append(HumanAction(action, actor, result.grounded, result.decision))
             if result.decision is not None and result.decision.irreversible:
                 s.committed = True
         return result

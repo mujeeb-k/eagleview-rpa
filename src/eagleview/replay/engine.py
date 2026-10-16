@@ -168,6 +168,8 @@ class _Preempted(Exception):
     """An operator took the lease mid-step: wait for them to hand back."""
 
 
+# Terminal screens a probe run captures: the ones no state or outcome recognized.
+_PROBED = frozenset({FailureCategory.UNKNOWN_STATE, FailureCategory.STATE_TIMEOUT})
 # Takeovers per run: each needs a human, but a run should not loop through them forever.
 MAX_TAKEOVERS = 3
 # Failures a human cannot fix by taking over: policy refusals and the takeover's own outcomes.
@@ -268,6 +270,8 @@ async def replay(
     if tenant.app_profile != profile.id:
         raise ValueError(f"tenant {tenant.slug!r} runs {tenant.app_profile!r}, not {profile.id!r}")
     opts = options or RunOptions()
+    if opts.probe and desk is not None:
+        raise ValueError("a probe run never has an intervention desk: it must not be approvable")
     base = _Run(
         capability.ref,
         tenant,
@@ -1196,6 +1200,8 @@ class _Engine:
             message += ". Check the app before trying again: replay never retries after a commit"
             retryable = False
         evidence, observed = await self._capture_failure()
+        if self.options.probe and category in _PROBED:
+            await self._write_probe(category, step_id or self.at_step)
         failure = Failure(
             category=category,
             step_id=step_id or self.at_step,
@@ -1219,6 +1225,19 @@ class _Engine:
             )
             return self._result("needs_human", failure=failure)
         return self._result("failed", failure=failure)
+
+    async def _write_probe(self, category: FailureCategory, step_id: str | None) -> None:
+        """What a person could read on the unrecognized screen, for outcome classification.
+        Written through the writer, so the probe's own input values come out as placeholders."""
+        try:
+            boxes = await self.surface.text_boxes()
+        except Exception as exc:  # best effort, like the rest of the failure evidence
+            self._event("probe.error", error=type(exc).__name__)
+            return
+        texts = [{"text": b.text, "frame": b.frame} for b in boxes if b.source == "text"]
+        self.base.writer.write_json(
+            "probe", {"step_id": step_id, "category": category.value, "texts": texts}
+        )
 
     async def _capture_failure(self) -> tuple[FailureEvidence, str | None]:
         try:

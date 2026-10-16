@@ -530,24 +530,28 @@ This app must feel like a real 2004-era core system:
   is reviewed. *(Done: `tests/discovery/`; the plan was self-reviewed with the advisor.)*
 
 ### P7: Compiler
-- [ ] Segment: click+type → fill; click+select → select (record the option label); Return → press.
+- [x] Segment: click+type → fill; click+select → select (record the option label); Return → press.
       Drop screenshot, zoom, wait, and scroll actions (replay scrolls into view).
-- [ ] Prune: build a state-fingerprint graph from the trace and keep the shortest path from start to
+- [x] Prune: build a state-fingerprint graph from the trace and keep the shortest path from start to
       success, which removes the model's dead ends and retries.
-- [ ] Derive each step's `expect`: text that appears after the action and was absent before (headings
+- [x] Derive each step's `expect`: text that appears after the action and was absent before (headings
       first), plus the next target being resolvable.
-- [ ] Naming pass: Claude with structured output proposes ids, intents, title, and description. It may
+- [x] Naming pass: Claude with structured output proposes ids, intents, title, and description. It may
       not alter locators or predicates.
-- [ ] Verify: replay with the discovery inputs. Pass → `status: verified`.
-- [ ] Probe: Claude proposes 3 valid-shape but likely-nonexistent inputs. Replay in probe mode captures
+- [x] Verify: replay with the discovery inputs. Pass → `status: verified`.
+- [x] Probe: Claude proposes 3 valid-shape but likely-nonexistent inputs. Replay in probe mode captures
       the terminal unknown state. Claude classifies it into an outcome code plus a regex from visible
       text. Re-run to confirm the detector fires → `probed_verified`.
-- [ ] `eagleview approve <cap> --reviewer <name>` sets `approved` and records the approval in provenance.
-- [ ] `eagleview discover --goal ... --tenant ...` runs discover → compile → verify → probe in one
+- [x] `eagleview approve <cap> --reviewer <name>` sets `approved` and records the approval in provenance.
+- [x] `eagleview discover --goal ... --tenant ...` runs discover → compile → verify → probe in one
       command and prints the artifact path plus a review summary.
-- [ ] Compiled artifacts go to `capabilities/drafts/` (see P6). Verify and probe replays use P4's
+- [x] Compiled artifacts go to `capabilities/drafts/` (see P6). Verify and probe replays use P4's
       input normalization, so recorded inputs and replayed inputs are normalized the same way.
-- [ ] The compiler honours `EAGLEVIEW_MODEL` / `--model` for its naming and probing calls.
+- [x] The compiler honours `EAGLEVIEW_MODEL` / `--model` for its naming and probing calls.
+- **Done when:** one command discovers, compiles, verifies and probes a capability. *(Done:
+  `tests/compiler/` offline, including the write flow through Post with a scripted operator; one
+  real pipeline produced `member.lookup_share_balances@1.0.0`, verified, with MEMBER_NOT_FOUND
+  `probed_verified`, for $0.04. The plan was self-reviewed with the advisor.)*
 
 ### P8: Cross-tenant reuse (extension; runs together with P9)
 - [ ] Overlay model and resolution with tests.

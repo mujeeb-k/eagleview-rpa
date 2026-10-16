@@ -59,6 +59,8 @@ class FakeModel:
     turns: list[Turn]
     requests: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
     errors: list[BaseException] = field(default_factory=list[BaseException])
+    # Answers to the compiler's structured-output calls, keyed by a property of their schema.
+    structured: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def client(self) -> httpx2.AsyncClient:
         return httpx2.AsyncClient(transport=httpx2.MockTransport(self._handle))
@@ -72,9 +74,14 @@ class FakeModel:
         body = json.loads(request.content)
         self.requests.append(body)
         if "format" in body.get("output_config", {}):
-            text = json.dumps({"inputs": self.inputs})
+            props = body["output_config"]["format"]["schema"]["properties"]
+            answer: Any = {"inputs": self.inputs}
+            for key, value in self.structured.items():
+                if key in props:
+                    answer = value(body) if callable(value) else value
+            text = json.dumps(answer)
             return httpx2.Response(200, json=message([{"type": "text", "text": text}], "end_turn"))
-        turn = len(self.requests) - 2  # the first request extracted the inputs
+        turn = sum(1 for r in self.requests if "format" not in r.get("output_config", {})) - 1
         if turn >= len(self.turns):
             return httpx2.Response(
                 200, json=message([{"type": "text", "text": "I am done."}], "end_turn")
