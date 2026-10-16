@@ -356,6 +356,14 @@ ignoring it.
 
 ## 7. Phases (each ends with: make check, tick boxes, commit, STOP and summarize)
 
+**How the remaining phases run.**
+- **Grouping.** P8 and P9 run as one phase. P10 and P11 run as one phase. A grouped phase ends
+  with a single `make check`, commit, push, CI check and summary. A grouped phase pauses midway
+  only when a human must click Approve or Resume in the operator console.
+- **Plan approval.** P4, P6 and P7: write the plan, then wait for approval before building. P5 and
+  P8+P9: write the plan, then proceed without waiting.
+- Every phase still ends by stopping and summarizing.
+
 ### P0: Bootstrap and spikes
 - [x] Set up the uv project, ruff, pyright, pytest, Makefile (`check`, `bank`, `demo-offline`, `demo-full`),
       `.env.example`, `.gitignore` (.env, runs/, *.trace.zip), and GitHub Actions CI (check + offline tests).
@@ -442,6 +450,16 @@ This app must feel like a real 2004-era core system:
       error500-once retried, error500-always APP_ERROR, NOT_PERMITTED, unknown modal UNKNOWN_STATE.
 - [ ] `eagleview replay <cap> --input k=v [--tenant] [--escalate] [--approve-gates]`. Pretty console
       output plus result JSON.
+- [ ] **Input normalization:** string inputs are trimmed of surrounding whitespace, then validated
+      strictly against the schema. There is no other coercion: no case folding, no digit
+      extraction, no zero padding. This is documented in the README and in `--help`. A test shows
+      `" 10482 "` succeeds and `"10 482"` is rejected (`INPUT_INVALID`).
+- [ ] **Modified approved artifacts:** loading a `verified` or `approved` artifact whose content hash
+      doesn't match fails with a clear message. The message names the file and says how to
+      experiment: set `status: draft`, or pass `--allow-modified`. That flag runs the artifact as a
+      draft, records `modified: true` in the result, and is refused for unattended runs.
+- [ ] **`--headed`:** a visible browser, slowed so a person can watch, for observation only. Waits stay
+      predicate-based, so headed and headless runs take the same path.
 
 ### P5: Control and operator console
 - [ ] SessionController with lease and epoch. A state-machine test rejects every invalid transition.
@@ -475,6 +493,11 @@ This app must feel like a real 2004-era core system:
 - [ ] Recorder: `trace.jsonl` of actions with actor, grounding, policy decision, pre and post
       fingerprints, rationale, and redacted screenshot refs.
 - [ ] A scripted fake-model test runs offline in CI.
+- [ ] **Never overwrite committed artifacts:** discovery writes only to `capabilities/drafts/`. A file
+      that already exists gets a new name; it is never replaced. Promoting a draft into
+      `capabilities/` is a reviewed step (P7 `approve`).
+- [ ] **Configurable model:** `EAGLEVIEW_MODEL` (default `claude-sonnet-5-5`), with `--model` overriding
+      it. The model id is recorded in provenance.
 
 ### P7: Compiler
 - [ ] Segment: click+type → fill; click+select → select (record the option label); Return → press.
@@ -492,17 +515,23 @@ This app must feel like a real 2004-era core system:
 - [ ] `eagleview approve <cap> --reviewer <name>` sets `approved` and records the approval in provenance.
 - [ ] `eagleview discover --goal ... --tenant ...` runs discover → compile → verify → probe in one
       command and prints the artifact path plus a review summary.
+- [ ] Compiled artifacts go to `capabilities/drafts/` (see P6). Verify and probe replays use P4's
+      input normalization, so recorded inputs and replayed inputs are normalized the same way.
+- [ ] The compiler honours `EAGLEVIEW_MODEL` / `--model` for its naming and probing calls.
 
-### P8: Cross-tenant reuse (extension)
+### P8: Cross-tenant reuse (extension; runs together with P9)
 - [ ] Overlay model and resolution with tests.
-- [ ] `eagleview adapt <cap> --tenant copperhill`: replay; on LOCATOR_NOT_FOUND or UNKNOWN_STATE, make
-      one bounded authoring-time Claude call per failing step. Given the step intent and a screenshot,
-      Claude points to the target or names the interstitial. Grounding turns that into an overlay patch
-      (`llm_proposed`), and a verification replay confirms it. The overlay is written to `overlays/`.
+- [ ] A hand-authored Copperhill overlay at `overlays/copperhill/ironbridge-teller.yaml`, reviewed
+      like any artifact. It contains label aliases, the Select Branch interstitial handler, and step
+      patches keyed by semantic step id.
+- [ ] Proof: the same capability replays successfully on both tenants, each with its own demo member
+      (10482 at Lantern Bay, 2210236 at Copperhill). Lantern Bay's member replayed at Copperhill
+      returns MEMBER_NOT_FOUND.
 - [ ] App fingerprint version check, and per-step locator telemetry (strategy rank histograms) as the
       drift signal.
+- The automated LLM `eagleview adapt` command is cut. It is listed in REPORT §7 (Cuts) as a next step.
 
-### P9: Agent-facing catalog (extension)
+### P9: Agent-facing catalog (extension; runs together with P8)
 - [ ] The registry lists approved capabilities and maps each to a tool definition: snake_case name;
       description built from title, description, outcomes, and risk; input JSON Schema; output shape in
       the description.
@@ -512,7 +541,19 @@ This app must feel like a real 2004-era core system:
       use) picks the tool, replay runs, and Claude answers. A second prompt with a bad member shows the
       agent handling an `outcome`.
 
-### P10: Evidence generation
+### P10: Evidence generation (runs together with P11)
+- [ ] **Clean starting state:** every evidence and demo script first resets bank data and clears
+      faults (`POST /__admin/reset`), so no run inherits state from an earlier one.
+- [ ] **`make demo-offline`:**
+  - starts the bank itself, and stops it on exit, including on failure;
+  - drives takeover and approval with the scripted operator client from P5;
+  - never waits for a human;
+  - needs no API key.
+- [ ] **`make demo-handoff`:** the interactive takeover demo, kept separate. A person uses the console,
+      and every wait for them has a timeout that ends the run cleanly with a clear message.
+- [ ] **Held-out discovery check:** before release, run one discovery goal that is not in the evidence
+      set (for example "list member 10482's loans"). Record the result, pass or fail, honestly in
+      `evidence/README.md` and REPORT.md.
 - [ ] `scripts/evidence/*.sh`, one per scenario in §8. Each writes to `evidence/NN_name/` (redacted
       run.jsonl, step screenshots, summary.json, result.json, and the artifact copy for discoveries).
 - [ ] `eagleview view <run_dir>` writes a static `index.html` per run: a timeline of steps with
@@ -524,13 +565,18 @@ This app must feel like a real 2004-era core system:
       default. Output goes to `evidence/demo.mp4`, under 3 minutes. Playwright records webm, so the
       script transcodes it. The PII scan can't read video; the synthetic-only rule is what covers it.
 
-### P11: Docs and polish
+### P11: Docs and polish (runs together with P10)
 - [ ] README: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
       `make bank`); **offline demo first** (replay the committed artifacts, no API key); full demo
       (discover, then replay); operator console walkthrough; repo map; fictional-data note.
 - [ ] REPORT.md per §9, 1–3 pages.
 - [ ] docs/DESIGN.md (optional, longer): the schema reference generated from the Pydantic models.
 - [ ] A fresh-clone test in a clean container runs `make demo-offline` end to end.
+- [ ] CI runs `make demo-offline` end to end on every push, in addition to `make check`.
+- [ ] README states the tested platforms (macOS, Linux).
+- [ ] README shows the plain `uv run ...` command next to each `make` target.
+- [ ] README notes that discovery spends the user's own Anthropic API credit, with an approximate cost
+      per discovery run, measured from real runs.
 - [ ] Release checklist in §10.
 
 ## 8. Evidence scenarios
@@ -548,7 +594,7 @@ This app must feel like a real 2004-era core system:
 | 10 | Replay with unknown modal → escalate → operator takeover on the live session → resume → success; proposed patch | live-session handoff end to end |
 | 11 | Replay post with session expiry after commit → OUTCOME_UNCERTAIN, no retry | commit safety |
 | 12 | Prompt-injection drill → network guard blocks | allowlist enforcement |
-| 13 | Tenant B: base fails → adapt → overlay → success, each tenant replaying with its own member (10482 at Lantern Bay, 2210236 at Copperhill); then Lantern Bay's member replayed at Copperhill → MEMBER_NOT_FOUND | cross-tenant reuse; data never crosses tenants |
+| 13 | Tenant B: base fails → hand-authored overlay → success, each tenant replaying with its own member (10482 at Lantern Bay, 2210236 at Copperhill); then Lantern Bay's member replayed at Copperhill → MEMBER_NOT_FOUND | cross-tenant reuse; data never crosses tenants |
 | 14 | Agent invokes the capability through the catalog (success plus not-found) | agent-facing interface |
 | 15 | Replay ×20 stability report (optional, cheap) | determinism |
 
@@ -564,15 +610,17 @@ This app must feel like a real 2004-era core system:
    locator rank and agreement as the drift signal.
 4. **Heterogeneity & multi-tenant**: the Surface protocol; strategy applicability by surface;
    desktop via UIA/AX plus OCR anchors; app-profile reuse; overlays and label aliases; fingerprints and
-   version ranges; adapt via bounded authoring-time LLM; drift telemetry.
+   version ranges; drift telemetry.
 5. **Escalation & handoff**: stuck detection (discovery and replay); intervention payload; lease plus
    fencing epoch; cooperative pause; input relay as recording; resume validation; human-demonstrated
    patches.
 6. **Safety**: policy file, two enforcement layers, irreversible handling per mode, three-layer
    redaction, secrets by reference, the injection drill, and the honest limits list.
 7. **Cuts**: parked async escalation (`needs_human` persisted runs), real desktop surface, multi-browser
-   session host, webhook routing, real-time co-browsing, auth for the console. Next: per-tenant
-   telemetry dashboard, re-discovery on drift, approval workflow UI.
+   session host, webhook routing, real-time co-browsing, auth for the console, and automated
+   tenant adaptation (`eagleview adapt`: a bounded authoring-time LLM call per failing step proposes an
+   overlay patch, then a replay verifies it). Next: that adapt command, a per-tenant telemetry
+   dashboard, re-discovery on drift, and an approval workflow UI.
 
 ## 10. Release checklist
 - [ ] Fresh clone: `make demo-offline` passes with no API key.
@@ -580,3 +628,5 @@ This app must feel like a real 2004-era core system:
 - [ ] REPORT.md headings match §9 exactly; README demo commands are copy-pasted from a real terminal session.
 - [ ] Every evidence folder came from a script; `evidence/README.md` links all work.
 - [ ] CI is green and the license is MIT
+- [ ] Review CLAUDE.md and PLAN.md as an outside reader would. Either rewrite CLAUDE.md's "Voice and
+      framing" section in neutral terms, or move both files under `docs/`.

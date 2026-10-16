@@ -1,9 +1,15 @@
 """Seed data: deterministic, separate per tenant, and pinned where the demo depends on it."""
 
+import json
+import subprocess
+import sys
+from dataclasses import asdict
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+import mock_bank.seed
 from mock_bank.config import Tenant, load_tenant
 from mock_bank.seed import INJECTION_NOTE, MEMBER_COUNT, Member, generate
 
@@ -81,11 +87,14 @@ def test_shares_use_the_tenants_own_types(tenant: Tenant, members: dict[str, Mem
     labels = {
         kind: (tenant.suffix(st.low), st.description) for kind, st in tenant.share_types.items()
     }
+    e = tenant.edge_cases
     for m in members.values():
-        assert m.shares[0].kind == "base"
+        if m.number != e.loans_only_member:
+            assert m.shares[0].kind == "base"
         for s in m.shares:
             assert (s.suffix, s.description) == labels[s.kind]
-            assert Decimal("0.00") <= s.available <= s.balance
+            if m.number != e.overdrawn_member:
+                assert Decimal("0.00") <= s.available <= s.balance
     # The draws actually vary: some members have every share kind, some only the base share.
     counts = {len(m.shares) for m in members.values()}
     assert 1 in counts and 4 in counts
@@ -116,3 +125,78 @@ def test_share_codes_and_labels_differ_between_tenants() -> None:
 
     assert not labels(LANTERN) & labels(COPPERHILL)
     assert not set(LANTERN.products) & set(COPPERHILL.products)
+
+
+def _digest(members: dict[str, Member]) -> str:
+    return json.dumps({n: asdict(m) for n, m in members.items()}, default=str, sort_keys=True)
+
+
+# Runs the generator in a fresh interpreter whose clock says 2031-02-03: date.today(),
+# datetime.now() and friends are replaced before Faker or the seed module are imported.
+_FAKE_CLOCK = """
+import datetime as _dt, json, sys
+from dataclasses import asdict
+
+class _Date(_dt.date):
+    @classmethod
+    def today(cls): return cls(2031, 2, 3)
+
+class _DateTime(_dt.datetime):
+    @classmethod
+    def now(cls, tz=None): return cls(2031, 2, 3, 9, 30, tzinfo=tz)
+    @classmethod
+    def today(cls): return cls(2031, 2, 3, 9, 30)
+    @classmethod
+    def utcnow(cls): return cls(2031, 2, 3, 9, 30)
+
+_dt.date, _dt.datetime = _Date, _DateTime
+from mock_bank.config import load_tenant
+from mock_bank.seed import generate
+members = generate(load_tenant(sys.argv[1]))
+assert _dt.date.today().year == 2031
+print(json.dumps({n: asdict(m) for n, m in members.items()}, default=str, sort_keys=True))
+"""
+
+
+def test_seeded_data_does_not_depend_on_todays_date(
+    tenant: Tenant, members: dict[str, Member]
+) -> None:
+    """Everything is anchored to the frozen business date (2026-10-15), so data and evidence are
+    the same whatever day they are generated on."""
+    out = subprocess.run(
+        [sys.executable, "-c", _FAKE_CLOCK, tenant.slug],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=Path(__file__).resolve().parents[2],
+    ).stdout
+    assert out.strip() == _digest(members)
+
+
+def test_edge_cases(tenant: Tenant, members: dict[str, Member]) -> None:
+    e = tenant.edge_cases
+    overdrawn = members[e.overdrawn_member]
+    draft = next(s for s in overdrawn.shares if s.kind == "draft")
+    assert draft.balance == draft.available == Decimal(e.overdrawn_balance) < 0
+
+    loans_only = members[e.loans_only_member]
+    assert loans_only.shares == [] and loans_only.loans
+    assert {t.suffix for t in loans_only.txns} <= {ln.suffix for ln in loans_only.loans}
+
+    hyphenated = members[e.hyphenated_member]
+    assert "'" in hyphenated.last and "-" in hyphenated.last
+    assert hyphenated.display_name.startswith(e.hyphenated_last.upper() + ", ")
+    assert "'" not in hyphenated.email
+
+
+def test_edge_cases_change_only_their_own_members(
+    tenant: Tenant, members: dict[str, Member], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Applied after the draws, with per-member randomness: every other member, the pinned demo
+    member included, is exactly what it was before edge cases existed."""
+    monkeypatch.setattr(mock_bank.seed, "_apply_edge_cases", lambda *_: None)
+    plain = generate(tenant)
+    e = tenant.edge_cases
+    edge = {e.overdrawn_member, e.loans_only_member, e.hyphenated_member}
+    for number, member in members.items():
+        assert (member == plain[number]) is (number not in edge), number

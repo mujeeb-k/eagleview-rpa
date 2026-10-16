@@ -1,9 +1,9 @@
 """Tenant configuration: one YAML file per credit union running Ironbridge Teller."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 from ruamel.yaml import YAML
 
 TENANTS_DIR = Path(__file__).parent / "tenants"
@@ -47,6 +47,19 @@ class ShareType(BaseModel):
     product: str | None = None  # code in the Open Share select; None: cannot be opened there
 
 
+class EdgeCases(BaseModel):
+    """Members pinned to awkward but realistic shapes, so parsers and replay meet them on purpose.
+    Applied after the seeded draws, so every other member is unchanged."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    overdrawn_member: str  # share draft below zero, shown in legacy trailing-minus form
+    overdrawn_balance: str  # a negative decimal string, e.g. "-12.34"
+    loans_only_member: str  # loans, but no share accounts at all
+    hyphenated_member: str
+    hyphenated_last: str  # an apostrophe and a hyphen, e.g. O'Brien-Smith
+
+
 class Tenant(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -74,6 +87,17 @@ class Tenant(BaseModel):
     txn_base: int
     suffix_prefix: str
     share_types: dict[ShareKind, ShareType]
+    edge_cases: EdgeCases
+
+    @model_validator(mode="after")
+    def _edge_members_are_ordinary_members(self) -> Self:
+        e = self.edge_cases
+        special = [e.overdrawn_member, e.loans_only_member, e.hyphenated_member]
+        if len(set(special)) != 3 or {self.demo_member, self.injection_member} & set(special):
+            raise ValueError("edge-case members must be distinct from each other and the demo")
+        if not e.overdrawn_balance.startswith("-"):
+            raise ValueError("overdrawn_balance must be negative")
+        return self
 
     @property
     def password_env(self) -> str:

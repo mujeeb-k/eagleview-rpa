@@ -127,3 +127,25 @@ async def test_one_browser_holds_both_tenants(
     await sign_on(b, copperhill)
     await open_member(a, lantern, lantern.demo)
     await open_member(b, copperhill, copperhill.demo)
+
+
+async def test_edge_case_members_render(page: Page, bank: Bank) -> None:
+    """Overdrawn share draft in trailing-minus form, a member with loans and no shares, and an
+    apostrophe-hyphen surname, at both tenants."""
+    e = bank.tenant.edge_cases
+    members = generate(bank.tenant)
+    await sign_on(page, bank)
+
+    main = await open_member(page, bank, e.overdrawn_member)
+    draft = bank.tenant.share_types["draft"].description
+    owed = money(Decimal(e.overdrawn_balance))
+    assert owed.endswith("-") and not owed.startswith("-")
+    await expect(main.locator("tr", has_text=draft)).to_contain_text(owed)
+
+    main = await open_member(page, bank, e.loans_only_member)
+    await expect(main.get_by_text("No share accounts.")).to_be_visible()
+    for loan in members[e.loans_only_member].loans:
+        await expect(main.get_by_text(loan.description)).to_be_visible()
+
+    main = await open_member(page, bank, e.hyphenated_member)
+    await expect(main.get_by_text(members[e.hyphenated_member].display_name)).to_be_visible()

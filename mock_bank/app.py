@@ -28,7 +28,8 @@ UNFAULTED = ("/__admin", "/img/")
 
 
 def money(value: Decimal) -> str:
-    return f"${value:,.2f}" if value >= 0 else f"-${-value:,.2f}"
+    """Legacy style: a negative balance carries a trailing minus, e.g. $12.34-."""
+    return f"${value:,.2f}" if value >= 0 else f"${-value:,.2f}-"
 
 
 def amount(value: Decimal) -> str:

@@ -79,6 +79,7 @@ Re-verify at https://platform.claude.com/docs/en/agents-and-tools/tool-use/compu
 - Work one phase of PLAN.md at a time. At the end of each phase: run `make check` (ruff, pyright, pytest),
   tick the phase's boxes in PLAN.md, commit with a conventional message, then STOP and summarize what was
   built, what was decided, and what to review.
+- Which phases run together, and which plans need approval before building: PLAN.md §7.
 - If a design question isn't answered by PLAN.md, choose the simplest option consistent with the
   invariants, add a 2–3 line entry to docs/DECISIONS.md, and continue.
 - Never put an API key anywhere but `.env`, which is gitignored.

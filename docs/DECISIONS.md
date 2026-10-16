@@ -379,3 +379,24 @@ a name cell would write the name before it is a registered value the redactor sc
 navigation.** A blocked navigation commits Chrome's error page late and can interrupt the next
 navigation in the same page. Separate contexts make the tests independent. I confirmed this by
 running them in five shuffled orders.
+
+## 2026-10-15 — Mock-bank data: the clock and edge cases
+
+**Seeded data never reads today's date, and a test proves it.** Every date is computed from the
+frozen business date, 2026-10-15. The test runs the generator in a fresh interpreter where
+`date.today()` and `datetime.now()` say 2031, and requires identical data. I checked that the test
+can fail: it does when Faker's today-relative `date_of_birth` is put back.
+
+**Edge-case members are pinned in tenant config and applied after the draws.** Each tenant has:
+- an overdrawn share draft (Lantern Bay `-12.34`, Copperhill `-1208.77`);
+- a member with loans but no share accounts, whose history is loan payments;
+- an apostrophe-and-hyphen surname (`O'Brien-Smith`, `D'Amico-Reyes`).
+
+The overrides use their own per-member random generator, so no other member changes; a test
+compares every member with and without them. The demo members stay pinned by the golden test.
+
+**Negative balances print in legacy form, with a trailing minus (`$12.34-`).** Until now no
+balance was negative, so nothing else changed. Empty share and activity tables show a single
+message row ("No share accounts.", "No recent activity."), which table extraction already skips.
+A loans-only member therefore reads as `share_accounts: []`. P4 must decide whether an empty list
+satisfies the success predicate `output_present: share_accounts`. As written, it does not.

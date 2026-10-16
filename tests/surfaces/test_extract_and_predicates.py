@@ -167,3 +167,29 @@ async def test_leaf_predicates(open_surface: Any, lantern: Bank) -> None:
         ]
     }
     assert await holds(combined)
+
+
+async def test_reads_the_seeded_edge_cases(open_surface: Any, bank: Bank) -> None:
+    """Through the surface, on both tenants: an overdrawn share draft printed with a trailing
+    minus parses to a negative Decimal; a member with loans and no shares reads as an empty share
+    list; an apostrophe-hyphen surname reads back exactly."""
+    e = bank.tenant.edge_cases
+    members = generate(bank.tenant)
+    surface: PlaywrightSurface = await open_surface(bank, label_aliases=ALIASES)
+
+    await to_member(surface, bank, e.overdrawn_member)
+    raw = await surface.extract(SHARES)
+    assert isinstance(raw, list)
+    draft = bank.tenant.suffix(bank.tenant.share_types["draft"].low)
+    row = next(r for r in parse_rows(raw, SHARES.parse) if r["suffix"] == draft)
+    assert row["balance"] == row["available"] == Decimal(e.overdrawn_balance)
+    assert next(r["balance"] for r in raw if r["suffix"] == draft).endswith("-")
+
+    await to_member(surface, bank, e.loans_only_member)
+    assert await surface.extract(SHARES) == []
+    assert await surface.extract(NAME) == members[e.loans_only_member].display_name
+
+    await to_member(surface, bank, e.hyphenated_member)
+    name = await surface.extract(NAME)
+    assert name == members[e.hyphenated_member].display_name
+    assert e.hyphenated_last.upper() in name

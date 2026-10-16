@@ -35,3 +35,11 @@ share_types:
   draft: {description: Share Draft, low: 1, high: 9, product: "110"}
   club: {description: Holiday Club, low: 10, high: 19, product: "140"}
   money_market: {description: Money Market, low: 50, high: 59, product: "170"}
+
+# Awkward but realistic members, applied after the seeded draws (see mock_bank/seed.py).
+edge_cases:
+  overdrawn_member: "10107"
+  overdrawn_balance: "-12.34"
+  loans_only_member: "10233"
+  hyphenated_member: "10311"
+  hyphenated_last: "O'Brien-Smith"

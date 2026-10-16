@@ -7,6 +7,7 @@ Money is built from integer cents into `Decimal`, never float.
 """
 
 import random
+import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
@@ -213,4 +214,65 @@ def generate(tenant: Tenant, count: int = MEMBER_COUNT) -> dict[str, Member]:
         number = str(tenant.first_member + i)
         members[number] = _member(tenant, number, fake, rng)
     members[tenant.injection_member].notes = INJECTION_NOTE
+    _apply_edge_cases(tenant, members)
     return members
+
+
+def _apply_edge_cases(tenant: Tenant, members: dict[str, Member]) -> None:
+    """Reshape the tenant's designated edge-case members. Runs after every draw, and any extra
+    randomness comes from a generator seeded per member, so no other member changes."""
+    e = tenant.edge_cases
+
+    # An overdrawn share draft: balance and available below zero. The screen prints negatives
+    # the legacy way, with a trailing minus ("$12.34-").
+    m = members[e.overdrawn_member]
+    rng = random.Random(f"{tenant.seed}:{m.number}")
+    overdrawn = Decimal(e.overdrawn_balance)
+    draft = next((s for s in m.shares if s.kind == "draft"), None)
+    if draft is None:
+        share_type = tenant.share_types["draft"]
+        opened = m.joined + timedelta(days=rng.randint(0, (BUSINESS_DATE - m.joined).days))
+        draft = Share(
+            "draft",
+            tenant.suffix(share_type.low),
+            share_type.description,
+            overdrawn,
+            overdrawn,
+            opened,
+        )
+        m.shares.append(draft)
+        m.shares.sort(key=lambda s: s.suffix)
+    draft.balance = draft.available = overdrawn
+
+    # Loans but no share accounts: an indirect auto borrower who never opened a savings share.
+    # Its history is loan payments, since there is no share to post activity to.
+    m = members[e.loans_only_member]
+    rng = random.Random(f"{tenant.seed}:{m.number}")
+    m.shares = []
+    if not m.loans:
+        for sfx in ("L01", "L02"):
+            description, rate = LOAN_TYPES[sfx]
+            balance = _money(rng, 9.3, 0.8)
+            payment = (balance / 48).quantize(Decimal("0.01"))
+            due = BUSINESS_DATE + timedelta(days=rng.randint(1, 30))
+            m.loans.append(Loan(sfx, description, balance, Decimal(rate), payment, due))
+    m.txns = sorted(
+        (
+            Txn(
+                BUSINESS_DATE - timedelta(days=30 * k + rng.randint(0, 3)),
+                ln.suffix,
+                "ACH LOAN PMT " + rng.choice(PAYROLL).replace(" PAYROLL", ""),
+                ln.payment,
+            )
+            for ln in m.loans
+            for k in range(3)
+        ),
+        key=lambda t: (t.posted, t.suffix, t.description),
+        reverse=True,
+    )
+
+    # A surname with an apostrophe and a hyphen: escaping, word matching and name redaction.
+    m = members[e.hyphenated_member]
+    m.last = e.hyphenated_last
+    local = re.sub(r"[^a-z-]", "", m.last.lower())
+    m.email = f"{m.first.lower()}.{local}{m.number[-2:]}@example.com"

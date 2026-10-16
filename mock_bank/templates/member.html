@@ -31,6 +31,8 @@
 <td><font face="{{ f }}" size="2">{{ sh.nickname or "&nbsp;" | safe }}</font></td>
 <td align="right"><font face="Courier New" size="2">{{ sh.balance | money }}</font></td><td align="right"><font face="Courier New" size="2">{{ sh.available | money }}</font></td>
 </tr>
+{% else %}
+<tr><td colspan="5"><font face="{{ f }}" size="2"><i>No share accounts.</i></font></td></tr>
 {% endfor %}
 </table>
 <br>
@@ -63,6 +65,8 @@
 <td><font face="{{ f }}" size="2">{{ x.posted | mdy }}</font></td><td><font face="Courier New" size="2">{{ x.suffix }}</font></td>
 <td><font face="{{ f }}" size="2">{{ x.description }}</font></td><td align="right"><font face="Courier New" size="2">{{ x.amount | amount }}</font></td>
 </tr>
+{% else %}
+<tr><td colspan="4"><font face="{{ f }}" size="2"><i>No recent activity.</i></font></td></tr>
 {% endfor %}
 </table>
 <br>
