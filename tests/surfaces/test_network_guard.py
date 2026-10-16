@@ -1,17 +1,24 @@
 """The network guard: the second enforcement layer, independent of Surface.act. Every request,
-whatever caused it, is checked against the policy before it leaves the browser."""
+whatever caused it, is checked against the policy before it leaves the browser.
+
+Each test opens its own surface, so its own browser context and page: a navigation one test
+leaves in flight (a blocked request commits Chrome's error page late) can never reach another.
+At most one top-level navigation is checked per test for the same reason."""
 
 import asyncio
 import contextlib
+from dataclasses import replace
 from typing import Any
 
 from playwright.async_api import Error as PlaywrightError
 
+from eagleview.safety.policy_engine import ApprovalToken
 from eagleview.surfaces.web.network_guard import BlockedRequest
 from eagleview.surfaces.web.playwright_surface import PlaywrightSurface
 from tests.support.bank import Bank
-from tests.surfaces.conftest import Events, Site
-from tests.surfaces.helpers import pred
+from tests.surfaces.conftest import RUN_ID, Events, Site
+from tests.surfaces.helpers import act_on, button, pred
+from tests.surfaces.test_act import _to_review
 
 
 async def _blocked(surface: PlaywrightSurface, timeout_s: float = 5.0) -> list[BlockedRequest]:
@@ -22,6 +29,13 @@ async def _blocked(surface: PlaywrightSurface, timeout_s: float = 5.0) -> list[B
         assert loop.time() < deadline, "nothing was blocked"
         await asyncio.sleep(0.05)
     return surface.guard.drain()
+
+
+def _money_market_count(bank: Bank) -> int:
+    description = bank.tenant.share_types["money_market"].description
+    with bank.signed_on_client() as c:
+        page = c.post("/inq", data={"txtA": bank.demo, "txtB": ""})
+        return page.text.count(description)
 
 
 async def test_a_script_cannot_reach_the_admin_api(
@@ -39,12 +53,8 @@ async def test_a_script_cannot_reach_the_admin_api(
     assert [(b.method, b.reason) for b in blocked] == [("GET", "route_denied")]
     assert events.of("network.blocked")[0]["reason"] == "route_denied"
     # Encoded paths normalize to the same route.
-    assert (
-        await main.evaluate(
-            "() => fetch('/%5F%5Fadmin/faults').then(() => 'reached', () => 'blocked')"
-        )
-        == "blocked"
-    )
+    encoded = "() => fetch('/%5F%5Fadmin/faults').then(() => 'reached', () => 'blocked')"
+    assert await main.evaluate(encoded) == "blocked"
 
 
 async def test_another_tenants_origin_is_off_the_allowlist(
@@ -65,8 +75,6 @@ async def test_posting_without_approval_is_blocked_even_when_act_is_bypassed(
     open_surface: Any, lantern: Bank
 ) -> None:
     """Layer 1 is skipped entirely (a script submits the review form); layer 2 still stops it."""
-    from tests.surfaces.test_act import _to_review
-
     surface: PlaywrightSurface = await open_surface(lantern)
     await _to_review(surface, lantern)
     main = surface.page.frame(name="main")
@@ -75,36 +83,87 @@ async def test_posting_without_approval_is_blocked_even_when_act_is_bypassed(
     blocked = await _blocked(surface)
     assert [(b.method, b.reason) for b in blocked] == [("POST", "irreversible_without_approval")]
     assert not main.url.endswith("/share/posted")
-    # Nothing was posted: the member still has exactly the shares it started with.
-    with lantern.signed_on_client() as c:
-        page = c.post("/inq", data={"txtA": lantern.demo, "txtB": ""})
-        assert "Money Market" not in page.text
+    assert _money_market_count(lantern) == 0
 
 
-async def test_redirects_are_checked_hop_by_hop(open_site: Any, site: Site) -> None:
-    """Playwright never shows a route handler the targets of a redirect, so an allowed URL that
-    answers 302 to /__admin would otherwise get through. Navigations and fetches alike."""
+async def test_an_approval_posts_once_even_on_a_double_click(
+    open_surface: Any, lantern: Bank
+) -> None:
+    surface: PlaywrightSurface = await open_surface(lantern)
+    await _to_review(surface, lantern)
+    token = ApprovalToken(RUN_ID, "post_share")
+    surface.policy_ctx = replace(surface.policy_ctx, approvals=frozenset({token}))
+    result = await act_on(surface, button("Post"), "double_click", step_id="post_share")
+    assert result.ok, result
+    await surface.page.wait_for_timeout(1000)
+    assert _money_market_count(lantern) == 1
+
+
+async def test_an_approval_is_spent_by_its_first_request(open_surface: Any, lantern: Bank) -> None:
+    """The bank has no double-post guard, and the guard sends requests itself, so a browser
+    cancelling the first submit would not stop it. One token, one irreversible request."""
+    surface: PlaywrightSurface = await open_surface(lantern)
+    await _to_review(surface, lantern)
+    token = ApprovalToken(RUN_ID, "post_share")
+    surface.policy_ctx = replace(
+        surface.policy_ctx, step_id="post_share", approvals=frozenset({token})
+    )
+    main = surface.page.frame(name="main")
+    assert main is not None
+    # Two submits back to back, under one approved binding.
+    await main.evaluate(
+        "() => { const f = document.forms[0];"
+        " fetch(f.action, {method: 'POST', body: new URLSearchParams(new FormData(f))});"
+        " fetch(f.action, {method: 'POST', body: new URLSearchParams(new FormData(f))}); }"
+    )
+    blocked = await _blocked(surface)
+    assert [b.reason for b in blocked] == ["approval_spent"]
+    await surface.page.wait_for_timeout(300)
+    assert _money_market_count(lantern) == 1
+
+
+async def test_a_fetch_redirecting_to_a_denied_route_is_blocked(open_site: Any, site: Site) -> None:
+    """Playwright never shows a route handler the targets of a redirect; the guard checks them."""
     surface: PlaywrightSurface = await open_site("keystrokes.html")
-    main = surface.page.main_frame
-    # A fetch that redirects to a denied route.
-    status = await main.evaluate(
+    status = await surface.page.main_frame.evaluate(
         "() => fetch('/redirect?to=%2F__admin%2Ffaults')"
         ".then(r => 'reached ' + r.url, () => 'blocked')"
     )
     assert status == "blocked"
     assert "GET /__admin/faults" not in site.hits
-    # A fetch that redirects somewhere allowed still works, through every hop.
-    ok = await main.evaluate("() => fetch('/redirect?to=%2Fok').then(r => r.text())")
-    assert "reached /ok" in ok
-    # A navigation that redirects somewhere allowed lands there, as a fresh, routed request.
+    assert [b.reason for b in surface.guard.drain()] == ["route_denied"]
+
+
+async def test_a_fetch_redirecting_somewhere_allowed_follows_every_hop(
+    open_site: Any, site: Site
+) -> None:
+    surface: PlaywrightSurface = await open_site("keystrokes.html")
+    body = await surface.page.main_frame.evaluate(
+        "() => fetch('/redirect?to=%2Fredirect%3Fto%3D%252Fok').then(r => r.text())"
+    )
+    assert "reached /ok" in body
+    assert surface.guard.drain() == []
+
+
+async def test_a_navigation_redirecting_to_a_denied_route_is_blocked(
+    open_site: Any, site: Site
+) -> None:
+    surface: PlaywrightSurface = await open_site("keystrokes.html")
+    with contextlib.suppress(PlaywrightError):
+        await surface.page.goto(site.url + "/redirect?to=%2F__admin%2Fx")
+    blocked = await _blocked(surface)
+    assert [b.url.rsplit("/", 2)[-2:] for b in blocked] == [["__admin", "x"]]
+    assert "GET /__admin/x" not in site.hits
+
+
+async def test_a_navigation_redirecting_somewhere_allowed_arrives_through_the_guard(
+    open_site: Any, site: Site
+) -> None:
+    surface: PlaywrightSurface = await open_site("keystrokes.html")
     await surface.page.goto(site.url + "/redirect?to=%2Fwelcome")
     await surface.page.wait_for_url("**/welcome")
     assert "GET /welcome" in site.hits
-    # A navigation that redirects to a denied route: aborted, and the browser shows its error page.
-    with contextlib.suppress(PlaywrightError):
-        await surface.page.goto(site.url + "/redirect?to=%2F__admin%2Fx")
-    assert "GET /__admin/x" not in site.hits
-    assert any(b.url.endswith("/__admin/x") for b in surface.guard.drain())
+    assert surface.guard.drain() == []
 
 
 async def test_a_method_preserving_redirect_of_a_post_navigation_is_blocked(

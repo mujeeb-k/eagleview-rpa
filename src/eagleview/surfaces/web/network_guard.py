@@ -21,7 +21,7 @@ from urllib.parse import urljoin
 from playwright.async_api import APIResponse, BrowserContext, Route
 from playwright.async_api import Error as PlaywrightError
 
-from eagleview.safety.policy_engine import Decision, PolicyContext, PolicyEngine
+from eagleview.safety.policy_engine import ApprovalToken, Decision, PolicyContext, PolicyEngine
 from eagleview.surfaces.base import EventSink
 
 MAX_REDIRECTS = 10
@@ -51,6 +51,11 @@ class NetworkGuard:
     state: Callable[[], GuardState]
     sink: EventSink | None = None
     blocked: list[BlockedRequest] = field(default_factory=list[BlockedRequest])
+    # Approvals already used. One token authorizes one irreversible request: a double-click, a
+    # resubmit or a script cannot post twice on it. This matters more than it seems, because the
+    # guard sends each request itself (route.fetch), so a browser cancelling a navigation no
+    # longer stops the request it already handed over.
+    spent: set[ApprovalToken] = field(default_factory=set[ApprovalToken])
 
     async def install(self, context: BrowserContext) -> None:
         await context.route("**/*", self._handle)
@@ -62,7 +67,13 @@ class NetworkGuard:
 
     def _check(self, method: str, url: str) -> tuple[Decision, GuardState]:
         st = self.state()
-        return self.engine.check_request(method, url, st.actor, st.ctx), st
+        decision = self.engine.check_request(method, url, st.actor, st.ctx)
+        if decision.allowed and decision.reason == "approved" and st.ctx.step_id is not None:
+            token = ApprovalToken(st.ctx.run_id, st.ctx.step_id)
+            if token in self.spent:
+                return Decision("block", "approval_spent", decision.detail, irreversible=True), st
+            self.spent.add(token)
+        return decision, st
 
     async def _block(
         self, route: Route, method: str, url: str, d: Decision, st: GuardState

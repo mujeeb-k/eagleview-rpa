@@ -11,6 +11,7 @@ import io
 from dataclasses import replace
 from typing import Any
 
+import pytest
 from PIL import Image
 
 from eagleview.safety.policy_engine import ApprovalToken
@@ -51,29 +52,56 @@ REF_FIELD = spec(
 # --- (a) grounding immediately before acting -------------------------------------------------
 
 
+@pytest.mark.parametrize("record_candidates", [False, True])
 async def test_grounding_runs_right_before_the_mouse_at_the_same_point(
-    open_surface: Any, lantern: Bank
+    open_surface: Any, lantern: Bank, record_candidates: bool
 ) -> None:
+    """Ground, then (while recording) generate candidates, then a last hit-test confirmation,
+    then the mouse: nothing reads the page between the confirmation and the click."""
     surface = await open_surface(lantern)
     await to_inquiry(surface)
-    calls: list[tuple[str, tuple[int, int]]] = []
-    real_ground, real_click = surface.grounder.at_point, surface.page.mouse.click
+    surface.record_candidates = record_candidates
+    calls: list[str] = []
+    points: list[tuple[int, int]] = []
+    grounder, resolver, mouse = surface.grounder, surface.resolver, surface.page.mouse
+    real_ground, real_confirm, real_find, real_click = (
+        grounder.at_point,
+        grounder.confirm,
+        resolver.find,
+        mouse.click,
+    )
 
     async def ground(x: int, y: int) -> Any:
-        calls.append(("ground", (x, y)))
+        calls.append("ground")
+        points.append((x, y))
         return await real_ground(x, y)
 
+    async def confirm(g: Any) -> bool:
+        calls.append("confirm")
+        return await real_confirm(g)
+
+    async def find(*args: Any) -> Any:
+        calls.append("find")
+        return await real_find(*args)
+
     async def click(x: float, y: float, **kw: Any) -> None:
-        calls.append(("click", (int(x), int(y))))
+        calls.append("click")
+        points.append((int(x), int(y)))
         await real_click(x, y, **kw)
 
-    surface.grounder.at_point = ground  # type: ignore[method-assign]
-    surface.page.mouse.click = click  # type: ignore[method-assign]
-    result = await act_on(surface, GO_IMAGE)
+    grounder.at_point = ground  # type: ignore[method-assign]
+    grounder.confirm = confirm  # type: ignore[method-assign]
+    resolver.find = find  # type: ignore[method-assign]
+    mouse.click = click  # type: ignore[method-assign]
+    target = await resolved(surface, GO_IMAGE)
+    calls.clear()
+    result = await surface.act(Action(type="click"), "automation", EPOCH, target=target)
     assert result.ok
-    assert [kind for kind, _ in calls] == ["ground", "click"]
-    assert calls[0][1] == calls[1][1] == result.point
+    assert calls[0] == "ground" and calls[-2:] == ["confirm", "click"]
+    assert ("find" in calls) is record_candidates
+    assert points[0] == points[-1] == result.point
     assert result.grounded is not None and result.grounded.tag == "img"
+    assert bool(result.grounded.candidates) is record_candidates
 
 
 async def test_a_modal_appearing_after_resolution_blocks_the_click(
@@ -318,3 +346,27 @@ def _text(text: str) -> Any:
 
 def _field(target: Any, value: str) -> Any:
     return pred({"field_value": {"target": target.model_dump(mode="json"), "equals": value}})
+
+
+async def test_wait_is_only_for_the_discovery_model(open_surface: Any, lantern: Bank) -> None:
+    """Replay never sleeps (it polls predicates); the surface enforces that, not convention."""
+    surface = await open_surface(lantern)
+    result = await surface.act(Action(type="wait", duration_ms=10), "automation", EPOCH)
+    assert result.status == "error"
+
+
+async def test_act_events_name_only_links_and_buttons(
+    open_surface: Any, lantern: Bank, events: Events
+) -> None:
+    surface = await open_surface(lantern)
+    await to_member(surface, lantern, lantern.demo)
+    name_cell = spec(
+        {"strategy": "anchor", "anchor_text": "Name:", "relation": "right_of", "control": "text"},
+        frame=["main"],
+    )
+    assert (await act_on(surface, name_cell)).ok
+    logged = events.of("surface.act")[-1]["target"]
+    assert logged["text"] is None and logged["name"] is None
+    assert any(
+        e["target"] and e["target"]["text"] == "Member Inquiry" for e in events.of("surface.act")
+    )

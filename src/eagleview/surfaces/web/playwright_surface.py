@@ -279,9 +279,7 @@ class PlaywrightSurface:
             reason=result.reason,
             point=list(result.point) if result.point else None,
             step_id=step_id,
-            target=None
-            if g is None
-            else {"frame": g.frame, "tag": g.tag, "role": g.role, "name": g.name, "text": g.text},
+            target=None if g is None else _loggable(g),
             text_length=len(action.text) if action.text is not None else None,
         )
         return result
@@ -354,7 +352,9 @@ class PlaywrightSurface:
                 clip = {"x": x0, "y": y0, "width": x1 - x0, "height": y1 - y0}
                 image = await self.page.screenshot(type="png", clip=clip)  # type: ignore[arg-type]
                 return ActionResult("done", action, actor, decision=decision, image=image)
-            case _:  # wait: the discovery model's pause. Replay never issues it; it polls.
+            case _:  # wait: the discovery model's pause. Replay polls predicates, never sleeps.
+                if actor != "llm":
+                    return ActionResult("error", action, actor, "wait is for the discovery model")
                 ms = min(action.duration_ms or 1000, _MAX_WAIT_MS)
                 await asyncio.sleep(ms / 1000)
                 return ActionResult("done", action, actor, decision=decision)
@@ -405,6 +405,16 @@ class PlaywrightSurface:
         if not decision.allowed:
             return _refused(action, actor, decision, point, grounded)
 
+        # Nothing may read or change the page between this confirmation and the mouse.
+        if not await self.grounder.confirm(grounding):
+            return ActionResult(
+                "target_mismatch",
+                action,
+                actor,
+                "the page changed after grounding",
+                point,
+                grounded,
+            )
         self._bind(actor, ctx)
         x, y = point
         mouse = self.page.mouse
@@ -584,6 +594,20 @@ class PlaywrightSurface:
         if not grid:
             raise ExtractError("not_found", "the table is empty")
         return map_columns(Grid(header=grid[0], rows=grid[1:]), spec.columns, self.aliases)
+
+
+def _loggable(g: GroundedTarget) -> dict[str, object]:
+    """What a log line may say about a target. Names and text only for links and buttons: a
+    click on a cell during discovery would otherwise write a member's name before it is a
+    registered value the redactor knows to scrub."""
+    control = g.role in ("link", "button") or g.tag == "a"
+    return {
+        "frame": g.frame,
+        "tag": g.tag,
+        "role": g.role,
+        "name": g.name if control else None,
+        "text": g.text if control else None,
+    }
 
 
 def _refused(

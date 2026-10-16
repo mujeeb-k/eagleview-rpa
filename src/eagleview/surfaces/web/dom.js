@@ -128,6 +128,13 @@
     };
   }
 
+  // Is el topmost at a top-level point right now? The last check before the mouse moves.
+  function topmostAt(el, x, y) {
+    if (!el.isConnected) return false;
+    const o = offset(el.ownerDocument.defaultView);
+    return hitsAt(el, x - o.x, y - o.y, "element");
+  }
+
   function climb(el) {
     if (el && el.nodeType !== 1) el = el.parentElement;
     let e = el;
@@ -443,7 +450,8 @@
   }
 
   return {
-    norm, labelKey, framePath, offset, rendered, inViewport, hitsAt, pointFor, climb, ownText,
+    norm, labelKey, framePath, offset, rendered, inViewport, hitsAt, pointFor, topmostAt, climb,
+    ownText,
     sameTarget, domKey, describe, fieldValue, textBoxes, controls, deepActive, readTable,
   };
 })()

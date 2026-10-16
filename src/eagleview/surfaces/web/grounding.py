@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from playwright.async_api import CDPSession, Page
+from playwright.async_api import Error as PlaywrightError
 
 from eagleview.schema.locators import (
     A11yLocator,
@@ -83,6 +84,20 @@ class Grounder:
             if grounding is not None:
                 return grounding
         raise GroundingError(f"the page changed while grounding ({x}, {y})")
+
+    async def confirm(self, grounding: Grounding) -> bool:
+        """The grounded element is still topmost at the grounded point. Cheap, and the last read
+        of the page before the mouse moves, whatever ran since grounding (candidate generation
+        reads the page many times)."""
+        x, y = grounding.target.point
+        try:
+            return bool(
+                await grounding.element.handle.evaluate(
+                    element_fn("return EV.topmostAt(el, arg[0], arg[1]);"), [x, y]
+                )
+            )
+        except PlaywrightError:
+            return False
 
     async def focus(self) -> GroundedTarget | None:
         """The deep keyboard focus through frames, described like a pointer target. None when the

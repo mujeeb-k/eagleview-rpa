@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs
 
 import pytest
 from playwright.async_api import Browser
@@ -102,9 +103,9 @@ class _SiteHandler(BaseHTTPRequestHandler):
         self.hits.append(f"{self.command} {self.path}")
         path, _, query = self.path.partition("?")
         if path == "/redirect":
-            params = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
+            params = {k: v[0] for k, v in parse_qs(query).items()}
             self.send_response(int(params.get("code", "302")))
-            self.send_header("Location", params["to"].replace("%2F", "/"))
+            self.send_header("Location", params["to"])
             self.end_headers()
             return
         file = PAGES / path.lstrip("/")

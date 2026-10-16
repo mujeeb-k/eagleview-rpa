@@ -356,3 +356,26 @@ single cell is a table message and is skipped. Any other ragged row is an error.
 
 **Mock-bank fixtures moved to a pytest plugin.** `tests/support/bank.py` and `teller.py` are
 shared with the surface tests through `pytest_plugins` in the root conftest.
+
+## 2026-10-15 — P3 review fixes
+
+**One approval token authorizes one irreversible request.** The guard spends a `(run_id,
+step_id)` token on the first request it allows, and blocks later ones as `approval_spent`. The
+guard sends requests itself through `route.fetch`, so a browser cancelling a navigation no longer
+stops a request already handed to the guard. Before this fix, two scripted submits under one
+approved binding both posted, and the mock bank has no double-post guard of its own.
+
+**Nothing reads the page between the last check and the mouse.** While discovery records
+candidate locators, many page reads run after grounding. `act()` ends with `confirm`: the
+grounded element must still be topmost at the grounded point. A failure returns
+`target_mismatch`. A spy test checks that the last two calls are always confirm, then click.
+
+**`wait` is refused for every actor except `llm`.** Replay polls predicates and never sleeps
+(invariant 9), and the surface enforces this rather than relying on convention. `surface.act`
+events name a target, and give its text, only for links and buttons. Otherwise a discovery click on
+a name cell would write the name before it is a registered value the redactor scrubs.
+
+**Every network-guard test opens its own browser context and checks at most one top-level
+navigation.** A blocked navigation commits Chrome's error page late and can interrupt the next
+navigation in the same page. Separate contexts make the tests independent. I confirmed this by
+running them in five shuffled orders.
