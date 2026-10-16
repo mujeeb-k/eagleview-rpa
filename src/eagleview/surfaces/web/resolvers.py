@@ -104,12 +104,12 @@ def is_transient(exc: PlaywrightError) -> bool:
 
 
 async def text_boxes_in(
-    frame: Frame, path: tuple[str, ...]
+    frame: Frame, path: tuple[str, ...], *, every: bool = False
 ) -> tuple[list[TextBox], list[ElementHandle], list[bool]]:
     """Visible text in one frame: boxes, the element carrying each, and heading flags. A frame
-    that is navigating shows nothing."""
+    that is navigating shows nothing. `every` adds covered and out-of-view text, for redaction."""
     try:
-        handle = await frame.evaluate_handle(page_fn("return EV.textBoxes(doc);"))
+        handle = await frame.evaluate_handle(page_fn("return EV.textBoxes(doc, arg);"), every)
         raw, els = await split_pair(handle)
     except PlaywrightError as exc:
         if is_transient(exc):

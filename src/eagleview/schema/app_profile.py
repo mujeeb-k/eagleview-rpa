@@ -177,6 +177,18 @@ class GlobalState(BaseModel):
         return self
 
 
+class ScreenLabels(BaseModel):
+    """Personal data a screen shows beside its labels, which the evidence writer paints over in
+    every screenshot and scrubs from every DOM snapshot, whether or not the run ever reads it.
+
+    `screen` is text that identifies the screen, such as its heading, compared as a whole label
+    (case-insensitive, trailing colon ignored). Omitted, the rule applies to every screen."""
+
+    model_config = _STRICT
+    screen: str | None = Field(default=None, min_length=1)
+    labels: list[str] = Field(min_length=1)
+
+
 class AppProfile(BaseModel):
     model_config = _STRICT
     schema_version: SchemaVersion
@@ -187,6 +199,7 @@ class AppProfile(BaseModel):
     fingerprint: Fingerprint
     login: LoginMacro
     global_states: list[GlobalState] = Field(default_factory=list[GlobalState])
+    sensitive_labels: list[ScreenLabels] = Field(default_factory=list[ScreenLabels])
 
     @model_validator(mode="after")
     def _unique_states(self) -> Self:

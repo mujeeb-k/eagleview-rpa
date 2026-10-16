@@ -854,6 +854,38 @@
       "title": "RetryStepIfIdempotent",
       "type": "object"
     },
+    "ScreenLabels": {
+      "additionalProperties": false,
+      "description": "Personal data a screen shows beside its labels, which the evidence writer paints over in\nevery screenshot and scrubs from every DOM snapshot, whether or not the run ever reads it.\n\n`screen` is text that identifies the screen, such as its heading, compared as a whole label\n(case-insensitive, trailing colon ignored). Omitted, the rule applies to every screen.",
+      "properties": {
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Labels",
+          "type": "array"
+        },
+        "screen": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screen"
+        }
+      },
+      "required": [
+        "labels"
+      ],
+      "title": "ScreenLabels",
+      "type": "object"
+    },
     "SelectChoice": {
       "additionalProperties": false,
       "properties": {
@@ -1181,6 +1213,13 @@
       "pattern": "^1\\.\\d+$",
       "title": "Schema Version",
       "type": "string"
+    },
+    "sensitive_labels": {
+      "items": {
+        "$ref": "#/$defs/ScreenLabels"
+      },
+      "title": "Sensitive Labels",
+      "type": "array"
     },
     "surface": {
       "enum": [

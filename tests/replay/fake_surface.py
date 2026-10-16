@@ -126,7 +126,7 @@ class FakeSurface:
     async def extract(self, spec: ScalarExtract | TableSpec) -> RawValue:
         return "42"
 
-    async def text_boxes(self) -> list[TextBox]:
+    async def text_boxes(self, *, every: bool = False) -> list[TextBox]:
         return [TextBox(text=t, x=0, y=0, width=1, height=1) for t in sorted(self.texts)]
 
     async def dom_snapshot(self) -> str:

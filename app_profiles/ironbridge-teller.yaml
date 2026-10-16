@@ -51,3 +51,16 @@ global_states:
   - id: maintenance_banner
     detect: { text_matches: { pattern: "(?i)unavailable for scheduled maintenance" } }
     fail: { category: APP_UNAVAILABLE, retryable: true }
+# Personal data shown beside these labels is painted out of every screenshot and scrubbed from every
+# DOM snapshot, whether or not a run reads it. A screen is named by its heading.
+sensitive_labels:
+  - screen: Member Search
+    labels: ["Member #", "Last Name"]
+  - screen: Member Detail
+    labels: ["Name", "Member #", "SSN", "DOB", "Phone", "Email", "Address", "Notes"]
+  - screen: Open Share Account
+    labels: ["Member"]
+  - screen: Review - Open Share
+    labels: ["Member"]
+  - screen: Share Account Opened
+    labels: ["Member"]

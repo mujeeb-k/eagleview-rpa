@@ -260,3 +260,21 @@ async def test_copperhill_without_its_overlay_stops_at_select_branch(
     assert r.failure is not None and r.failure.category == "UNKNOWN_STATE"
     assert "sign-on did not reach its success state" in (r.failure.message or "")
     assert r.failure.observed is not None and "/branch" in r.failure.observed
+
+
+async def test_failure_evidence_hides_personal_data_the_run_never_read(
+    replay: Replay, lantern: Bank
+) -> None:
+    # The run fails on Member Detail under a translucent modal, before it extracts anything. The
+    # app profile's sensitive labels still keep the address, phone and notes off disk.
+    lantern.set_faults(unknown_modal_on="/member")
+    run = await replay(lantern, {"member_id": DEMO})
+    assert run.result.failure is not None
+    assert run.result.failure.evidence.dom_snapshot is not None
+    m = _members("lantern-bay", lantern)[DEMO]
+    written = run.files_text()
+    assert "Member Detail" in written  # the snapshot is there, and readable
+    for value in [m.display_name, m.phone, m.email, m.street, f"{m.city}, {m.state} {m.zip}"]:
+        assert value not in written, value
+    if m.notes:
+        assert m.notes not in written

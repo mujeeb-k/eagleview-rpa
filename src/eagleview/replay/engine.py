@@ -232,6 +232,7 @@ async def replay(
         time.monotonic(),
     )
     writer.redactor.use_capability(capability)
+    writer.use_screen_labels(profile.sensitive_labels)
     base.event(
         "run.start",
         capability=capability.ref,
@@ -634,7 +635,12 @@ class _Engine:
         if shot:
             self._shot_no += 1
             self.shots.append(
-                _Shot(self._shot_no, "before", obs.screenshot, await self.surface.text_boxes())
+                _Shot(
+                    self._shot_no,
+                    "before",
+                    obs.screenshot,
+                    await self.surface.text_boxes(every=True),
+                )
             )
         return Before(obs.fingerprint, self.surface.navigation_count(), expect_held)
 
@@ -644,7 +650,7 @@ class _Engine:
         if new or self._shot_no == 0:
             self._shot_no += 1
         self.shots.append(
-            _Shot(self._shot_no, "after", obs.screenshot, await self.surface.text_boxes())
+            _Shot(self._shot_no, "after", obs.screenshot, await self.surface.text_boxes(every=True))
         )
         return self._shot_no
 

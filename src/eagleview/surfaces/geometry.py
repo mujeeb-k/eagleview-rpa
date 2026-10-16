@@ -209,3 +209,53 @@ def group_lines(boxes: Sequence[TextBox]) -> list[str]:
         for row in rows:
             lines.append(" ".join(normalize_text(b.text) for b in sorted(row, key=lambda b: b.x)))
     return lines
+
+
+# How far below its label a labelled value may run when nothing below bounds it, in label heights.
+VALUE_LINES = 4
+
+
+def labelled_values(boxes: Sequence[TextBox], labels: Iterable[str]) -> list[tuple[str, TextBox]]:
+    """The text shown beside each of `labels`, as (label, box) pairs.
+
+    A label's value region starts at its right edge and runs:
+    - across, up to the next label-like text on the label's row (a listed label, or text ending in
+      a colon), so `Name:` stops at `Member #:` in a two-column layout;
+    - down, to the next text in the label's own column, so a two-line address is covered, but at
+      most VALUE_LINES label heights.
+    Boxes whose centre falls in that region are values; label-like text is never a value. Labels
+    are document text and must share a frame with their values."""
+    keys = {label_key(text) for text in labels}
+
+    def label_like(b: TextBox) -> bool:
+        return b.source == "text" and (
+            label_key(b.text) in keys or normalize_text(b.text).endswith(":")
+        )
+
+    out: list[tuple[str, TextBox]] = []
+    for i, lab in enumerate(boxes):
+        if lab.source != "text" or label_key(lab.text) not in keys:
+            continue
+        a = Box.of(i, lab)
+        peers = [(Box.of(j, b), b) for j, b in enumerate(boxes) if j != i and b.frame == lab.frame]
+        x_stops = [
+            g.x
+            for g, b in peers
+            if label_like(b) and g.x >= a.right - EDGE_TOLERANCE_PX and _vertical_band(a, g)
+        ]
+        x_stop = min(x_stops, default=None)
+        y_stops = [
+            g.y
+            for g, b in peers
+            if b.source == "text" and g.y >= a.bottom - EDGE_TOLERANCE_PX and _horizontal_band(a, g)
+        ]
+        y_end = min([*y_stops, a.y + VALUE_LINES * max(a.height, 1)])
+        for g, b in peers:
+            if label_like(b) or g.x < a.right - EDGE_TOLERANCE_PX:
+                continue
+            if x_stop is not None and g.x >= x_stop:
+                continue
+            centre = g.y + g.height / 2
+            if a.y - EDGE_TOLERANCE_PX <= centre < y_end:
+                out.append((normalize_text(lab.text).rstrip(":").rstrip(), b))
+    return out

@@ -259,10 +259,10 @@ class PlaywrightSurface:
             headings=tuple(headings),
         )
 
-    async def text_boxes(self) -> list[TextBox]:
+    async def text_boxes(self, *, every: bool = False) -> list[TextBox]:
         out: list[TextBox] = []
         for frame in self.page.frames:
-            boxes, _, _ = await text_boxes_in(frame, frame_path(frame))
+            boxes, _, _ = await text_boxes_in(frame, frame_path(frame), every=every)
             out += boxes
         return out
 

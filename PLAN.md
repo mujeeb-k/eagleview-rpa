@@ -566,7 +566,7 @@ This app must feel like a real 2004-era core system:
       agent handling an `outcome`.
 
 ### P10: Evidence generation (runs together with P11)
-- [ ] **Screen-level redaction, before any evidence is written (from P4).** Replay paints values it
+- [x] **Screen-level redaction, before any evidence is written (from P4; done before P5).** Replay paints values it
       typed or read, plus pattern matches. Other personal data on the screen, such as the address
       and notes on Member Detail, is still written readable to `runs/` screenshots and failure DOM
       snapshots. Fix: the app profile lists sensitive labels per screen ("Address:", "Notes:"),

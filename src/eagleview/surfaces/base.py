@@ -240,7 +240,10 @@ class Surface(Protocol):
 
     async def extract(self, spec: ScalarExtract | TableSpec) -> RawValue: ...
 
-    async def text_boxes(self) -> list[TextBox]: ...
+    async def text_boxes(self, *, every: bool = False) -> list[TextBox]:
+        """Text a person can see now, with its geometry. `every` adds text that is covered (a
+        translucent overlay still shows it) or out of view, for redaction; never for locating."""
+        ...
 
     async def dom_snapshot(self) -> str:
         """The current document(s) as markup, for failure evidence. Raw: only evidence.writer

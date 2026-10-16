@@ -325,7 +325,10 @@
 
   // Every piece of text visible in this frame's viewport, with the element that carries it.
   // Visible means topmost at the centre of its first on-screen line, through every frame.
-  function textBoxes(doc) {
+  // Visible text and its geometry. With `every`, also text that is covered (under a fake modal's
+  // translucent overlay) or scrolled out of view, unclipped: redaction must reach text a person
+  // can still read through an overlay, and values a DOM snapshot will contain.
+  function textBoxes(doc, every) {
     const win = doc.defaultView;
     const W = win.innerWidth, H = win.innerHeight;
     const o = offset(win);
@@ -333,6 +336,7 @@
     const boxes = [], els = [];
     const root = doc.body || doc.documentElement;
     if (!root) return { boxes, els };
+    const inView = (r) => every || (r.right > 0 && r.bottom > 0 && r.left < W && r.top < H);
     const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       const p = n.parentElement;
@@ -341,17 +345,20 @@
       const range = doc.createRange();
       range.selectNodeContents(n);
       const rects = Array.from(range.getClientRects()).filter(
-        (r) => r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < W && r.top < H
+        (r) => r.width > 0 && r.height > 0 && inView(r)
       );
       if (!rects.length) continue;
       const r0 = rects[0];
       const cx = Math.min(Math.max(r0.left + r0.width / 2, 0), W - 1);
       const cy = Math.min(Math.max(r0.top + r0.height / 2, 0), H - 1);
-      if (!hitsAt(p, cx, cy, "text")) continue;
-      const left = Math.max(0, Math.min(...rects.map((r) => r.left)));
-      const top = Math.max(0, Math.min(...rects.map((r) => r.top)));
-      const right = Math.min(W, Math.max(...rects.map((r) => r.right)));
-      const bottom = Math.min(H, Math.max(...rects.map((r) => r.bottom)));
+      if (!every && !hitsAt(p, cx, cy, "text")) continue;
+      const lo = every ? -Infinity : 0;
+      const left = Math.max(lo, Math.min(...rects.map((r) => r.left)));
+      const top = Math.max(lo, Math.min(...rects.map((r) => r.top)));
+      const right = every ? Math.max(...rects.map((r) => r.right))
+        : Math.min(W, Math.max(...rects.map((r) => r.right)));
+      const bottom = every ? Math.max(...rects.map((r) => r.bottom))
+        : Math.min(H, Math.max(...rects.map((r) => r.bottom)));
       boxes.push({
         text, frame, source: "text", heading: isHeading(p),
         x: Math.round(left + o.x), y: Math.round(top + o.y),
@@ -363,10 +370,10 @@
       const text = el.tagName === "BUTTON" ? norm(el.innerText) : controlText(el);
       if (!text || !rendered(el)) continue;
       const r = firstRect(el);
-      if (!r || r.right <= 0 || r.bottom <= 0 || r.left >= W || r.top >= H) continue;
+      if (!r || !inView(r)) continue;
       const cx = Math.min(Math.max(r.left + r.width / 2, 0), W - 1);
       const cy = Math.min(Math.max(r.top + r.height / 2, 0), H - 1);
-      if (!hitsAt(el, cx, cy, "element")) continue;
+      if (!every && !hitsAt(el, cx, cy, "element")) continue;
       boxes.push({ text, frame, source: "control", heading: false, ...topBox(el, r) });
       els.push(el);
     }

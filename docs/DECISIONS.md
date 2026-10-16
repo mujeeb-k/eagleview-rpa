@@ -494,3 +494,44 @@ success, 3 outcome, 4 rejected, 5 failed and 6 needs_human; 2 is left to usage e
 **Until P8, Copperhill stops at Select Branch.** Its handler lives in the tenant overlay, and
 choosing a branch by position needs the overlay's surface support. A test pins the current
 behaviour: UNKNOWN_STATE at sign-on, observed on `/branch`.
+
+## 2026-10-16 — Screen-level redaction (before P5)
+
+**This closes the P4 known limit, before any discovery trace or evidence is written.** Until now,
+personal data on screen that a run never read or typed was caught only by the pattern layer, such as
+the address and notes on Member Detail. It was written readable in screenshots and failure DOM
+snapshots under `runs/`, which broke invariant 4.
+
+**[REVIEW] The app profile lists sensitive labels per screen.** `sensitive_labels` is a list of
+`{screen, labels}`. `screen` is text that identifies the screen, its heading here, compared as a
+whole label; omitting it applies the rule to every screen. Ironbridge lists:
+- Member Search: Member #, Last Name.
+- Member Detail: Name, Member #, SSN, DOB, Phone, Email, Address, Notes.
+- The Member line on Open Share, Review and Posted.
+
+The alternative was one global label list, which is simpler. I rejected it because a label such as
+"Member" means a person on one screen and a menu heading on another. Not listed: Member Since
+dates, loan balances and transaction amounts, which identify no one once the identifiers are masked.
+
+**[REVIEW] What counts as "the value beside a label" is geometry, not markup.** The value region
+starts at the label's right edge. It runs across to the next label-like text on that row (a listed
+label, or text ending in a colon). It runs down to the next text in the label's own column, which
+covers a two-line address, and never more than four label heights. The rule reads only text boxes,
+so a desktop surface can reuse it, like the anchor strategy. The alternative, the next table cell
+in the DOM, is more exact on this app. I rejected it because it would not carry over to OCR or UI
+Automation.
+
+**The writer registers those values; it does not paint rectangles of its own.** Before each
+screenshot, `EvidenceWriter.register_screen` registers every labelled value as personal data.
+Value-aware redaction then paints those boxes and scrubs them from every later DOM snapshot and
+event. The engine already writes screenshots before DOM snapshots, so a failure snapshot is
+scrubbed of everything its screenshot showed.
+
+**Redaction now sees covered and out-of-view text.** `text_boxes(every=True)` includes text under a
+fake modal's translucent overlay, which a person can still read in the screenshot, and text
+scrolled out of view, which a DOM snapshot contains. Locating still uses only what is visible.
+Before this, value-aware painting also skipped covered text, so a modal could leave a registered
+value readable. A test fills the Member Detail screen with and without the unknown modal and
+checks every personal value's box is solid black and absent from the DOM snapshot. Another test
+shows that a failure run's evidence no longer contains them, and it fails when the engine stops
+passing the labels to the writer.

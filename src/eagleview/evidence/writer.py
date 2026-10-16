@@ -22,9 +22,12 @@ from typing import Literal
 from PIL import Image, ImageDraw
 from pydantic import BaseModel
 
-from eagleview.safety.redaction import Redactor
+from eagleview.safety.redaction import Redactor, is_name_field
 from eagleview.schema.action import TextBox
+from eagleview.schema.app_profile import ScreenLabels
+from eagleview.schema.common import Sensitivity
 from eagleview.schema.events import STRUCTURAL_FIELDS, Event
+from eagleview.surfaces.geometry import expand_aliases, label_key, labelled_values
 
 _NAME = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,63}$")
 _FILL = (0, 0, 0)
@@ -41,6 +44,32 @@ class EvidenceWriter:
         self.run_dir.mkdir(parents=True, exist_ok=False)
         self._seq = 0
         self._lock = threading.Lock()
+        self._screens: list[ScreenLabels] = []
+        self._aliases: Mapping[str, Sequence[str]] = {}
+
+    def use_screen_labels(
+        self,
+        rules: Sequence[ScreenLabels],
+        aliases: Mapping[str, Sequence[str]] | None = None,
+    ) -> None:
+        """Adopt the app profile's sensitive labels (and a tenant's aliases for them). From now on
+        every screenshot registers the values beside them before it is painted."""
+        self._screens = list(rules)
+        self._aliases = aliases or {}
+
+    def register_screen(self, text_boxes: Sequence[TextBox]) -> None:
+        """Register, as personal data, the text beside every sensitive label on this screen. Pass
+        every text box, covered and out of view included, so DOM snapshots are scrubbed too."""
+        present = {label_key(b.text) for b in text_boxes}
+        for rule in self._screens:
+            if rule.screen is not None and label_key(rule.screen) not in present:
+                continue
+            labels = expand_aliases(rule.labels, self._aliases)
+            for label, box in labelled_values(text_boxes, labels):
+                field = re.sub(r"[^a-z0-9]+", "_", label.casefold()).strip("_") or "value"
+                self.redactor.register(
+                    box.text, Sensitivity.pii, field, is_name=is_name_field(field)
+                )
 
     @property
     def events_path(self) -> Path:
@@ -79,12 +108,14 @@ class EvidenceWriter:
         *,
         text_boxes: Sequence[TextBox],
     ) -> Path:
-        """Paint over every text box the redactor flags, then write the PNG.
+        """Paint over every text box the redactor flags, then write the PNG. Values beside the
+        app profile's sensitive labels are registered first, so they are among those flagged.
 
         `text_boxes` has no default on purpose: there is no way to write an unredacted screenshot.
         Pass an empty list only for an image known to carry no text."""
         if not 0 <= step <= 9999:
             raise ValueError("step must be 0..9999")
+        self.register_screen(text_boxes)
         path = self.run_dir / "steps" / f"{step:04d}_{phase}.png"
         path.parent.mkdir(exist_ok=True)
         path.write_bytes(self.redact_png(png, text_boxes))
