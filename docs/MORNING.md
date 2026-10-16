@@ -196,5 +196,8 @@ out, by design.
   Linux. The driver also hid the failing step behind a 120 s timeout.
 - **The fix (`06fbb62`): green** (run 38863367145). The surface now applies the HTML
   implicit-submission rule on every host (#39), and all ten offline scenarios pass on Linux.
-- This file is in a later, docs-and-evidence commit; its CI result is in my closing message, not
+- **The evidence regeneration (`b797bf4`): failed** (run 38865333365). A path fix I made in
+  that commit crashed on `make demo-offline`'s relative `--out runs/demo`. I had not rerun
+  `demo-offline` locally after that change. The next commit fixes it, with a test.
+- This file is in that next commit; its CI result is in my closing message, not
   here, because a file can't report the CI run of the commit that contains it.

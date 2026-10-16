@@ -671,8 +671,12 @@ def write_record(
     clean = redactor.redact_tree(json.loads(json.dumps(record, default=str)))
     text = json.dumps(clean, indent=2)
     if moved_to is not None:
-        for here, there in ((out, moved_to), (out.relative_to(REPO), moved_to.relative_to(REPO))):
-            text = text.replace(f"{here}/", f"{there}/")
+        here, there = out.resolve(), moved_to.resolve()
+        pairs = [(here, there)]
+        if here.is_relative_to(REPO) and there.is_relative_to(REPO):
+            pairs.append((here.relative_to(REPO), there.relative_to(REPO)))
+        for a, b in pairs:
+            text = text.replace(f"{a}/", f"{b}/")
     text = text.replace(f"{REPO}/", "")
     (out / "result.json").write_text(text + "\n")
     return json.loads(text)

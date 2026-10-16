@@ -80,3 +80,11 @@ def test_a_record_names_where_its_folder_ends_up(tmp_path: Path) -> None:
         (staging / "result.json").unlink(missing_ok=True)
         staging.rmdir()
     assert written["review"] == "written to evidence/01_x/a.yaml and evidence/01_x/b.yaml"
+
+
+def test_a_record_moved_to_a_relative_folder_is_written(tmp_path: Path) -> None:
+    """`make demo-offline` passes `--out runs/demo`, a relative path."""
+    from scripts.evidence.driver import write_record
+
+    written = write_record(tmp_path, {"status": "pass"}, moved_to=Path("runs/demo/04_x"))
+    assert written == {"status": "pass"}
