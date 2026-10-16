@@ -1,15 +1,19 @@
 # Eagleview
 
+[![The demo: an AI learns a bank task once, then a recipe runs it with no AI (1:50, click to play)](evidence/demo_poster.png)](evidence/demo.mp4)
+
 Eagleview automates legacy bank and credit-union back-office applications that have no API. An
 LLM discovers how to do a task once, through the screen, and the run is compiled into a typed,
 versioned **capability artifact**. Production replays that artifact **deterministically, with no
 LLM**, and a person can take over the same live session when automation is stuck, then hand it
 back.
 
-**Watch the 3-minute demo: [evidence/demo.mp4](evidence/demo.mp4).** It shows discovery by the
-model, replay with no model, a "member not found" answer, the approval gate on Post, a person
-taking over in the operator console, and an AI assistant using the approved capability. It is
-recorded from the mock bank only, by `scripts/evidence/demo_video.sh`.
+**The demo ([evidence/demo.mp4](evidence/demo.mp4), 1:50, narrated, with subtitles)** follows
+one member's question from start to finish: the model learning the lookup once, the approved
+recipe answering with no model, a member number that doesn't exist, the approval gate on Post, a
+person taking over the live session, and the same recipe at a second credit union. It is filmed
+from the mock bank only and rendered by `scripts/evidence/demo_video.sh` (Remotion, in
+[video/](video/README.md)). Narration is AI-generated.
 
 All institutions, people and data in this repository are fictional and synthetic. The app being
 automated is "Ironbridge Teller 7", a mock legacy teller system in `mock_bank/`, run as two

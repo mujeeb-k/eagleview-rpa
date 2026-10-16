@@ -12,9 +12,20 @@ and the subtitles are the same words.
 
 ## Preview and render
 
-You need Node 20 or later, `ffmpeg`, and the raw clips in `runs/demo_video/` (record any that are
-missing with `scripts/evidence/demo_video.sh --record-video --no-build`; only the discovery and
-agent segments call the model).
+You need Node 20 or later, `ffmpeg`, and the raw clips in `runs/demo_video/`. The whole film,
+`evidence/demo.mp4` and its poster `evidence/demo_poster.png`, is rendered by one script:
+
+```bash
+scripts/evidence/demo_video.sh
+```
+
+To record footage first (only the discovery and the two agent segments call the model):
+
+```bash
+scripts/evidence/demo_video.sh --record-video --segments ask_savings,ask_missing
+```
+
+To work on the film itself:
 
 ```bash
 cd video && npm ci
@@ -45,7 +56,8 @@ cd video && npm run render
 - `sync-sheet` writes `runs/demo_video/sync_sheet.png` from the render: one frame per click or
   keypress, at its ripple, labelled with the action.
 - `studio` opens Remotion Studio (http://localhost:3000) to scrub through the `Demo` composition.
-- `render` writes `runs/demo_video/draft.mp4`.
+- `render` writes a draft to `runs/demo_video/draft.mp4`; the `Poster` still composition is the
+  README's poster.
 
 To change a narration line, edit it in `prepare.py` and run `prepare-media` again: each beat's
 length follows its audio, and footage holds its last frame while the narration finishes.

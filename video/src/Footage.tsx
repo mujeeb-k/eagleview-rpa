@@ -173,8 +173,8 @@ const Pointer: React.FC<{ x: number; y: number; color: string; k: number }> = ({
 );
 
 /** A pointer label, beside its element and never on it: placed beyond the element's edge and
- * joined to it by a short line. Drawn in source pixels inside the camera; `k` is the zoom, so
- * text and strokes keep their size on screen. */
+ * joined to it by a short line. Drawn in source pixels inside the camera; `k` is the source-to-
+ * screen scale (the frame's size times the zoom), so text is 30 px tall on a 1080p screen. */
 export const PointerLabel: React.FC<{ label: Label; t: number; k: number }> = ({ label, t, k }) => {
   const to = label.to ?? 9999;
   const fade = interpolate(t, [label.from, label.from + 0.3, to - 0.2, to], [0, 1, 1, 0], {
@@ -225,10 +225,10 @@ export const PointerLabel: React.FC<{ label: Label; t: number; k: number }> = ({
           whiteSpace: "nowrap",
           fontFamily: FONT,
           fontWeight: 600,
-          fontSize: 22 / k,
+          fontSize: 30 / k,
           color: "#0B0F17",
           background: label.color,
-          padding: `${5 / k}px ${12 / k}px`,
+          padding: `${6 / k}px ${14 / k}px`,
           borderRadius: 999,
           boxShadow: `0 ${4 / k}px ${16 / k}px rgba(0,0,0,.45)`,
         }}
@@ -248,21 +248,21 @@ export const Token: React.FC<{ who: Control["who"]; note?: string }> = ({ who, n
           display: "flex",
           alignItems: "center",
           gap: 10,
-          padding: "8px 16px 8px 12px",
+          padding: "10px 22px 10px 16px",
           borderRadius: 999,
-          background: "rgba(11,15,23,.88)",
-          border: `2px solid ${color}`,
+          background: "rgba(11,15,23,.92)",
+          border: `3px solid ${color}`,
           fontFamily: FONT,
-          fontSize: 22,
+          fontSize: 32,
           fontWeight: 600,
           color: INK,
         }}
       >
-        <span style={{ width: 12, height: 12, borderRadius: 99, background: color }} />
+        <span style={{ width: 16, height: 16, borderRadius: 99, background: color }} />
         Driving: <span style={{ color }}>{who}</span>
       </div>
       {note ? (
-        <div style={{ fontFamily: FONT, fontSize: 17, color, background: "rgba(11,15,23,.8)", padding: "3px 10px", borderRadius: 6 }}>
+        <div style={{ fontFamily: FONT, fontSize: 28, color, background: "rgba(11,15,23,.85)", padding: "4px 12px", borderRadius: 8 }}>
           {note}
         </div>
       ) : null}
@@ -307,7 +307,8 @@ export const Footage: React.FC<FootageProps> = ({
   const { s, sinceCut, press } = sourceAt(t, segments);
   const cam = camera(shots, t);
   const base = frame.w / SRC_W;
-  const k = cam.scale;
+  const zoom = cam.scale;
+  const k = base * zoom; // source pixels to screen pixels: overlays size their text by it
   const cursor = cursorAt(presses, actions, t);
   const thought = thoughts.find((x) => t >= x.o0 && t < x.o1);
   const who = control ? whoAt(control, s) : null;
@@ -333,7 +334,7 @@ export const Footage: React.FC<FootageProps> = ({
           width: SRC_W,
           height: SRC_H,
           transformOrigin: "0 0",
-          transform: `scale(${base * k}) translate(${-cam.left}px, ${-cam.top}px)`,
+          transform: `scale(${k}) translate(${-cam.left}px, ${-cam.top}px)`,
         }}
       >
         <AbsoluteFill>
@@ -369,10 +370,10 @@ export const Footage: React.FC<FootageProps> = ({
                 top: a.y - 56 / k,
                 fontFamily: FONT,
                 fontWeight: 700,
-                fontSize: 22 / k,
+                fontSize: 30 / k,
                 color: "#0B0F17",
                 background: actorColor(a.actor),
-                padding: `${4 / k}px ${12 / k}px`,
+                padding: `${5 / k}px ${14 / k}px`,
                 borderRadius: 8 / k,
                 whiteSpace: "nowrap",
                 opacity: interpolate(t, [p.o0, p.o0 + 0.15, until - 0.15, until], [0, 1, 1, 0]),
@@ -391,11 +392,11 @@ export const Footage: React.FC<FootageProps> = ({
           <div
             style={{
               position: "absolute",
-              left: Math.min(cursor.x + 34 / k, SRC_W - 520 / k),
+              left: Math.min(cursor.x + 34 / k, SRC_W - 760 / k),
               top: cursor.y + 34 / k,
-              maxWidth: 480 / k,
+              maxWidth: 720 / k,
               fontFamily: FONT,
-              fontSize: 20 / k,
+              fontSize: 30 / k,
               lineHeight: 1.3,
               color: INK,
               background: "rgba(23,18,48,.92)",
@@ -416,7 +417,7 @@ export const Footage: React.FC<FootageProps> = ({
               left: cursor.x + 34 / k,
               top: cursor.y - 40 / k,
               fontFamily: FONT,
-              fontSize: 20 / k,
+              fontSize: 28 / k,
               fontWeight: 600,
               color: AI,
               background: "rgba(11,15,23,.85)",

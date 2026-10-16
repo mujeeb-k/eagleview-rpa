@@ -10,6 +10,7 @@ evidence/ is touched. Every coordinate, time and line of AI reasoning comes from
 chat's question and answer come from the real agent run."""
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -19,18 +20,9 @@ from typing import Any
 
 from ruamel.yaml import YAML
 
-from scripts.evidence.demo_video import (
-    APPROVED_LOOKUP,
-    QUESTION,
-    RAW,
-    anchor_of,
-    blank_until,
-    control_timeline,
-    events_of,
-    length,
-    ts,
-)
+from scripts.evidence.demo_video import APPROVED_LOOKUP, RAW
 from video import sync
+from video.sync import anchor_of, blank_until, control_timeline, events_of, length, ts
 
 REPO = Path(__file__).resolve().parents[1]
 OPEN_SHARE = REPO / "capabilities" / "drafts" / "member.open_share_account.yaml"
@@ -38,8 +30,8 @@ MEDIA = REPO / "video" / "public" / "media"
 FPS = 30
 VOICE = "Samantha"  # the most natural installed voice; no Premium or Enhanced voice is installed
 RATE = 165  # words per minute
-GAP = 0.35  # silence between subtitle cues
-LEAD = 0.4  # silence before a scene's first cue
+GAP = 0.2  # silence between subtitle cues
+LEAD = 0.2  # silence before a scene's first cue
 yaml = YAML(typ="safe")
 
 
@@ -371,21 +363,44 @@ def recipe(discovery_actions: list[dict[str, Any]], table: list[int]) -> list[di
     return steps
 
 
-def adjustments() -> list[str]:
-    """Copperhill's reviewed overlay, as sticky notes."""
-    notes: list[str] = []
+def adjustments() -> list[dict[str, str]]:
+    """Copperhill's reviewed overlays, as differences pinned to the recipe: a renamed label on
+    the step that finds things by it, a different search button, and an extra screen."""
+    out: list[dict[str, str]] = []
     for path in sorted((REPO / "overlays" / "copperhill").glob("*.yaml")):
         o = yaml.load(path.read_text())
         for label, aliases in (o.get("label_aliases") or {}).items():
-            notes.append(f"'{label}' is '{aliases[0]}'")
+            step = {"Member #": "enter_member_id", "Member Inquiry": "open_member_inquiry"}
+            out.append({"step": step.get(label, ""), "text": f"“{label}” → “{aliases[0]}”"})
         for state in o.get("global_states_add") or []:
             if "Branch" in json.dumps(state):
-                notes.append("Branch screen: pick Hillcrest")
-        for step, patch in (o.get("step_patches") or {}).items():
+                out.append({"step": "", "text": "+ a Select Branch screen after sign-on"})
+        for step_id, patch in (o.get("step_patches") or {}).items():
             names = [x.get("name") for x in patch["target"]["locators"]["prepend"] if x.get("name")]
-            if step == "submit_member_search" and names:
-                notes.append(f"GO is a '{names[0]}' button")
-    return notes
+            if step_id == "submit_member_search" and names:
+                out.append({"step": step_id, "text": f"GO → “{names[0]}” button"})
+    return out
+
+
+def first_sentence(text: str) -> str:
+    """The reply's first sentence, verbatim: in both replies it is the one that answers."""
+    head = text.strip().split("\n", 1)[0]
+    m = re.match(r"(.+?[.!?])(\s|$)", head)
+    return m.group(1) if m else head
+
+
+def measured(discovery_run: str, agent: "Clip") -> dict[str, float]:
+    """The two numbers on screen, from the ledger and the run logs only: what the discovery run
+    cost, and how long the agent's replay took with no model calls during it."""
+    ledger = [json.loads(line) for line in (REPO / "runs" / "discovery_ledger.jsonl").open()]
+    usd = sum(float(e["usd"]) for e in ledger if e["run_id"] == discovery_run)
+    events = events_of(agent.run_dir)
+    start = ts(next(e["ts"] for e in events if e["kind"] == "run.start"))
+    end = next(e for e in events if e["kind"] == "run.end")
+    during = [e for e in ledger if start <= ts(e["ts"]) <= ts(end["ts"])]
+    if during:
+        sys.exit(f"the replay overlapped {len(during)} model calls; '0 AI calls' would be false")
+    return {"discovery_usd": usd, "replay_s": end["timing_ms"]["total"] / 1000}
 
 
 # --- the story -------------------------------------------------------------------------------
@@ -415,10 +430,11 @@ def build() -> dict[str, Any]:
     shutil.rmtree(MEDIA, ignore_errors=True)
     MEDIA.mkdir(parents=True)
 
-    m_disc, m_agent, m_hand = meta("discovery"), meta("agent"), meta("handoff")
+    m_disc, m_agent, m_hand = meta("discovery"), meta("ask_savings"), meta("handoff")
+    m_ask2 = meta("ask_missing")
     m_miss, m_gate, m_rep, m_cop = meta("missing"), meta("gate"), meta("replay"), meta("copperhill")
     disc = clip("discovery", "discovery", Path(m_disc["run_dir"]))
-    agent = clip("agent", "agent", Path(m_agent["run_dir"]))
+    agent = clip("agent", "ask_savings", Path(m_agent["run_dir"]))
     hand_dir = m_hand.get("run_dir") or str(next((RAW / "handoff" / "runs").glob("r_*")))
     hand = clip("handoff", "handoff", Path(hand_dir))
     miss = clip("missing", "missing", Path(m_miss["run_dir"]))
@@ -427,9 +443,8 @@ def build() -> dict[str, Any]:
     cop = clip("copperhill", "copperhill", Path(m_cop["run_dir"]))
     clips = {c.name: c for c in (disc, agent, hand, miss, gate, rep, cop)}
 
-    lookup = yaml.load(APPROVED_LOOKUP.read_text())
-    not_found = next(o for o in lookup["outcomes"] if o["code"] == "MEMBER_NOT_FOUND")
-    answer = m_agent["detail"].split("\n\n", 1)[1]
+    question, answer = m_agent["question"], m_agent["answer_plain"]
+    numbers = measured(Path(m_disc["run_dir"]).name, agent)
 
     # Discovery: jump cuts over the model's thinking. Each kept piece runs from just before a
     # turn's first action to just after its last one has painted.
@@ -447,8 +462,8 @@ def build() -> dict[str, Any]:
         nxt = turns[i + 1]["t"] if i + 1 < len(turns) else disc.duration
         acts = [a for a in d_actions if turn["t"] <= a["done"] < nxt]
         first = min((a["t"] for a in acts), default=turn["t"])
-        a = max(prev, min(turn["t"], first) - 1.0)
-        b = (max(a2["onset"] or a2["done"] for a2 in acts) + 1.0) if acts else turn["t"] + 2.2
+        a = max(prev, min(turn["t"], first) - 0.7)
+        b = (max(a2["onset"] or a2["done"] for a2 in acts) + 0.6) if acts else turn["t"] + 1.6
         d_pieces.append(piece(disc, a, min(b, nxt + 0.6), cut=True))
         prev = d_pieces[-1]["to"]
     evidence_from_trace(disc, d_actions)
@@ -460,6 +475,7 @@ def build() -> dict[str, Any]:
     )
     signed = hand.first("session.signed_on")
     go = next(a["t"] for a in h_actions if a["step"] == "submit_member_search")
+    ops = [a for a in h_actions if a["actor"].startswith("operator")]
     waiting = hand.first("control.transition", to="AWAITING_HUMAN")
     modal = modal_box(hand, waiting - 0.5)
     human = hand.first("control.transition", to="HUMAN")
@@ -492,8 +508,8 @@ def build() -> dict[str, Any]:
                 "Amber asks her credit union's AI assistant a simple question:",
                 "how much is in my savings?",
             ],
-            props={"question": QUESTION, "who": "Amber"},
-            min_s=6.5,
+            props={"question": question, "who": "Amber"},
+            min_s=6.0,
         ),
         Scene(
             "problem",
@@ -504,7 +520,7 @@ def build() -> dict[str, Any]:
                 "The only way in is a person clicking through its screens.",
             ],
             props={
-                "question": QUESTION,
+                "question": question,
                 "app": still(
                     rep, rep.first("step.done", step_id="open_member_inquiry") + 0.3, "app_search"
                 ),
@@ -527,7 +543,12 @@ def build() -> dict[str, Any]:
                 "It looks at the screen, decides what to do, and clicks.",
             ],
             pieces=d_pieces,
-            props={"actions": d_actions, "turns": turns, "control": [{"t": 0, "who": "AI"}]},
+            props={
+                "actions": d_actions,
+                "turns": turns,
+                "control": [{"t": 0, "who": "AI"}],
+                "metric": f"1 AI run · ${numbers['discovery_usd']:.2f}",
+            },
         ),
         Scene(
             "recipe",
@@ -559,24 +580,26 @@ def build() -> dict[str, Any]:
                 "checks each screen is right before moving on,",
                 "and hands back her balances.",
             ],
-            pieces=[piece(agent, agent.start, agent.duration)],
-            zoom=("table", 3, 0.3),
+            pieces=[piece(agent, agent.first("session.signed_on"), agent.duration)],
+            zoom=("table", 2, 0.3),
             props={
-                "question": QUESTION,
+                "question": question,
                 "answer": answer,
+                "highlight": first_sentence(answer),
                 "status": "Looking up balances for member 10482",
+                "metric": f"0 AI calls · {numbers['replay_s']:.1f} s",
                 "actions": a_agent,
                 "done": done_steps(agent),
                 "control": [{"t": 0, "who": "Recipe"}],
                 "region": regions["table"],
             },
-            tail=4.5,
+            tail=3.5,
         ),
         Scene(
             "surprise",
             "handoff",
             ["Real systems throw surprises, like this warning the recipe has never seen."],
-            pieces=[piece(hand, signed, go + 2.2)],
+            pieces=[piece(hand, signed, go + 1.6)],
             props={
                 "phase": "alert",
                 "actions": h_actions,
@@ -602,7 +625,10 @@ def build() -> dict[str, Any]:
             "takeover",
             "handoff",
             ["who takes over the very same screen, clears the warning,"],
-            pieces=[piece(hand, human, resume)],
+            pieces=[
+                piece(hand, max(human, ops[0]["onset"] - 0.9), ops[0]["onset"] + 0.5),
+                piece(hand, ops[1]["onset"] - 0.7, min(resume, ops[1]["onset"] + 0.6)),
+            ],
             props={
                 "phase": "person",
                 "actions": h_actions,
@@ -639,10 +665,11 @@ def build() -> dict[str, Any]:
                 "actions": a_miss,
                 "control": [{"t": 0, "who": "Recipe"}],
                 "region": regions["banner"],
-                "code": not_found["code"],
-                "message": " ".join(str(not_found["message"]).split()),
+                "question": m_ask2["question"],
+                "answer": m_ask2["answer_plain"],
+                "highlight": first_sentence(m_ask2["answer_plain"]),
             },
-            tail=4.0,
+            tail=2.0,
         ),
         Scene(
             "gate",
@@ -679,15 +706,15 @@ def build() -> dict[str, Any]:
                 "And because many credit unions run this same software,",
                 "a recipe learned at one works at another with a few small adjustments.",
             ],
-            pieces=[piece(cop, cop.start, cop.duration)],
+            pieces=[piece(cop, cop.first("session.signed_on"), cop.duration)],
             after_cue=0,
+            tail=0.4,
             props={
-                "notes": adjustments(),
+                "diffs": adjustments(),
                 "steps": recipe(d_actions, regions["table"]),
                 "actions": a_cop,
                 "control": [{"t": 0, "who": "Recipe"}],
             },
-            tail=1.0,
         ),
         Scene(
             "close",
@@ -698,7 +725,7 @@ def build() -> dict[str, Any]:
             ],
             min_s=5,
         ),
-        Scene("url", "url", [], props={"url": "github.com/mujeeb-k/eagleview-rpa"}, min_s=4),
+        Scene("url", "url", [], props={"url": "github.com/mujeeb-k/eagleview-rpa"}, min_s=3.1),
     ]
     return lay_out(scenes, clips, regions)
 

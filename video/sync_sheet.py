@@ -3,8 +3,8 @@ labelled with the action: the visual half of the sync check in video/sync.py.
 
     PYTHONPATH=. uv run python video/sync_sheet.py
 
-Reads video/public/media/story.json and runs/demo_video/draft.mp4; writes
-runs/demo_video/sync_sheet.png."""
+Reads video/public/media/story.json and the rendered film (evidence/demo.mp4, or the path given);
+writes runs/demo_video/sync_sheet.png."""
 
 import json
 import subprocess
@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 REPO = Path(__file__).resolve().parents[1]
 STORY = REPO / "video" / "public" / "media" / "story.json"
-DRAFT = REPO / "runs" / "demo_video" / "draft.mp4"
+FILM = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "evidence" / "demo.mp4"
 OUT = REPO / "runs" / "demo_video" / "sync_sheet.png"
 CELL = (640, 360)
 BAND = 34
@@ -25,7 +25,7 @@ COLS = 4
 def frame(t: float) -> Image.Image:
     w, h = CELL
     raw = subprocess.run(
-        ["ffmpeg", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(DRAFT), "-frames:v", "1"]
+        ["ffmpeg", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(FILM), "-frames:v", "1"]
         + ["-vf", f"scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
         capture_output=True,
         check=True,

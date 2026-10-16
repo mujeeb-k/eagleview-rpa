@@ -14,9 +14,12 @@ the action: stable, followed by the action's effect, closer to the action's own 
 "before" screenshot than to its "after" one (where those exist), and with the target element,
 not blank space, under the ripple."""
 
+import json
+import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -354,3 +357,74 @@ def check_action(
     if not not_blank(held, a["x"], a["y"]):
         problems.append(f"blank space under the ripple at ({a['x']},{a['y']})")
     return problems
+
+
+# --- footage and run logs ---------------------------------------------------------------
+
+# The console's holder field, as the corner label says it. While a run waits for help the lease
+# is released and the holder is "nobody": the label says so rather than claim automation.
+WHO = {"AWAITING_HUMAN": "No one", "HUMAN": "Person"}  # every other state: Automation
+
+
+def blank_until(ffmpeg: str, src: Path) -> float:
+    """Seconds of blank (white) frames at the start of a clip."""
+    probe = subprocess.run(
+        [ffmpeg, "-hide_banner", "-i", str(src), "-vf", "negate,blackdetect=d=0.04:pix_th=0.08"]
+        + ["-an", "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+    ).stderr
+    m = re.search(r"black_start:0(?:\.0+)?\s+black_end:([\d.]+)", probe)
+    return float(m.group(1)) if m else 0.0
+
+
+def length(src: Path) -> float:
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(src)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    if out and out != "N/A":
+        return float(out)
+    probe = subprocess.run(  # Playwright's webm may not carry a duration: count its frames
+        ["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0"]
+        + ["-show_entries", "stream=nb_read_frames,r_frame_rate", "-of", "json", str(src)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    s = json.loads(probe)["streams"][0]
+    num, den = map(int, s["r_frame_rate"].split("/"))
+    return int(s["nb_read_frames"]) * den / num
+
+
+def events_of(run_dir: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in (run_dir / "run.jsonl").open()]
+
+
+def anchor_of(events: Sequence[dict[str, Any]]) -> float:
+    """The harness's first navigation: the moment the sign-on page is painted, which is where a
+    clip's trimmed start lines up with the run log."""
+    return next(
+        ts(e["ts"]) for e in events if e["kind"] == "surface.act" and e.get("action") == "navigate"
+    )
+
+
+def ts(text: str) -> float:
+    return datetime.fromisoformat(text).timestamp()
+
+
+def control_timeline(run_dir: Path) -> list[tuple[float, str]]:
+    """Who is in control, from the session controller's own transitions in the run log: the
+    state and holder the console's banner shows. While a run waits for help nobody holds the
+    lease ("No one"); while the operator holds it, "Person". After the hand-back, automation
+    validates the screen and finishes; the lease field is briefly empty there and after the run
+    completes, but automation is the actor, so those states read "Automation"."""
+    out: list[tuple[float, str]] = []
+    for e in events_of(run_dir):
+        if e["kind"] == "control.transition":
+            who = WHO.get(str(e.get("to")), "Automation")
+            if not out or out[-1][1] != who:
+                out.append((ts(e["ts"]), who))
+    return out

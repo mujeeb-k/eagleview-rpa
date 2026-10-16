@@ -1331,3 +1331,30 @@ punctuation, or a name) is scrubbed like a value, as before. The alternative, ne
 data (`"row 10482"`) through. The over-match that registered "Search" as a value (a button label
 inside a sensitive label's value region) remains: it hides the word in free text on that screen,
 which errs towards hiding.
+
+## 2026-10-16 — The narrated demo, finished
+
+**[REVIEW] The chat lines are two real agent runs.** "Hi, I'm member 10482. How much is in my
+savings?" and "Can you check the savings for member 99999?" were asked through the catalog with
+the mock bank up (2 runs, about $0.01); their replies are shown in full, verbatim (markdown marks
+removed for the screen), with the reply's first sentence, the one that answers, highlighted. The
+alternative, the scenario-14 questions, didn't match the story's "my savings".
+
+**[REVIEW] The agent segments are filmed at real speed.** Every other replay is filmed with the
+250 ms slow motion used for watchability; the agent's replay is not, so the label beside it,
+"0 AI calls · 1.7 s", is that run's own measured time (its `run.end`), and the ledger shows no
+model call between its `run.start` and `run.end` (prepare.py stops if one does). Beat 3's
+"1 AI run · $0.05" is the ledger total for the video's own discovery run. Both are computed by
+`video/prepare.py`; nothing on screen is typed in by hand.
+
+**Every replay starts once the teller is signed in.** The sign-on is the profile's macro, not the
+recipe, and cutting it brings the film to 1:50 with every click and its hold kept. Dead time was
+trimmed (silences between cues, waits between the staff member's two clicks), never a click.
+
+**Copperhill has four differences, not three.** Its overlays rename two labels ("Member Inquiry"
+→ "Member Lookup", "Member #" → "Acct Holder No."), add a Select Branch screen, and use a Search
+button for GO; the card shows all four, from the overlay files.
+
+**The film is rendered by the evidence script.** `scripts/evidence/demo_video.sh` now only
+records footage (opt-in) and then renders the story with Remotion to `evidence/demo.mp4` and
+`evidence/demo_poster.png`; the old ffmpeg assembly was removed with the film it made.

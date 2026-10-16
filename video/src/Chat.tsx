@@ -4,10 +4,9 @@ import { AI, FONT, INK, MUTED, PANEL } from "./theme";
 
 export type Message =
   | { from: "member"; text: string; at: number; typeFor?: number }
-  | { from: "assistant"; text: string; at: number }
+  | { from: "assistant"; text: string; at: number; highlight?: string }
   | { from: "typing"; at: number; until: number }
-  | { from: "status"; text: string; at: number; until?: number }
-  | { from: "result"; code: string; text: string; at: number };
+  | { from: "status"; text: string; at: number; until?: number };
 
 const appear = (t: number, at: number) =>
   interpolate(t, [at, at + 0.35], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -21,7 +20,9 @@ export const Chat: React.FC<{
   h: number;
   who: string;
   messages: Message[];
-}> = ({ x, y, w, h, who, messages }) => {
+  /** Text size of the messages: everything a viewer reads is at least 28 px at 1080p. */
+  size?: number;
+}> = ({ x, y, w, h, who, messages, size = 30 }) => {
   const t = useCurrentFrame() / useVideoConfig().fps;
   return (
     <div
@@ -42,11 +43,11 @@ export const Chat: React.FC<{
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "18px 22px", borderBottom: "1px solid rgba(255,255,255,.07)" }}>
-        <span style={{ width: 34, height: 34, borderRadius: 99, background: AI, display: "grid", placeItems: "center", color: "#0B0F17", fontWeight: 800, fontSize: 18 }}>
+        <span style={{ width: 44, height: 44, borderRadius: 99, background: AI, display: "grid", placeItems: "center", color: "#0B0F17", fontWeight: 800, fontSize: 22 }}>
           AI
         </span>
-        <span style={{ fontSize: 24, fontWeight: 600 }}>Credit union assistant</span>
-        <span style={{ marginLeft: "auto", fontSize: 15, color: MUTED, border: `1px solid ${MUTED}`, borderRadius: 6, padding: "2px 8px" }}>
+        <span style={{ fontSize: 30, fontWeight: 600 }}>Credit union assistant</span>
+        <span style={{ marginLeft: "auto", fontSize: 28, color: MUTED, border: `2px solid ${MUTED}`, borderRadius: 8, padding: "2px 12px" }}>
           illustration
         </span>
       </div>
@@ -60,8 +61,8 @@ export const Chat: React.FC<{
               const n = m.typeFor ? Math.floor(m.text.length * Math.min(1, (t - m.at) / m.typeFor)) : m.text.length;
               return (
                 <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", ...lift }}>
-                  <div style={{ fontSize: 16, color: MUTED, textAlign: "right", marginBottom: 4 }}>{who}</div>
-                  <div style={{ background: "#2A3446", borderRadius: "18px 18px 4px 18px", padding: "14px 18px", fontSize: 28, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 28, color: MUTED, textAlign: "right", marginBottom: 6 }}>{who}</div>
+                  <div style={{ background: "#2A3446", borderRadius: "22px 22px 6px 22px", padding: "16px 22px", fontSize: size, lineHeight: 1.3 }}>
                     {m.text.slice(0, n)}
                     {n < m.text.length ? <span style={{ opacity: 0.6 }}>|</span> : null}
                   </div>
@@ -79,24 +80,29 @@ export const Chat: React.FC<{
             }
             if (m.from === "status") {
               return (
-                <div key={i} style={{ alignSelf: "flex-start", fontSize: 20, color: AI, display: "flex", alignItems: "center", gap: 10, ...lift }}>
-                  <span style={{ width: 16, height: 16, borderRadius: 99, border: `3px solid ${AI}`, borderTopColor: "transparent", transform: `rotate(${t * 360}deg)` }} />
+                <div key={i} style={{ alignSelf: "flex-start", fontSize: 28, color: AI, display: "flex", alignItems: "center", gap: 12, ...lift }}>
+                  <span style={{ width: 22, height: 22, borderRadius: 99, border: `4px solid ${AI}`, borderTopColor: "transparent", transform: `rotate(${t * 360}deg)` }} />
                   {m.text}
                 </div>
               );
             }
-            if (m.from === "result") {
-              return (
-                <div key={i} style={{ alignSelf: "flex-start", maxWidth: "92%", background: "#1E2535", borderLeft: `4px solid ${AI}`, borderRadius: 14, padding: "14px 18px", ...lift }}>
-                  <div style={{ fontFamily: "Menlo, monospace", fontSize: 20, color: AI, marginBottom: 6 }}>{m.code}</div>
-                  <div style={{ fontSize: 24, lineHeight: 1.3 }}>{m.text}</div>
-                </div>
-              );
-            }
+            // The reply in full and verbatim; the sentence that answers the question is marked.
+            const at = m.highlight ? m.text.indexOf(m.highlight) : -1;
+            const mark = at >= 0 && m.highlight ? (
+              <>
+                {m.text.slice(0, at)}
+                <span style={{ background: `${AI}40`, boxShadow: `inset 0 -3px 0 ${AI}`, borderRadius: 4, padding: "0 2px" }}>
+                  {m.highlight}
+                </span>
+                {m.text.slice(at + m.highlight.length)}
+              </>
+            ) : (
+              m.text
+            );
             return (
-              <div key={i} style={{ alignSelf: "flex-start", maxWidth: "94%", ...lift }}>
-                <div style={{ background: "#1E2535", borderRadius: "18px 18px 18px 4px", padding: "14px 18px", fontSize: 21, lineHeight: 1.38, whiteSpace: "pre-wrap" }}>
-                  {m.text}
+              <div key={i} style={{ alignSelf: "flex-start", maxWidth: "96%", ...lift }}>
+                <div style={{ background: "#1E2535", borderRadius: "22px 22px 22px 6px", padding: "16px 22px", fontSize: size, lineHeight: 1.36, whiteSpace: "pre-wrap" }}>
+                  {mark}
                 </div>
               </div>
             );
