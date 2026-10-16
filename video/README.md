@@ -53,8 +53,15 @@ cd video && npm run render
   action's own logged "before" screenshot better than its "after" one, has the target element
   (not blank space) under the ripple, sits inside the camera's view, and is what the timeline
   shows at that moment.
+- **The anchor check** runs there too (`check_anchors` in `prepare.py`). A line that names
+  something on screen ("this warning", "the final button", "the bank says so", "hands back her
+  balances") declares when that thing appears: measured from the footage (the first frame from
+  which its region looks as it does once it is shown), or, for the chat reply, from the
+  composition's own timing. The line is placed no earlier than that, and the build stops if it
+  starts earlier, if a line uses one of those words without an anchor, or if the thing never
+  appears in the scene's footage.
 - `sync-sheet` writes `runs/demo_video/sync_sheet.png` from the render: one frame per click or
-  keypress, at its ripple, labelled with the action.
+  keypress, at its ripple, labelled with the action, then one per anchored line as it starts.
 - `studio` opens Remotion Studio (http://localhost:3000) to scrub through the `Demo` composition.
 - `render` writes a draft to `runs/demo_video/draft.mp4`; the `Poster` still composition is the
   README's poster.

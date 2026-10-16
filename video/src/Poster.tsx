@@ -8,6 +8,9 @@ import { BG, FONT, INK, PERSON } from "./theme";
 /** The README's poster: the approved recipe beside Amber's answered chat, from the same story
  * data as the film (the real question and reply, the recipe the real discovery compiled). */
 export const Poster: React.FC<{ story: Story | null }> = ({ story }) => {
+  // The film's own length, from the story it is rendered from, as m:ss.
+  const secs = Math.round(story?.duration ?? 0);
+  const length = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
   if (!story) return <AbsoluteFill style={{ background: BG }} />;
   const recipe = story.scenes.find((s) => s.id === "approve");
   const answer = story.scenes.find((s) => s.id === "answer");
@@ -71,7 +74,7 @@ export const Poster: React.FC<{ story: Story | null }> = ({ story }) => {
           <circle cx={12} cy={12} r={12} fill={BG} />
           <path d="M9.5 7.5v9l7-4.5Z" fill="#fff" />
         </svg>
-        Watch the demo (1:50)
+        Watch the demo ({length})
       </div>
     </AbsoluteFill>
   );

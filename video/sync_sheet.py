@@ -1,5 +1,7 @@
 """One frame of the rendered draft per click or keypress, at the moment its ripple plays,
-labelled with the action: the visual half of the sync check in video/sync.py.
+labelled with the action: the visual half of the sync check in video/sync.py. Then one frame per
+line that names something on screen, as the line starts: the visual half of the anchor check in
+video/prepare.py.
 
     PYTHONPATH=. uv run python video/sync_sheet.py
 
@@ -35,7 +37,20 @@ def frame(t: float) -> Image.Image:
 
 def main() -> int:
     story = json.loads(STORY.read_text())
-    entries = [e for e in story["sync"] if e["t"] is not None]
+    entries = [
+        {"t": e["t"], "label": f"{e['scene']}: {e['name']}", "ok": not e["problems"]}
+        for e in story["sync"]
+        if e["t"] is not None
+    ]
+    starts = {sc["id"]: sc["start"] for sc in story["scenes"]}
+    entries += [
+        {
+            "t": starts[a["scene"]] + a["starts"] + 0.05,
+            "label": f"{a['scene']}: line “{a['what']}”",
+            "ok": not a["problems"],
+        }
+        for a in story["anchors"]
+    ]
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial.ttf", 20)
     except OSError:
@@ -46,12 +61,10 @@ def main() -> int:
     for n, e in enumerate(entries):
         x, y = (n % COLS) * CELL[0], (n // COLS) * (CELL[1] + BAND)
         sheet.paste(frame(e["t"]), (x, y + BAND))
-        ok = "ok" if not e["problems"] else "BAD"
-        draw.text(
-            (x + 8, y + 6), f"{n + 1}. {e['scene']}: {e['name']}  [{ok}]", fill="#fff", font=font
-        )
+        ok = "ok" if e["ok"] else "BAD"
+        draw.text((x + 8, y + 6), f"{n + 1}. {e['label']}  [{ok}]", fill="#fff", font=font)
     sheet.save(OUT)
-    print(f"{OUT.relative_to(REPO)}: {len(entries)} actions")
+    print(f"{OUT.relative_to(REPO)}: {len(entries)} frames")
     return 0
 
 

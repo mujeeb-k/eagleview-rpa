@@ -1,6 +1,6 @@
 # Eagleview
 
-[![The demo: an AI learns a bank task once, then a recipe runs it with no AI (1:50, click to play)](evidence/demo_poster.png)](evidence/demo.mp4)
+[![The demo: an AI learns a bank task once, then a recipe runs it with no AI (1:48, click to play)](evidence/demo_poster.png)](evidence/demo.mp4)
 
 Eagleview automates legacy bank and credit-union back-office applications that have no API. An
 LLM discovers how to do a task once, through the screen, and the run is compiled into a typed,
@@ -8,7 +8,7 @@ versioned **capability artifact**. Production replays that artifact **determinis
 LLM**, and a person can take over the same live session when automation is stuck, then hand it
 back.
 
-**The demo ([evidence/demo.mp4](evidence/demo.mp4), 1:50, narrated, with subtitles)** follows
+**The demo ([evidence/demo.mp4](evidence/demo.mp4), 1:48, narrated, with subtitles)** follows
 one member's question from start to finish: the model learning the lookup once, the approved
 recipe answering with no model, a member number that doesn't exist, the approval gate on Post, a
 person taking over the live session, and the same recipe at a second credit union. It is filmed

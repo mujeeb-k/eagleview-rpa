@@ -32,6 +32,11 @@ VOICE = "Samantha"  # the most natural installed voice; no Premium or Enhanced v
 RATE = 165  # words per minute
 GAP = 0.2  # silence between subtitle cues
 LEAD = 0.2  # silence before a scene's first cue
+ANCHOR_LAG = 0.1  # an anchored line starts this long after the thing it names appears
+REPLY_AFTER_ZOOM = 1.8  # the answer's chat reply appears this long after its zoom starts
+# Words that point at something on screen. A line containing one must declare an anchor, and
+# must start no earlier than that thing appears, or the build stops (check_anchors).
+REFERS = ("this warning", "the final button", "the bank says so", "hands back her balances")
 yaml = YAML(typ="safe")
 
 
@@ -373,12 +378,15 @@ def adjustments() -> list[dict[str, str]]:
             step = {"Member #": "enter_member_id", "Member Inquiry": "open_member_inquiry"}
             out.append({"step": step.get(label, ""), "text": f"“{label}” → “{aliases[0]}”"})
         for state in o.get("global_states_add") or []:
-            if "Branch" in json.dumps(state):
-                out.append({"step": "", "text": "+ a Select Branch screen after sign-on"})
+            if "Branch" not in json.dumps(state):
+                sys.exit(f"{path.name}: the card has no words for state {state.get('id')!r}")
+            out.append({"step": "", "text": "+ a Select Branch screen after sign-on"})
         for step_id, patch in (o.get("step_patches") or {}).items():
             names = [x.get("name") for x in patch["target"]["locators"]["prepend"] if x.get("name")]
-            if step_id == "submit_member_search" and names:
-                out.append({"step": step_id, "text": f"GO → “{names[0]}” button"})
+            if step_id != "submit_member_search" or not names:
+                sys.exit(f"{path.name}: the card has no words for the patch to {step_id!r}")
+            out.append({"step": step_id, "text": f"GO → “{names[0]}” button"})
+    # Every difference the overlays make is on the card: none is dropped.
     return out
 
 
@@ -406,6 +414,38 @@ def measured(discovery_run: str, agent: "Clip") -> dict[str, float]:
 # --- the story -------------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class Anchor:
+    """What a line of narration names on screen, and when that first appears: a region of the
+    scene's footage, measured from the frames (`sync.appears`), and/or a fixed time after the
+    scene's zoom starts (the chat reply, which the composition draws)."""
+
+    what: str
+    region: tuple[int, int, int, int] | None = None
+    src: float | None = None  # the source time it appears, measured from the footage
+    after_zoom: float | None = None
+
+    def at(self, segments: list[dict[str, Any]], zoom_t: float | None) -> float:
+        times = []
+        if self.src is not None:
+            times.append(sync.out_time(segments, self.src))
+        if self.after_zoom is not None:
+            if zoom_t is None:
+                sys.exit(f"anchor {self.what!r}: the scene has no zoom")
+            times.append(zoom_t + self.after_zoom)
+        return max(times)
+
+
+def appears(c: Clip, region: list[int] | tuple[int, ...], ref: float, lo: float) -> Anchor:
+    assert c.frames is not None
+    box = (int(region[0]), int(region[1]), int(region[2]), int(region[3]))
+    return Anchor("", box, round(sync.appears(c.frames, box, ref, lo), 3))
+
+
+def anchored(what: str, a: Anchor) -> Anchor:
+    return Anchor(what, a.region, a.src, a.after_zoom)
+
+
 @dataclass
 class Scene:
     """One stretch of the film: what it shows (`kind` and its props), what is said (cues, in
@@ -424,6 +464,11 @@ class Scene:
     # before that cue, but never before the last action on screen has finished: the camera
     # waits for the footage, so it never crops out a click or frames a screen not yet shown.
     zoom: tuple[str, int, float] | None = None
+    # Lines that name something on screen: cue index -> when that thing appears.
+    anchors: dict[int, Anchor] = field(default_factory=dict[int, Anchor])
+    # The footage waits on its first frame so that the thing this cue names appears just as the
+    # cue starts, rather than while the lines before it are still being spoken.
+    land: int | None = None
 
 
 def build() -> dict[str, Any]:
@@ -473,7 +518,6 @@ def build() -> dict[str, Any]:
     h_actions = actions(
         hand, {"enter_member_id": "10482"}, actors=("harness", "automation", "operator")
     )
-    signed = hand.first("session.signed_on")
     go = next(a["t"] for a in h_actions if a["step"] == "submit_member_search")
     ops = [a for a in h_actions if a["actor"].startswith("operator")]
     waiting = hand.first("control.transition", to="AWAITING_HUMAN")
@@ -492,6 +536,14 @@ def build() -> dict[str, Any]:
     a_gate = replay_actions(gate, "10482", OPEN_SHARE)
     a_cop = replay_actions(cop, str(m_cop["member"]), None)  # Copperhill's overlay moves things
 
+    def step_act(acts: list[dict[str, Any]], step: str) -> dict[str, Any]:
+        return next(a for a in acts if a["step"] == step)
+
+    def painted(c: Clip, act: dict[str, Any]) -> float:
+        """When the screen an action opened has finished painting."""
+        assert c.frames is not None
+        return sync.settled(c.frames, act["onset"] or act["done"])
+
     regions = {
         "table": m_rep["zoom"],
         "banner": m_miss["zoom"],
@@ -499,6 +551,21 @@ def build() -> dict[str, Any]:
         "detail": m_hand["zoom"],
         "copperhill_table": m_cop["zoom"],
     }
+
+    # Where each beat starts, and when the things its lines name appear, from the footage.
+    # The filled-in field, just before GO (after the typing is logged, so it isn't shown half-done).
+    surprise_from = max(go - 0.6, step_act(h_actions, "enter_member_id")["done"] + 0.05)
+    warning = appears(hand, modal, waiting - 0.5, go)
+    miss_from = max(
+        painted(miss, step_act(a_miss, "open_member_inquiry")),
+        step_act(a_miss, "enter_member_id")["t"] - 0.5,
+    )
+    banner = appears(miss, regions["banner"], miss.duration - 0.1, miss_from)
+    opened = step_act(a_gate, "click_open_share")
+    gate_from = max(painted(gate, opened), opened["done"] + 0.05)
+    review = appears(gate, regions["post"], gate.duration - 0.1, gate_from)
+    agent_from = agent.first("session.signed_on")
+    table = appears(agent, regions["table"], agent.duration - 0.1, agent_from)
 
     scenes = [
         Scene(
@@ -580,8 +647,11 @@ def build() -> dict[str, Any]:
                 "checks each screen is right before moving on,",
                 "and hands back her balances.",
             ],
-            pieces=[piece(agent, agent.first("session.signed_on"), agent.duration)],
+            pieces=[piece(agent, agent_from, agent.duration)],
             zoom=("table", 2, 0.3),
+            anchors={
+                3: Anchor("hands back her balances", table.region, table.src, REPLY_AFTER_ZOOM)
+            },
             props={
                 "question": question,
                 "answer": answer,
@@ -598,13 +668,15 @@ def build() -> dict[str, Any]:
         Scene(
             "surprise",
             "handoff",
-            ["Real systems throw surprises, like this warning the recipe has never seen."],
-            pieces=[piece(hand, signed, go + 1.6)],
+            ["Real systems throw surprises,", "like this warning the recipe has never seen."],
+            pieces=[piece(hand, surprise_from, go + 1.6)],
+            anchors={1: anchored("this warning", warning)},
+            land=1,
             props={
                 "phase": "alert",
                 "actions": h_actions,
                 "control": control(hand, default="Recipe"),
-                "modal_t": go + 0.3,
+                "modal_t": warning.src,
                 "modal": modal,
             },
         ),
@@ -617,7 +689,7 @@ def build() -> dict[str, Any]:
                 "phase": "waiting",
                 "actions": h_actions,
                 "control": control(hand, default="Recipe"),
-                "modal_t": go + 0.3,
+                "modal_t": warning.src,
                 "modal": modal,
             },
         ),
@@ -633,7 +705,7 @@ def build() -> dict[str, Any]:
                 "phase": "person",
                 "actions": h_actions,
                 "control": control(hand, default="Recipe"),
-                "modal_t": go + 0.3,
+                "modal_t": warning.src,
                 "modal": modal,
             },
         ),
@@ -647,7 +719,7 @@ def build() -> dict[str, Any]:
                 "phase": "back",
                 "actions": h_actions,
                 "control": control(hand, default="Recipe"),
-                "modal_t": go + 0.3,
+                "modal_t": warning.src,
                 "modal": modal,
                 "region": regions["detail"],
             },
@@ -659,8 +731,9 @@ def build() -> dict[str, Any]:
                 "If someone asks about a member number that doesn't exist,",
                 "the bank says so, and the assistant passes on a clear answer instead of an error.",
             ],
-            pieces=[piece(miss, miss.first("session.signed_on"), miss.duration)],
+            pieces=[piece(miss, miss_from, miss.duration)],
             zoom=("banner", 1, 0.4),
+            anchors={1: anchored("the bank says so", banner)},
             props={
                 "actions": a_miss,
                 "control": [{"t": 0, "who": "Recipe"}],
@@ -679,8 +752,10 @@ def build() -> dict[str, Any]:
                 "never happens on its own.",
                 "Eagleview stops at the final button until a person approves.",
             ],
-            pieces=[piece(gate, gate.first("session.signed_on"), gate.duration)],
-            zoom=("post", 1, 0.3),
+            pieces=[piece(gate, gate_from, gate.duration)],
+            zoom=("post", 2, 0.0),
+            anchors={2: anchored("the final button", review)},
+            land=2,
             props={
                 "actions": a_gate,
                 "control": [{"t": 0, "who": "Recipe"}],
@@ -747,12 +822,34 @@ def lay_out(scenes: list[Scene], clips: dict[str, Clip], regions: dict[str, Any]
         spoken: list[tuple[Path, float]] = [
             speak(text, f"{s.id}_{i}") for i, text in enumerate(s.cues)
         ]
-        talk = (LEAD + sum(d for _, d in spoken) + GAP * max(0, len(spoken) - 1)) if spoken else 0.0
         delay = 0.0
         if s.after_cue is not None:
             delay = LEAD + sum(d for _, d in spoken[: s.after_cue + 1]) + GAP * (s.after_cue + 1)
         acts: list[dict[str, Any]] = s.props.get("actions", [])
+        if s.land is not None:
+            natural = LEAD + sum(d for _, d in spoken[: s.land]) + GAP * s.land
+            undelayed, _ = sync.schedule(s.pieces, acts, 0.0)
+            delay = max(0.0, natural - ANCHOR_LAG - s.anchors[s.land].at(undelayed, None))
         segments, presses = sync.schedule(s.pieces, acts, delay)
+        # Each line follows the last after a short gap, except that a line naming something on
+        # screen waits until that thing has appeared. The zoom is placed as its cue is.
+        starts: list[float] = []
+        zoom_t: float | None = None
+        at = LEAD
+        for i, (_, d) in enumerate(spoken):
+            if i:
+                at += GAP
+            if i in s.anchors:
+                at = max(at, s.anchors[i].at(segments, zoom_t) + ANCHOR_LAG)
+            starts.append(at)
+            if s.zoom is not None and s.zoom[1] == i:
+                after = max((p["o1"] for p in presses), default=0.0) + 0.3
+                zoom_t = round(max(at - s.zoom[2], after), 3)
+            at += d
+        talk = at if spoken else 0.0
+        if "reply_at" in s.props or any(a.after_zoom is not None for a in s.anchors.values()):
+            assert zoom_t is not None
+            s.props["reply_at"] = round(zoom_t + REPLY_AFTER_ZOOM, 3)
         footage = (segments[-1]["o1"] - delay) if segments else 0.0
         duration = max(talk + 0.5, delay + footage + s.tail if s.pieces else 0.0, s.min_s)
         thoughts: list[dict[str, Any]] = []
@@ -762,24 +859,20 @@ def lay_out(scenes: list[Scene], clips: dict[str, Clip], regions: dict[str, Any]
             ]
             thoughts = sync.thoughts(turns, acts, presses, duration)
         parts: list[Path] = []
-        at = LEAD if spoken else 0.0
-        if spoken:
-            parts.append(silence(LEAD, f"{s.id}_lead"))
-        for i, ((wav, d), text) in enumerate(zip(spoken, s.cues, strict=True)):
+        at = 0.0
+        for i, ((wav, d), text, start) in enumerate(zip(spoken, s.cues, starts, strict=True)):
+            parts.append(silence(start - at, f"{s.id}_gap{i}"))
             cues_out.append(
                 {
                     "text": text,
-                    "start": round(t + at, 3),
-                    "end": round(t + at + d, 3),
+                    "start": round(t + start, 3),
+                    "end": round(t + start + d, 3),
                     "scene": s.id,
                     "index": i,
                 }
             )
             parts.append(wav)
-            at += d
-            if i + 1 < len(spoken):
-                parts.append(silence(GAP, f"{s.id}_gap{i}"))
-                at += GAP
+            at = start + d
         parts.append(silence(max(0.05, duration - at), f"{s.id}_tail"))
         beat = MEDIA / f"vo_{n:02d}_{s.id}.wav"
         concat(parts, beat)
@@ -790,12 +883,8 @@ def lay_out(scenes: list[Scene], clips: dict[str, Clip], regions: dict[str, Any]
         )
         local = [c for c in cues_out if c["scene"] == s.id]
         shots: list[dict[str, Any]] = []
-        if s.zoom is not None:
-            name, cue, lead = s.zoom
-            after = max((p["o1"] for p in presses), default=0.0) + 0.3
-            shots.append(
-                {"t": round(max(local[cue]["start"] - t - lead, after), 3), "region": regions[name]}
-            )
+        if s.zoom is not None and zoom_t is not None:
+            shots.append({"t": zoom_t, "region": regions[s.zoom[0]]})
         out_scenes.append(
             {
                 "id": s.id,
@@ -810,16 +899,31 @@ def lay_out(scenes: list[Scene], clips: dict[str, Clip], regions: dict[str, Any]
                 "delay": round(delay, 3),
                 "props": s.props,
                 "cues": [
-                    {"start": round(c["start"] - t, 3), "end": round(c["end"] - t, 3)}
+                    {
+                        "start": round(c["start"] - t, 3),
+                        "end": round(c["end"] - t, 3),
+                        "text": c["text"],
+                    }
                     for c in local
                 ],
+                "anchors": {
+                    str(i): {
+                        "what": a.what,
+                        "appears": round(a.at(segments, zoom_t), 3),
+                        "src": a.src,
+                        "region": a.region,
+                    }
+                    for i, a in s.anchors.items()
+                },
             }
         )
         t += duration
     shutil.rmtree(MEDIA / "vo", ignore_errors=True)
     checked = check_sync(out_scenes, clips)
+    anchors = check_anchors(out_scenes, clips)
     return {
         "sync": checked,
+        "anchors": anchors,
         "fps": FPS,
         "voice": VOICE,
         "rate": RATE,
@@ -903,6 +1007,64 @@ def check_sync(scenes: list[dict[str, Any]], clips: dict[str, Clip]) -> list[dic
     if failed:
         sys.exit(f"sync check failed for {failed} of {len(out)} actions")
     print(f"sync check: all {len(out)} overlaid actions match their footage")
+    return out
+
+
+def check_anchors(scenes: list[dict[str, Any]], clips: dict[str, Clip]) -> list[dict[str, Any]]:
+    """Every line that names something on screen starts no earlier than that thing appears.
+    A line with one of the REFERS words but no anchor fails too, and so does an anchor whose
+    thing appears after the scene's footage ends. The build stops here on any failure."""
+    out: list[dict[str, Any]] = []
+    failed = 0
+    for sc in scenes:
+        for i, cue in enumerate(sc["cues"]):
+            text = cue.get("text", "")
+            named = [w for w in REFERS if w in text]
+            anchor = sc["anchors"].get(str(i))
+            problems: list[str] = []
+            if not named and anchor is None:
+                continue
+            if anchor is None:
+                problems.append(f"names {named[0]!r} on screen but declares no anchor")
+                appears_at = None
+            else:
+                appears_at = anchor["appears"]
+                if anchor["src"] is not None:
+                    clip = clips[sc["pieces"][0]["clip"]]
+                    assert clip.frames is not None
+                    measured = sync.appears(
+                        clip.frames, anchor["region"], anchor["src"] + 0.5, sc["pieces"][0]["from"]
+                    )
+                    if measured > anchor["src"] + 1 / FPS:
+                        problems.append(f"the footage shows it at {measured:.3f}s, not before")
+                    if anchor["src"] > sc["pieces"][-1]["to"]:
+                        problems.append("it appears after the scene's footage ends")
+                if cue["start"] + 1e-6 < appears_at:
+                    problems.append(
+                        f"the line starts at {cue['start']:.2f}s, before it appears at "
+                        f"{appears_at:.2f}s"
+                    )
+            failed += bool(problems)
+            out.append(
+                {
+                    "scene": sc["id"],
+                    "what": anchor["what"] if anchor else named[0],
+                    "line": text,
+                    "starts": cue["start"],
+                    "appears": appears_at,
+                    "problems": problems,
+                }
+            )
+    for r in out:
+        mark = "ok " if not r["problems"] else "BAD"
+        when = f"appears {r['appears']:.2f}s" if r["appears"] is not None else "no anchor"
+        print(
+            f"  {mark} {r['scene']:<9} {r['what']!r:<26} line {r['starts']:.2f}s, {when} "
+            f"{'; '.join(r['problems'])}"
+        )
+    if failed or not out:
+        sys.exit(f"anchor check failed for {failed} of {len(out)} lines")
+    print(f"anchor check: all {len(out)} lines that name something start after it appears")
     return out
 
 

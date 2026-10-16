@@ -428,3 +428,26 @@ def control_timeline(run_dir: Path) -> list[tuple[float, str]]:
             if not out or out[-1][1] != who:
                 out.append((ts(e["ts"]), who))
     return out
+
+
+def appears(
+    f: Frames, region: Sequence[int], ref: float, lo: float = 0.0, threshold: float = 2.5
+) -> float:
+    """When a thing first appears and stays: the first source time from `lo` on after which the
+    region (screen pixels: x0, y0, x1, y1) looks as it does at `ref`, where it is known to be on
+    screen, in every frame up to `ref`."""
+    sx, sy = SMALL[0] / SRC[0], SMALL[1] / SRC[1]
+    x0, y0, x1, y1 = region
+    box = (
+        round(x0 * sx),
+        round(y0 * sy),
+        max(round(x1 * sx), round(x0 * sx) + 1),
+        max(round(y1 * sy), round(y0 * sy) + 1),
+    )
+    target = f.small[f.index(ref)].crop(box)
+    first = f.index(ref)
+    for i in range(f.index(ref), f.index(lo) - 1, -1):
+        if mean_diff(f.small[i].crop(box), target) > threshold:
+            break
+        first = i
+    return first / FPS

@@ -1407,3 +1407,31 @@ no paid runs.
 
 **The run cap is 45, up from 33.** The user authorised paid runs to regenerate all evidence with
 `make evidence`, about 6 runs, on top of the 31 already in the ledger. The ledger is unchanged.
+
+## 2026-10-16 — Narration that waits for what it names
+
+**[REVIEW] A line that names something on screen starts only once that thing appears.** Two
+beats spoke ahead of their footage: "like this warning…" played before the warning existed, and
+"Eagleview stops at the final button…" played on the Open Share form, before the review screen.
+`video/prepare.py` now lets a line declare an anchor. The anchor's appearance is measured from
+the footage: the first frame from which a region (the alert's title bar, the IBT-1004 banner, the
+review screen around Post, the Share Accounts table) looks as it does once shown, and stays so.
+For the chat reply it is the composition's own reply time, which prepare.py now sets. The line
+is placed no earlier than 0.1 s after that. `check_anchors` stops the build if an anchored line
+starts earlier, if a line uses one of the naming phrases without an anchor, or if the thing
+never appears in the scene's footage. The alternative, tuning each beat's timing by hand, is
+how the drift crept in.
+
+**The surprise and approval beats hold their first frame so the thing lands on its line.**
+Placing a line late leaves the footage running ahead. So in those two beats, the footage waits
+on its first frame (the filled-in member number; the Open Share form) until the warning, or the
+review screen, appears 0.1 s before its line. The surprise line is now two subtitle cues, "Real
+systems throw surprises," and "like this warning the recipe has never seen.", with the same
+words. The approval zoom moved to the line about the final button, so the camera never frames
+the review screen before it exists.
+
+**The lookup routine is shown in full twice, not five times.** Amber's answer shows it, and so
+does Copperhill, where it differs. The surprise starts just before GO, the not-found beat at the
+Member # field, and the approval beat at the Open Share form. The film is 1:48 (108.2 s), down
+from 1:50. On the Copperhill card, the Select Branch difference, at the top, now appears first
+rather than last, so all four differences are on screen together for about a second.

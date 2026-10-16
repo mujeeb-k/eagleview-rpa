@@ -388,9 +388,10 @@ export const Answer: React.FC<P> = ({ story, scene }) => {
   const t = useT();
   const answer = prop<string>(scene, "answer");
   const region = prop<Region>(scene, "region");
+  // When the reply appears is set by prepare.py, which starts "hands back her balances" after it.
   const zoomAt = zoomStart(scene);
-  const lift = zoomAt + 1.0;
-  const reply = lift + 0.8;
+  const reply = prop<number>(scene, "reply_at");
+  const lift = reply - 0.8;
   // The amounts the reply quotes, lifted out of the table it read them from.
   const amounts = answer
     .split("\n")
@@ -641,7 +642,8 @@ export const Reuse: React.FC<P> = ({ story, scene }) => {
   const notes: Record<string, string> = {};
   for (const d of diffs) if (d.step) notes[d.step] = d.text;
   const extra = diffs.find((d) => !d.step);
-  const noteAt = (i: number) => 0.6 + i * 0.45;
+  // The extra screen sits at the top of the card, so it is read first; the label notes follow.
+  const noteAt = (i: number) => 1.05 + i * 0.45;
   return (
     <Bg>
       {intro || t < scene.delay + 0.5 ? (
@@ -657,7 +659,7 @@ export const Reuse: React.FC<P> = ({ story, scene }) => {
             title="The same recipe, at Copperhill"
             notes={notes}
             noteAt={noteAt}
-            extra={extra ? { text: extra.text, at: noteAt(steps.length) } : undefined}
+            extra={extra ? { text: extra.text, at: 0.6 } : undefined}
           />
         </div>
       ) : null}
