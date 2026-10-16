@@ -2,7 +2,7 @@
 
 from playwright.async_api import FrameLocator, Page, expect
 
-from tests.mock_bank.conftest import Bank, main_frame, nav_frame
+from tests.support.bank import Bank, main_frame, nav_frame
 
 
 async def sign_on(page: Page, bank: Bank) -> None:

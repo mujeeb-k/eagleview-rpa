@@ -265,3 +265,94 @@ identifier is masked and an amount follows `redact_amounts`.
 **Name tokens never rewrite placeholders.** The second scrubbing pass skips `[label]`
 placeholders from the first pass. The property test found the case: a name token `NAME` was
 turning `[member_name]` into `[member_[member_name]]`.
+
+## 2026-10-15 — P3 web surface
+
+**`act()` grounds at the exact point immediately before acting, and acts there with the mouse.**
+The order is: lease check, then the point (a resolved target is scrolled into view first), then
+grounding, then the identity check, then the policy, then `mouse.click(x, y)`. I never act through a
+selector, because Playwright's `locator.click()` re-resolves, scrolls and retargets on its own, so
+the click could land on something that was never grounded. Keyboard actions ground the deep
+focus instead, so Enter on a focused "Post" is judged as a click on Post.
+
+**The identity check compares live elements, not paths.** When the caller passes a resolved
+target, the element under the point must be that same live node, compared with `===` in its
+own frame, or the action returns `target_mismatch` and nothing happens. A table layout can rebuild
+an identical DOM path on the next screen; a detached handle or a covering modal fails the check.
+`sameTarget` treats a `<font>` inside its `<a>` as the same target as the `<a>`.
+
+**Grounding runs two hit tests and requires them to agree.** CDP `DOM.getNodeForLocation` gives
+the node whose accessibility role and name the browser reports. A JS `elementFromPoint` descent
+through the frames gives a Playwright handle that resolvers can be compared against. Both climb
+to the actionable ancestor, and their DOM keys must match, or grounding retries once and then fails.
+
+**Fill types its value, key by key.** Fill does this:
+1. clicks the field, then checks that focus landed on the grounded node (by browser node id);
+2. selects the existing text with `el.select()` and presses Delete;
+3. types the value with `keyboard.type`, which sends keydown, keypress, input and keyup for each
+   character.
+
+`ControlOrMeta+a` was rejected: it is Meta on macOS and Control on Linux, so replay would behave
+differently by platform. Values must be printable ASCII. Playwright types any other character
+with `insertText`, which fires no key events, so I refuse those values rather than half-type them.
+Typing has no `delay`, because a delay is a sleep on the replay path.
+
+**Visible means topmost, through every frame.** Text, controls and table rows count as visible
+only if a hit test at their centre lands on them in their own document, and each enclosing
+frame element is topmost in its parent at that point. A point outside the viewport is not
+visible. `resolve`, `act` and table extraction scroll into view first. `text_boxes()` and
+the text predicates report only what is on screen now, matching the screenshot. One known limit:
+an overlay with `pointer-events: none` is invisible to hit testing.
+
+**Text boxes include text that controls draw.** A box marked `source: control` covers button
+labels, typed field values and the selected option of a select, because none of them is a DOM text
+node. Without these boxes, the after-screenshot of `enter_member_id` would be written with the member number
+readable, and the `{text: OK}` dismiss handler could not find the OK button. Password values
+appear masked, as on screen. Anchors use document text only.
+
+**Ranked resolution takes the first unique locator and never breaks ties.** Ambiguous locators
+are skipped, not picked from. The agreement check compares the winner with the next locator that
+also resolves uniquely, and it is logged as a `locator.resolve` event. Text and a11y strategies
+count only rendered elements. Grounding proposes a11y, anchor (left, right, above), text, css,
+xpath and point candidates, and keeps only those that resolve uniquely back to the grounded element.
+
+**Anchor geometry is overlap-based and stays within one frame.** Relations require overlapping
+row or column bands, with a 4 px edge tolerance and no absolute positions, because CI fonts
+differ. Two candidates within 2 px of each other count as a tie, and a tie is ambiguous. A label
+and its control must share a frame. The algorithm reads only `TextBox` geometry, so it lives in
+`surfaces/geometry.py` for a future desktop surface.
+
+**The network guard follows redirects itself.** Playwright calls a route handler only for the
+first request in a redirect chain, and a fulfilled 3xx is followed unrouted. I checked both
+empirically. So the guard fetches every request with redirects off and checks each `Location`.
+- For a page or frame navigation, it answers with a stub page that calls `location.replace`, so
+  the next hop is a fresh request that comes back through the guard.
+- For a subresource, it follows the chain hop by hop.
+- A 307 or 308 that would replay a POST navigation elsewhere is blocked.
+
+The policy context is read when each request arrives. Blocked requests are aborted and drained by
+the engine. Cookies set during `route.fetch` reach the browser context, so sign-on works.
+
+**The state fingerprint is title plus frame URL paths plus visible headings, with digits
+normalized.** This markup has no `h1`, so a heading is `h1`–`h6`, `role=heading`, or bold text of
+16 px or more, and it must be topmost. The fingerprint ignores the banner countdown and changes when a
+modal covers the page heading.
+
+**A frame that is navigating shows nothing.** Evaluate errors such as "execution context
+destroyed" or "frame detached" make that frame empty for this check, so a settle loop polling
+during a navigation looks again instead of crashing.
+
+**`act()` checks the holder through a `HolderGuard` protocol.** `FixedHolder` stands in for one
+actor at one epoch until P5's SessionController implements the lease. `Action` gained `scroll`
+(dx, dy) and `TextBox` gained `source`. Both default safely, and neither is part of an artifact
+hash.
+
+**Value parsing is surface-agnostic and lives in `surfaces/extract.py`.** Placing it in
+`replay/` would make surfaces import replay, and P4's engine imports surfaces. `money_us`
+accepts these legacy negative forms: a leading minus, parentheses, a trailing ledger minus and
+a `DR` suffix. `CR` is positive. Two sign markers at once (`-12.34 DR`, `(12.34) CR`) are refused
+as contradictory. Table columns are found by header label, tenant aliases included. A row with a
+single cell is a table message and is skipped. Any other ragged row is an error.
+
+**Mock-bank fixtures moved to a pytest plugin.** `tests/support/bank.py` and `teller.py` are
+shared with the surface tests through `pytest_plugins` in the root conftest.

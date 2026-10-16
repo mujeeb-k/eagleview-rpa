@@ -420,17 +420,18 @@ This app must feel like a real 2004-era core system:
 - [x] `tests/test_import_boundaries.py`.
 
 ### P3: Web surface
-- [ ] `PlaywrightSurface`: observe (1280x800 viewport screenshot plus a state fingerprint of frame URLs,
+- [x] `PlaywrightSurface`: observe (1280x800 viewport screenshot plus a state fingerprint of frame URLs,
       title, and normalized visible headings), act, and zoom.
-- [ ] Grounding: pixel → `GroundedTarget` (frame path, tag, role, name, label association, row-header
+- [x] Grounding: pixel → `GroundedTarget` (frame path, tag, role, name, label association, row-header
       text, nearest text anchors left and above, bounding box), then generate candidate locators in rank
       order and keep only those that resolve uniquely.
-- [ ] Resolvers for each strategy, including the geometric `anchor` resolver over `text_boxes()` with
+- [x] Resolvers for each strategy, including the geometric `anchor` resolver over `text_boxes()` with
       aliases. An agreement check resolves the top two strategies and logs whether they match.
-- [ ] Predicates and the extract engine, including the anchored table extractor and `money_us` → Decimal.
-- [ ] Network guard.
+- [x] Predicates and the extract engine, including the anchored table extractor and `money_us` → Decimal.
+- [x] Network guard. *(Redirect hops are checked too: Playwright doesn't route them.)*
 - **Done when:** integration tests resolve every control in both flows on tenant A through at least two
-  strategies, and ambiguity is detected.
+  strategies, and ambiguity is detected. *(Done: `tests/surfaces/`. Every control has a semantic
+  strategy plus another, and grounding round-trips each one.)*
 
 ### P4: Replay engine (before discovery, so it's testable alone)
 - [ ] The engine from §4, recovery handlers, app profile loading, the login macro, and secret refs.

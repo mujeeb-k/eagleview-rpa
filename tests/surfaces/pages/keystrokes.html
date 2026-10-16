@@ -1,0 +1,30 @@
+<html>
+<head><title>Keystroke handlers</title></head>
+<body>
+<!-- A legacy entry form whose behaviour lives in per-keystroke handlers. Setting .value directly
+     (Playwright's fill, or any DOM write) bypasses all of them. -->
+<script>
+var downs = 0, ups = 0;
+function digitsOnly(e) {
+  var c = String.fromCharCode(e.which || e.keyCode);
+  return /[0-9]/.test(c);
+}
+function counted() {
+  ups++;
+  document.getElementsByTagName('span')[0].innerHTML = downs + '/' + ups;
+  var f = document.forms[0];
+  f.go.disabled = f.num.value.length < 4;
+}
+</script>
+<form onsubmit="return false;">
+<table border="0" cellpadding="4">
+<tr><td><font size="2">Member #</font></td>
+<td><input type="text" name="num" size="10" onkeydown="downs++;" onkeypress="return digitsOnly(event);" onkeyup="counted();"></td>
+<td><input type="button" name="go" value="Go" disabled></td></tr>
+<tr><td><font size="2">Reference</font></td>
+<td><input type="text" name="ref" size="10" value="OLD-VALUE"></td><td></td></tr>
+</table>
+</form>
+<font size="2">Keys: <span>0/0</span></font>
+</body>
+</html>

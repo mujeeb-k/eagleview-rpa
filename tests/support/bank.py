@@ -1,4 +1,5 @@
-"""Fixtures: both tenants in-process on ephemeral ports, reset before every test, plus a browser."""
+"""Mock-bank fixtures, shared as a pytest plugin: both tenants in-process on ephemeral ports, reset
+before every test, plus a pinned-geometry browser."""
 
 import secrets
 from collections.abc import AsyncIterator, Iterator

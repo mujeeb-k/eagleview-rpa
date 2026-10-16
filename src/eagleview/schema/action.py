@@ -48,11 +48,16 @@ class Action(BaseModel):
     url: str | None = None  # navigate
     option: str | None = None  # select, by label
     region: tuple[int, int, int, int] | None = None  # zoom: x0, y0, x1, y1
+    scroll: tuple[int, int] | None = None  # scroll: (dx, dy) in pixels; positive is right/down
     duration_ms: int | None = Field(default=None, ge=0)
 
 
 class TextBox(BaseModel):
-    """Visible text and its geometry in screenshot pixels: DOM ranges on web, OCR/UIA on desktop."""
+    """Visible text and its geometry in screenshot pixels: DOM ranges on web, OCR/UIA on desktop.
+
+    `source` is `text` for document text and `control` for text a form control draws itself: a
+    button's label, a field's typed value, a select's chosen option. Anchors use `text` only; the
+    redactor paints both, since a typed member number is on screen like any other text."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     text: str
@@ -61,3 +66,12 @@ class TextBox(BaseModel):
     width: int = Field(ge=0)
     height: int = Field(ge=0)
     frame: str | None = None
+    source: Literal["text", "control"] = "text"
+
+    @property
+    def right(self) -> int:
+        return self.x + self.width
+
+    @property
+    def bottom(self) -> int:
+        return self.y + self.height

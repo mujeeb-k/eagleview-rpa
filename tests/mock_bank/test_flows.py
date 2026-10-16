@@ -7,8 +7,8 @@ from playwright.async_api import BrowserContext, Page, expect
 
 from mock_bank.app import money
 from mock_bank.seed import generate
-from tests.mock_bank.conftest import Bank, main_frame
-from tests.mock_bank.teller import open_member, search, sign_on
+from tests.support.bank import Bank, main_frame
+from tests.support.teller import open_member, search, sign_on
 
 NOT_FOUND = re.compile(r"no member(s)? found", re.I)
 

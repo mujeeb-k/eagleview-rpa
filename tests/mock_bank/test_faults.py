@@ -6,8 +6,8 @@ import pytest
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Page, expect
 
-from tests.mock_bank.conftest import Bank, main_frame
-from tests.mock_bank.teller import open_member, search, sign_on
+from tests.support.bank import Bank, main_frame
+from tests.support.teller import open_member, search, sign_on
 
 # ---- session_expire_after_requests ------------------------------------------------------------
 

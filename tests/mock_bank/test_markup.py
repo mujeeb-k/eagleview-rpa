@@ -5,7 +5,7 @@ import re
 
 import pytest
 
-from tests.mock_bank.conftest import Bank
+from tests.support.bank import Bank
 
 PAGES = ["/frames", "/banner", "/nav", "/home", "/inq", "/member", "/share/open"]
 
