@@ -566,6 +566,13 @@ This app must feel like a real 2004-era core system:
       agent handling an `outcome`.
 
 ### P10: Evidence generation (runs together with P11)
+- [ ] **Screen-level redaction, before any evidence is written (from P4).** Replay paints values it
+      typed or read, plus pattern matches. Other personal data on the screen, such as the address
+      and notes on Member Detail, is still written readable to `runs/` screenshots and failure DOM
+      snapshots. Fix: the app profile lists sensitive labels per screen ("Address:", "Notes:"),
+      and the writer paints the text anchored right of each one, using the existing anchor
+      geometry, with the same scrub applied to DOM snapshots. A test runs the PII scan over a
+      Member Detail run.
 - [ ] **Clean starting state:** every evidence and demo script first resets bank data and clears
       faults (`POST /__admin/reset`), so no run inherits state from an earlier one.
 - [ ] **`make demo-offline`:**
