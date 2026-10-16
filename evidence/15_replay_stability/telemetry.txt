@@ -1,0 +1,4 @@
+capability | tenant | step | runs | winners | rank-0 share | agreement
+member.lookup_share_balances@1.0.0 | lantern-bay | enter_member_id | 20 | anchor@0x20 | 100% | 100%
+member.lookup_share_balances@1.0.0 | lantern-bay | open_member_inquiry | 20 | a11y@0x20 | 100% | 100%
+member.lookup_share_balances@1.0.0 | lantern-bay | submit_member_search | 20 | anchor@0x20 | 100% | 100%

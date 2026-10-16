@@ -1,0 +1,229 @@
+schema_version: '1.0'
+id: member.list_loans
+version: 1.0.0
+title: List all loans for a member from Member Inquiry.
+description: Opens Member Inquiry in the teller application, looks up a member by member number, and
+  reads the loans table shown for that member. Returns each loan's suffix, description, balance, 
+  rate, payment, and next due date. Read-only; nothing is changed or staged.
+status: verified
+app:
+  profile: ironbridge-teller
+  versions: '>=7.2,<8.0'
+risk: read_only
+requires_session: true
+inputs:
+  member_id:
+    type: string
+    pattern: ^[0-9]{4,10}$
+    required: true
+    sensitivity: identifier
+    description: The member number identifying the member whose loans are listed, digits only.
+    example: '10482'
+outputs:
+  member_loans:
+    type: array
+    sensitivity: pii
+    required: true
+    description: List of loans the member holds, one entry per loan row shown on the screen.
+    items:
+      loan_suffix:
+        type: string
+      loan_description:
+        type: string
+      loan_balance:
+        type: decimal
+        scale: 2
+      interest_rate:
+        type: string
+      payment_amount:
+        type: decimal
+        scale: 2
+      next_due_date:
+        type: string
+outcomes:
+  - code: MEMBER_NOT_FOUND
+    kind: business
+    detect:
+      text_matches:
+        frame: []
+        pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
+    message: The teller system reported that no member exists for the member number that was 
+      searched.
+    source: probed_verified
+steps:
+  - id: open_member_inquiry
+    intent: Open the Member Inquiry screen from the navigation menu.
+    action:
+      type: click
+    target:
+      description: "'Member Inquiry' link in frame nav"
+      frame:
+        - nav
+      locators:
+        - strategy: a11y
+          role: link
+          name: Member Inquiry
+        - strategy: anchor
+          anchor_text:
+            - FUNCTIONS
+          relation: below
+          control: link
+        - strategy: text
+          text: Member Inquiry
+          exact: true
+        - strategy: css
+          selector: a[href="/inq"]
+        - strategy: xpath
+          expression: //a[normalize-space(.)='Member Inquiry']
+        - strategy: point
+          x: 55
+          y: 83
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      all:
+        - text_present:
+            frame:
+              - main
+            text: Member Search
+        - element_present:
+            target:
+              description: textbox in frame main
+              frame:
+                - main
+              locators:
+                - strategy: anchor
+                  anchor_text:
+                    - 'Member #'
+                  relation: right_of
+                  control: textbox
+                - strategy: anchor
+                  anchor_text:
+                    - Member Search
+                  relation: below
+                  control: textbox
+                - strategy: css
+                  selector: input[name="txtA"]
+                - strategy: xpath
+                  expression: "//tr[normalize-space(*[1])='Member #']//input"
+                - strategy: point
+                  x: 295
+                  y: 135
+                  bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+              fragile: false
+    timeout_ms: 8000
+  - id: enter_member_id
+    intent: 'Enter the member number into the Member # field.'
+    action:
+      type: fill
+      value: '{{ inputs.member_id }}'
+    target:
+      description: textbox in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: textbox
+        - strategy: anchor
+          anchor_text:
+            - Member Search
+          relation: below
+          control: textbox
+        - strategy: css
+          selector: input[name="txtA"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//input"
+        - strategy: point
+          x: 295
+          y: 135
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      field_value:
+        target: self
+        equals: '{{ inputs.member_id }}'
+    timeout_ms: 8000
+  - id: submit_member_lookup
+    intent: Click the search image button to load the member's record and loans.
+    action:
+      type: click
+    target:
+      description: img in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: image
+        - strategy: css
+          selector: img[src="/img/go.svg"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//img"
+        - strategy: point
+          x: 418
+          y: 135
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      text_present:
+        frame:
+          - main
+        text: Member Detail
+    timeout_ms: 8000
+  - id: extract_member_loans
+    intent: Read the loans table rows from the member's record.
+    action:
+      type: extract
+    extract:
+      member_loans:
+        table:
+          anchor_text: Loan Accounts
+          frame:
+            - main
+          header_row: true
+          columns:
+            loan_suffix: Sfx
+            loan_description: Description
+            loan_balance: Balance
+            interest_rate: Rate
+            payment_amount: Payment
+            next_due_date: Next Due
+          parse:
+            loan_balance: money_us
+            payment_amount: money_us
+    risk: read
+    idempotent: true
+    requires_approval: false
+    timeout_ms: 8000
+success:
+  all:
+    - text_present:
+        frame:
+          - main
+        text: Loan Accounts
+    - output_present: member_loans
+provenance:
+  discovered_by:
+    run_id: r_20261016T060558_f2c6a5
+    model: claude-sonnet-5-5
+    at: '2026-10-16T06:06:13.326807Z'
+  verified_by:
+    - run_id: r_20261016T060618_02214c
+      at: '2026-10-16T06:06:48.922267Z'
+    - run_id: r_20261016T060647_ad61f1
+      at: '2026-10-16T06:06:48.922267Z'
+  content_hash: sha256:db0917c42a2cc1825a32b10b334b7f6570b02c2e88d50ea7da72b8b9c922641f

@@ -588,42 +588,42 @@ This app must feel like a real 2004-era core system:
       and the writer paints the text anchored right of each one, using the existing anchor
       geometry, with the same scrub applied to DOM snapshots. A test runs the PII scan over a
       Member Detail run.
-- [ ] **Clean starting state:** every evidence and demo script first resets bank data and clears
+- [x] **Clean starting state:** every evidence and demo script first resets bank data and clears
       faults (`POST /__admin/reset`), so no run inherits state from an earlier one.
-- [ ] **`make demo-offline`:**
+- [x] **`make demo-offline`:**
   - starts the bank itself, and stops it on exit, including on failure;
   - drives takeover and approval with the scripted operator client from P5;
   - never waits for a human;
   - needs no API key.
-- [ ] **`make demo-handoff`:** the interactive takeover demo, kept separate. A person uses the console,
+- [x] **`make demo-handoff`:** the interactive takeover demo, kept separate. A person uses the console,
       and every wait for them has a timeout that ends the run cleanly with a clear message.
-- [ ] **Held-out discovery check:** before release, run one discovery goal that is not in the evidence
+- [x] **Held-out discovery check:** before release, run one discovery goal that is not in the evidence
       set (for example "list member 10482's loans"). Record the result, pass or fail, honestly in
       `evidence/README.md` and REPORT.md.
-- [ ] `scripts/evidence/*.sh`, one per scenario in §8. Each writes to `evidence/NN_name/` (redacted
+- [x] `scripts/evidence/*.sh`, one per scenario in §8. Each writes to `evidence/NN_name/` (redacted
       run.jsonl, step screenshots, summary.json, result.json, and the artifact copy for discoveries).
-- [ ] `eagleview view <run_dir>` writes a static `index.html` per run: a timeline of steps with
+- [x] `eagleview view <run_dir>` writes a static `index.html` per run: a timeline of steps with
       screenshots, decisions, locator ranks, and recoveries.
-- [ ] `evidence/README.md`: a table of scenario, command, status, and what it demonstrates, with links.
-- [ ] A test scans /evidence for PII patterns and fails if any are found.
-- [ ] Demo video (the one exception to invariant 4): `scripts/evidence/demo_video.sh --record-video`
+- [x] `evidence/README.md`: a table of scenario, command, status, and what it demonstrates, with links.
+- [x] A test scans /evidence for PII patterns and fails if any are found.
+- [ ] Demo video (the one exception to invariant 4) *(script built: `scripts/evidence/demo_video.sh --record-video`; not recorded, as the user asked)*: `scripts/evidence/demo_video.sh --record-video`
       records the mock bank only (synthetic data), and only with that explicit flag. It is never on by
       default. Output goes to `evidence/demo.mp4`, under 3 minutes. Playwright records webm, so the
       script transcodes it. The PII scan can't read video; the synthetic-only rule is what covers it.
 
 ### P11: Docs and polish (runs together with P10)
-- [ ] README: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
+- [x] README: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
       `make bank`); **offline demo first** (replay the committed artifacts, no API key); full demo
       (discover, then replay); operator console walkthrough; repo map; fictional-data note.
-- [ ] REPORT.md per §9, 1–3 pages.
-- [ ] docs/DESIGN.md (optional, longer): the schema reference generated from the Pydantic models.
-- [ ] A fresh-clone test in a clean container runs `make demo-offline` end to end.
-- [ ] CI runs `make demo-offline` end to end on every push, in addition to `make check`.
-- [ ] README states the tested platforms (macOS, Linux).
-- [ ] README shows the plain `uv run ...` command next to each `make` target.
-- [ ] README notes that discovery spends the user's own Anthropic API credit, with an approximate cost
+- [x] REPORT.md per §9, 1–3 pages. *(Draft; a test pins the seven headings.)*
+- [ ] docs/DESIGN.md (optional, longer): the schema reference generated from the Pydantic models. *(Skipped: optional; `schemas/*.schema.json` is the generated reference.)*
+- [x] A fresh-clone test in a clean container runs `make demo-offline` end to end. *(CI: a fresh GitHub runner, every push.)*
+- [x] CI runs `make demo-offline` end to end on every push, in addition to `make check`.
+- [x] README states the tested platforms (macOS, Linux).
+- [x] README shows the plain `uv run ...` command next to each `make` target.
+- [x] README notes that discovery spends the user's own Anthropic API credit, with an approximate cost
       per discovery run, measured from real runs.
-- [ ] Release checklist in §10.
+- [ ] Release checklist in §10. *(Partly; the user's items are in docs/MORNING.md.)*
 
 ## 8. Evidence scenarios
 | # | Scenario | Shows |

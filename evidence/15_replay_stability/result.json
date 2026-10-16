@@ -1,0 +1,14 @@
+{
+  "scenario": "15",
+  "name": "replay_stability",
+  "shows": "determinism over 20 runs",
+  "command": "scripts/evidence/15_replay_stability.sh",
+  "runs": 20,
+  "successes": 20,
+  "distinct_outputs": 1,
+  "ms_min": 1328,
+  "ms_max": 1615,
+  "ms_mean": 1398,
+  "status": "pass",
+  "seconds": 29.6
+}

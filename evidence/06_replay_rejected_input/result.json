@@ -1,0 +1,31 @@
+{
+  "scenario": "06",
+  "name": "replay_rejected_input",
+  "shows": "preflight validation, UI never touched",
+  "command": "scripts/evidence/06_replay_rejected_input.sh",
+  "run": {
+    "run_id": "r_20261016T055859_2089dc",
+    "capability": "member.lookup_share_balances@1.0.0",
+    "effective_hash": "sha256:6966fbe8bc44ac165d6a493cbc9d4de462187c06e4ed129fe0e9f5d1a5759287",
+    "tenant": "lantern-bay",
+    "status": "rejected",
+    "rejection": {
+      "code": "INPUT_INVALID",
+      "errors": [
+        {
+          "field": "member_id",
+          "code": "pattern",
+          "message": "does not match ^[0-9]{4,10}$"
+        }
+      ]
+    },
+    "recoveries": [],
+    "interventions": [],
+    "locator_report": [],
+    "timing_ms": {
+      "total": 0
+    }
+  },
+  "status": "pass",
+  "seconds": 0.0
+}

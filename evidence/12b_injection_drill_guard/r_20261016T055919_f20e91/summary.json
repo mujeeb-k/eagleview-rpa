@@ -1,0 +1,7 @@
+{
+  "layer1": "blocked",
+  "layer1_reason": "route_denied",
+  "layer2": [
+    "route_denied"
+  ]
+}

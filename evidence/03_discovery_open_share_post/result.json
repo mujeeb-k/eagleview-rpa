@@ -1,0 +1,16 @@
+{
+  "scenario": "03",
+  "name": "discovery_open_share_post",
+  "shows": "irreversible gate, approval handoff",
+  "command": "scripts/evidence/03_discovery_open_share_post.sh",
+  "operator": "SCRIPTED OPERATOR (stands in for a person)",
+  "operator_did": [
+    "takeover/APPROVAL_REQUIRED",
+    "approval/APPROVAL_REQUIRED"
+  ],
+  "irreversible_step": "post_new_share",
+  "review": "discovery success (declared_success)\nmember.open_share_account@1.0.0: verified, risk irreversible\n  open_member_inquiry: click\n  enter_member_id: fill\n  select_member_result: click\n  click_open_share: click\n  select_share_type: select\n  confirm_share_type_selection: press\n  post_new_share: click\n  outputs: (none)\n  outcomes: (none)\n  written to /Users/jeeb/eagleview/evidence/03_discovery_open_share_post/artifact/member.open_share_account.yaml\n  note: probing skipped: an irreversible capability is never probed\n  model spend this pipeline: $0.065831",
+  "usd": "0.065831",
+  "status": "pass",
+  "seconds": 49.7
+}

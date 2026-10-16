@@ -21,6 +21,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlsplit
 
@@ -178,10 +179,18 @@ class PlaywrightSurface:
         label_aliases: Mapping[str, Sequence[str]] | None = None,
         app_fingerprint: str | None = None,
         actor: str = "harness",
+        record_video_dir: Path | None = None,
     ) -> Self:
         """A fresh context at the pinned geometry, with the network guard installed before the
-        first page exists, so no request ever escapes it. Traces, video and HAR stay off."""
-        context = await browser.new_context(viewport=VIEWPORT, device_scale_factor=1)  # type: ignore[arg-type]
+        first page exists, so no request ever escapes it. Traces, video and HAR stay off.
+
+        `record_video_dir` is the one exception to invariant 4, for the mock bank's demo video
+        only (scripts/evidence/demo_video.sh --record-video). It is an explicit argument, never
+        an environment switch, and nothing passes it by default."""
+        extra: dict[str, Any] = {}
+        if record_video_dir is not None:
+            extra = {"record_video_dir": str(record_video_dir), "record_video_size": VIEWPORT}
+        context = await browser.new_context(viewport=VIEWPORT, device_scale_factor=1, **extra)  # type: ignore[arg-type]
         state = GuardState(actor, ctx)
         guard = NetworkGuard(engine, lambda: state, sink)
         await guard.install(context)
@@ -561,6 +570,9 @@ class PlaywrightSurface:
         if matches != 1:
             return f"{matches} options are labelled {option!r}"
         await handle.select_option(label=normalize_text(option))
+        # Focus stays on the list, as after a person's choice: a following Enter acts on it (on
+        # this app it submits the form, which is what discovery recorded).
+        await handle.focus()
         return None
 
     async def _keyboard(self, action: Action, actor: str, ctx: PolicyContext) -> ActionResult:

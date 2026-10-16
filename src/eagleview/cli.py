@@ -395,3 +395,10 @@ def mcp(
             await serve_stdio(catalog)
 
     asyncio.run(go())
+
+
+@app.command(help="Write a static index.html timeline for a run directory (redacted inputs only).")
+def view(run_dir: Annotated[Path, typer.Argument(help="A runs/<run_id> directory.")]) -> None:
+    from eagleview.evidence.run_viewer import render
+
+    typer.echo(render(run_dir))

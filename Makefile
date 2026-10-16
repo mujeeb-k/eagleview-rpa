@@ -1,4 +1,4 @@
-.PHONY: check lint typecheck test test-live bank demo-offline demo-full
+.PHONY: check lint typecheck test test-live bank demo-offline demo-handoff demo-full evidence
 
 check: lint typecheck test
 
@@ -21,8 +21,22 @@ test-live:
 bank:
 	uv run python -m mock_bank
 
+# The offline demo: no API key, no human. Starts the bank in-process (and stops it on exit),
+# replays the committed artifacts through the main scenarios, and drives the takeover and the
+# approval with the scripted operator. Writes to runs/demo/, never to evidence/.
 demo-offline:
-	@echo "make demo-offline: not implemented until P11" >&2; exit 1
+	PYTHONPATH=. uv run python scripts/evidence/driver.py 04 05 06 07 08 09 10 11 12b 13 --out runs/demo
 
+# The interactive takeover: a person uses the operator console (http://127.0.0.1:8700).
+demo-handoff:
+	PYTHONPATH=. uv run python scripts/demo_handoff.py
+
+# Discover with the real model, then replay. Needs ANTHROPIC_API_KEY; spends from the ledger.
 demo-full:
-	@echo "make demo-full: not implemented until P11" >&2; exit 1
+	PYTHONPATH=. uv run python scripts/evidence/driver.py 01 04 --out runs/demo-full
+
+# Regenerate all evidence from scratch (real model for 01, 02, 03, 12a; 14 once approved).
+evidence:
+	rm -rf evidence/[0-9]*_*
+	@set -e; for s in scripts/evidence/[0-9]*.sh; do "$$s"; done
+	scripts/evidence/index.sh

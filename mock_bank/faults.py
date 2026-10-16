@@ -4,6 +4,9 @@ Each fault is a `key=value` spec, matching PLAN.md:
 
     session_expire_after_requests=N   serve N more authenticated page requests, then expire the
                                       session that makes the next one (one-shot)
+    session_expire_on=<route>         expire the session that next requests <route> (one-shot), so
+                                      a test can expire it right after a given screen, whatever
+                                      the request count
     system_notice_on=<route>          a known "System Notice" modal on every response for <route>
     unknown_modal_on=<route>          a modal no handler knows, on every response for <route>
     slow_ms=<route>:<ms>              delay every response for <route>
@@ -39,6 +42,7 @@ def _split(value: str) -> tuple[str, str | None]:
 @dataclass
 class Faults:
     expire_after: int | None = None
+    expire_on: str | None = None
     system_notice_on: str | None = None
     unknown_modal_on: str | None = None
     slow: tuple[str, int] | None = None
@@ -59,6 +63,8 @@ class Faults:
                 if not value.isdigit():
                     raise FaultSpecError(f"{key} needs a non-negative integer: {value!r}")
                 self.expire_after = int(value)
+            case "session_expire_on":
+                self.expire_on = _route(value)
             case "system_notice_on":
                 self.system_notice_on = _route(value)
             case "unknown_modal_on":
@@ -88,6 +94,8 @@ class Faults:
         out: dict[str, str] = {}
         if self.expire_after is not None:
             out["session_expire_after_requests"] = str(self.expire_after)
+        if self.expire_on:
+            out["session_expire_on"] = self.expire_on
         if self.system_notice_on:
             out["system_notice_on"] = self.system_notice_on
         if self.unknown_modal_on:
@@ -111,6 +119,13 @@ class Faults:
             return True
         self.expire_after -= 1
         return False
+
+    def take_expire_on(self, path: str) -> bool:
+        """True once: this request for the armed route must find its session expired."""
+        if self.expire_on is None or self.expire_on != path:
+            return False
+        self.expire_on = None
+        return True
 
     def take_error500(self, path: str) -> bool:
         if self.error500 is None or self.error500[0] != path:

@@ -3,6 +3,7 @@ Playwright: it receives a `SurfaceOpener` and works against the Surface protocol
 
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from pathlib import Path
 
 from playwright.async_api import Browser, async_playwright
 
@@ -33,6 +34,7 @@ def surface_opener(
     *,
     sink: EventSink | None = None,
     label_aliases: Mapping[str, Sequence[str]] | None = None,
+    record_video_dir: Path | None = None,
 ) -> SurfaceOpener:
     def open_surface(
         holder: HolderGuard, ctx: PolicyContext
@@ -40,7 +42,13 @@ def surface_opener(
         @asynccontextmanager
         async def opened() -> AsyncIterator[Surface]:
             surface = await PlaywrightSurface.open(
-                browser, engine, ctx, holder, sink=sink, label_aliases=label_aliases
+                browser,
+                engine,
+                ctx,
+                holder,
+                sink=sink,
+                label_aliases=label_aliases,
+                record_video_dir=record_video_dir,
             )
             try:
                 yield surface

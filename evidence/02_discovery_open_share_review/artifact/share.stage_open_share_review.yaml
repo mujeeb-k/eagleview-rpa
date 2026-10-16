@@ -1,0 +1,357 @@
+schema_version: '1.0'
+id: share.stage_open_share_review
+version: 1.0.0
+title: Stage a new share opening for a member up to the review screen without posting.
+description: Looks up a member by member number, opens the Open Share form, selects the given share 
+  type, and validates the form so the review screen is shown. The validation stages the new share 
+  but nothing is posted or committed, so the share is not created. No data is returned beyond the 
+  review screen being displayed.
+status: verified
+app:
+  profile: ironbridge-teller
+  versions: '>=7.2,<8.0'
+risk: write_staged
+requires_session: true
+inputs:
+  member_id:
+    type: string
+    pattern: ^[0-9]{4,10}$
+    required: true
+    sensitivity: identifier
+    description: Member number of the member who the share is being opened for; a numeric 
+      identifier.
+    example: '10482'
+  share_type:
+    type: string
+    pattern: ^[A-Za-z0-9][A-Za-z0-9 &/\-\.']{1,59}$
+    required: true
+    sensitivity: none
+    description: Display name of the share type to open, as it appears in the Share Type list.
+    example: Money Market
+outputs: {}
+outcomes:
+  - code: MEMBER_NOT_FOUND
+    kind: business
+    detect:
+      text_matches:
+        frame: []
+        pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
+    message: The teller system reported no member exists for the member number that was searched 
+      (IBT-1004).
+    source: probed_verified
+steps:
+  - id: open_member_inquiry
+    intent: Click the Member Inquiry link in the navigation menu to start a member lookup.
+    action:
+      type: click
+    target:
+      description: "'Member Inquiry' link in frame nav"
+      frame:
+        - nav
+      locators:
+        - strategy: a11y
+          role: link
+          name: Member Inquiry
+        - strategy: anchor
+          anchor_text:
+            - FUNCTIONS
+          relation: below
+          control: link
+        - strategy: text
+          text: Member Inquiry
+          exact: true
+        - strategy: css
+          selector: a[href="/inq"]
+        - strategy: xpath
+          expression: //a[normalize-space(.)='Member Inquiry']
+        - strategy: point
+          x: 55
+          y: 82
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      all:
+        - text_present:
+            frame:
+              - main
+            text: Member Search
+        - element_present:
+            target:
+              description: textbox in frame main
+              frame:
+                - main
+              locators:
+                - strategy: anchor
+                  anchor_text:
+                    - 'Member #'
+                  relation: right_of
+                  control: textbox
+                - strategy: anchor
+                  anchor_text:
+                    - Member Search
+                  relation: below
+                  control: textbox
+                - strategy: css
+                  selector: input[name="txtA"]
+                - strategy: xpath
+                  expression: "//tr[normalize-space(*[1])='Member #']//input"
+                - strategy: point
+                  x: 295
+                  y: 134
+                  bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+              fragile: false
+    timeout_ms: 8000
+  - id: enter_member_id
+    intent: 'Enter the member number in the Member # field of the inquiry form.'
+    action:
+      type: fill
+      value: '{{ inputs.member_id }}'
+    target:
+      description: textbox in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: textbox
+        - strategy: anchor
+          anchor_text:
+            - Member Search
+          relation: below
+          control: textbox
+        - strategy: css
+          selector: input[name="txtA"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//input"
+        - strategy: point
+          x: 295
+          y: 134
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      field_value:
+        target: self
+        equals: '{{ inputs.member_id }}'
+    timeout_ms: 8000
+  - id: submit_member_lookup
+    intent: Click GO to run the member lookup and display the member record.
+    action:
+      type: click
+    target:
+      description: img in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: image
+        - strategy: css
+          selector: img[src="/img/go.svg"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//img"
+        - strategy: point
+          x: 418
+          y: 135
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      all:
+        - text_present:
+            frame:
+              - main
+            text: Member Detail
+        - element_present:
+            target:
+              description: "'Open Share' button in frame main"
+              frame:
+                - main
+              locators:
+                - strategy: a11y
+                  role: button
+                  name: Open Share
+                - strategy: anchor
+                  anchor_text:
+                    - Date
+                  relation: below
+                  control: button
+                - strategy: text
+                  text: Open Share
+                  exact: true
+                - strategy: css
+                  selector: input[type="button"][value="Open Share"]
+                - strategy: xpath
+                  expression: //input[@value='Open Share']
+                - strategy: point
+                  x: 222
+                  y: 776
+                  bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+              fragile: false
+    timeout_ms: 8000
+  - id: open_share_form
+    intent: Click the Open Share button on the member record to bring up the Open Share form.
+    action:
+      type: click
+    target:
+      description: "'Open Share' button in frame main"
+      frame:
+        - main
+      locators:
+        - strategy: a11y
+          role: button
+          name: Open Share
+        - strategy: anchor
+          anchor_text:
+            - Date
+          relation: below
+          control: button
+        - strategy: text
+          text: Open Share
+          exact: true
+        - strategy: css
+          selector: input[type="button"][value="Open Share"]
+        - strategy: xpath
+          expression: //input[@value='Open Share']
+        - strategy: point
+          x: 222
+          y: 776
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      all:
+        - text_present:
+            frame:
+              - main
+            text: Open Share Account
+        - element_present:
+            target:
+              description: combobox in frame main
+              frame:
+                - main
+              locators:
+                - strategy: anchor
+                  anchor_text:
+                    - Share Type
+                  relation: right_of
+                  control: select
+                - strategy: anchor
+                  anchor_text:
+                    - '[member]'
+                  relation: below
+                  control: select
+                - strategy: css
+                  selector: select[name="f3"]
+                - strategy: xpath
+                  expression: //tr[normalize-space(*[1])='Share Type']//select
+                - strategy: point
+                  x: 358
+                  y: 166
+                  bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+              fragile: false
+    timeout_ms: 8000
+  - id: select_share_type
+    intent: Choose the requested share type in the Share Type list on the Open Share form.
+    action:
+      type: select
+      option: '{{ inputs.share_type }}'
+    target:
+      description: combobox in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - Share Type
+          relation: right_of
+          control: select
+        - strategy: anchor
+          anchor_text:
+            - '[member]'
+          relation: below
+          control: select
+        - strategy: css
+          selector: select[name="f3"]
+        - strategy: xpath
+          expression: //tr[normalize-space(*[1])='Share Type']//select
+        - strategy: point
+          x: 358
+          y: 166
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      field_value:
+        target: self
+        equals: '{{ inputs.share_type }}'
+    timeout_ms: 8000
+  - id: validate_open_share
+    intent: Click Validate to stage the new share and bring up the review screen without posting it.
+    action:
+      type: click
+    target:
+      description: "'Validate' button in frame main"
+      frame:
+        - main
+      locators:
+        - strategy: a11y
+          role: button
+          name: Validate
+        - strategy: anchor
+          anchor_text:
+            - Monthly
+          relation: below
+          control: button
+        - strategy: text
+          text: Validate
+          exact: true
+        - strategy: css
+          selector: input[type="submit"][value="Validate"]
+        - strategy: xpath
+          expression: //input[@value='Validate']
+        - strategy: point
+          x: 337
+          y: 251
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: write_staged
+    idempotent: true
+    requires_approval: false
+    expect:
+      text_present:
+        frame:
+          - main
+        text: Review - Open Share
+    timeout_ms: 8000
+success:
+  text_present:
+    frame:
+      - main
+    text: Review - Open Share
+provenance:
+  discovered_by:
+    run_id: r_20261016T060126_112c59
+    model: claude-sonnet-5-5
+    at: '2026-10-16T06:02:34.377001Z'
+  verified_by:
+    - run_id: r_20261016T060239_7176bd
+      at: '2026-10-16T06:03:08.484527Z'
+    - run_id: r_20261016T060305_d8dd4f
+      at: '2026-10-16T06:03:08.484527Z'
+  content_hash: sha256:3f10446dff2ffe1e2110b92d7dbee076762827cf3896f1e4d54c6d209828c660

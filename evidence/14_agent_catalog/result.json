@@ -1,0 +1,9 @@
+{
+  "scenario": "14",
+  "name": "agent_catalog",
+  "shows": "agent-facing interface",
+  "command": "scripts/evidence/14_agent_catalog.sh",
+  "pending": "no approved capability yet",
+  "status": "pending",
+  "seconds": 0.0
+}

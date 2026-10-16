@@ -222,3 +222,13 @@ async def test_modal_occludes_but_does_not_remove_text(page: Page, lantern: Bank
         }"""
     )
     assert topmost is False  # hit-testing sees the overlay on top
+
+
+def test_session_expire_on_a_route_fires_once_on_that_route(lantern: Bank) -> None:
+    lantern.set_faults(session_expire_on="/member")
+    with lantern.signed_on_client() as c:
+        assert "Member Search" in c.get("/inq").text  # other routes are untouched
+        page = c.post("/inq", data={"txtA": "10482", "txtB": ""}).text  # redirects to /member
+        assert "SESSION EXPIRED" in page
+    with lantern.signed_on_client() as c:  # one-shot: a fresh session is fine
+        assert "Member Detail" in c.post("/inq", data={"txtA": "10482", "txtB": ""}).text

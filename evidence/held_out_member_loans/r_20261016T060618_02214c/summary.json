@@ -1,0 +1,49 @@
+{
+  "run_id": "r_20261016T060618_02214c",
+  "capability": "member.list_loans@1.0.0",
+  "effective_hash": "sha256:84cc78b5e1885e41a5f8d8304d8c6659ec405a6c723197765df244db471cc1e1",
+  "tenant": "lantern-bay",
+  "status": "success",
+  "outputs": {
+    "member_loans": [
+      {
+        "loan_suffix": "[pii]",
+        "loan_description": "[pii]",
+        "loan_balance": "4969.61",
+        "interest_rate": "[pii]",
+        "payment_amount": "103.53",
+        "next_due_date": "[pii]"
+      }
+    ]
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_lookup",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 478,
+    "open_member_inquiry": 275,
+    "enter_member_id": 233,
+    "submit_member_lookup": 325,
+    "extract_member_loans": 2,
+    "total": 1420
+  }
+}

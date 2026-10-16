@@ -13,9 +13,12 @@ from typing import Any
 
 import pytest
 from PIL import Image
+from playwright.async_api import expect
 
 from eagleview.safety.policy_engine import ApprovalToken
 from eagleview.schema.action import Action
+from eagleview.schema.locators import TargetSpec
+from eagleview.surfaces.base import Unique
 from eagleview.surfaces.web.playwright_surface import PlaywrightSurface, playwright_key
 from tests.support.bank import Bank
 from tests.surfaces.conftest import RUN_ID, Events
@@ -370,3 +373,31 @@ async def test_act_events_name_only_links_and_buttons(
     assert any(
         e["target"] and e["target"]["text"] == "Member Inquiry" for e in events.of("surface.act")
     )
+
+
+async def test_a_select_leaves_focus_on_the_list(open_surface: Any, lantern: Bank) -> None:
+    from tests.support.teller import open_member
+
+    surface = await open_surface(lantern)
+    main = await open_member(surface.page, lantern, "10482")
+    await main.locator("input[value='Open Share']").click()
+    await expect(main.locator("select[name='f3']")).to_be_visible()
+    spec = TargetSpec.model_validate(
+        {"frame": ["main"], "locators": [{"strategy": "css", "selector": "select[name='f3']"}]}
+    )
+    found = await surface.resolve(spec)
+    assert isinstance(found, Unique)
+    result = await surface.act(
+        Action(type="select", option="Money Market"), "automation", EPOCH, target=found
+    )
+    assert result.ok, result.reason
+    focused = await surface.page.frame(name="main").evaluate("document.activeElement.name")  # type: ignore[union-attr]
+    assert focused == "f3"
+
+
+async def test_a_surface_records_no_video_unless_explicitly_asked(
+    open_surface: Any, lantern: Bank
+) -> None:
+    # Invariant 4: video holds raw screens. Only demo_video.sh --record-video passes a folder.
+    surface = await open_surface(lantern, signed_on=False)
+    assert surface.page.video is None

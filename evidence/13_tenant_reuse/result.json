@@ -1,0 +1,15 @@
+{
+  "scenario": "13",
+  "name": "tenant_reuse",
+  "shows": "cross-tenant reuse; data never crosses tenants",
+  "command": "scripts/evidence/13_tenant_reuse.sh",
+  "base_at_copperhill": "UNKNOWN_STATE",
+  "runs": {
+    "base": "r_20261016T055920_4530dc",
+    "lantern": "r_20261016T055935_ad2b05",
+    "copperhill": "r_20261016T055937_e844da",
+    "crossed": "r_20261016T055939_fd6ead"
+  },
+  "status": "pass",
+  "seconds": 20.3
+}

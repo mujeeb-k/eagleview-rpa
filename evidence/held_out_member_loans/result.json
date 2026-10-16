@@ -1,0 +1,7 @@
+{
+  "status": "verified",
+  "discovery": "success",
+  "stop_reason": "declared_success",
+  "review": "discovery success (declared_success)\nmember.list_loans@1.0.0: verified, risk read_only\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_lookup: click\n  extract_member_loans: extract\n  outputs: member_loans\n  outcomes: MEMBER_NOT_FOUND [probed_verified]\n  written to evidence/held_out_member_loans/artifact/member.list_loans.yaml\n  model spend this pipeline: $0.028306",
+  "usd": "0.028306"
+}

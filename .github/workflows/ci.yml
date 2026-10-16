@@ -17,3 +17,6 @@ jobs:
       - run: uv run playwright install --with-deps chromium
       # Offline only: tests marked `live` are deselected by default, so no API key is needed.
       - run: make check
+      # The offline demo end to end, on a fresh runner: the clean-container check. No API key and
+      # no human (the scripted operator answers the console). Passwords are generated into .env.
+      - run: make demo-offline

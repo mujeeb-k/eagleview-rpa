@@ -1,0 +1,30 @@
+{
+  "run_id": "r_20261016T060558_f2c6a5",
+  "goal": "List member [member]'s loans.",
+  "status": "success",
+  "stop_reason": "declared_success",
+  "model": "claude-sonnet-5-5",
+  "served_models": [
+    "claude-sonnet-5-5"
+  ],
+  "effort": "medium",
+  "fallbacks": true,
+  "inputs": {
+    "member_id": {
+      "type": "string",
+      "required": true,
+      "sensitivity": "identifier",
+      "description": "Member number whose loans are to be listed"
+    }
+  },
+  "outputs": [
+    "member_loans"
+  ],
+  "success_marked": true,
+  "turns": 3,
+  "actions": 4,
+  "tool_calls": 10,
+  "policy_blocks": 0,
+  "usd": "0.014340",
+  "seconds": 15.2
+}

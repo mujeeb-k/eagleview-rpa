@@ -58,6 +58,7 @@ async def run_replay(
     console_port: int | None = None,
     human_timeout_s: float = DEFAULT_HUMAN_TIMEOUT_S,
     overlays: list[Overlay] | None = None,
+    record_video_dir: Path | None = None,
 ) -> RunResult:
     """Replay once. Opens its own browser unless one is passed in.
 
@@ -83,7 +84,11 @@ async def run_replay(
             browser = await stack.enter_async_context(launched_browser(headed=headed))
         effective = resolve(capability, profile, tenant, overlays or [])
         opener = surface_opener(
-            browser, PolicyEngine(policy), sink=writer, label_aliases=effective.label_aliases
+            browser,
+            PolicyEngine(policy),
+            sink=writer,
+            label_aliases=effective.label_aliases,
+            record_video_dir=record_video_dir,  # the demo video only; never set by default
         )
         return await replay(
             effective.capability,

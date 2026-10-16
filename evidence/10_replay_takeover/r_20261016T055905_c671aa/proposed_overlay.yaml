@@ -1,0 +1,68 @@
+schema_version: '1.0'
+applies_to:
+  profile: ironbridge-teller
+  capabilities:
+    - '*'
+tenant: lantern-bay
+label_aliases: {}
+global_states_add:
+  - id: human_cash_drawer_alert
+    detect:
+      text_present:
+        frame: []
+        text: Cash Drawer Alert
+    recover:
+      type: click_sequence
+      clicks:
+        - frame:
+            - main
+          locators:
+            - strategy: anchor
+              anchor_text:
+                - Supervisor notified
+              relation: left_of
+              control: checkbox
+            - strategy: anchor
+              anchor_text:
+                - Drawer 04 is over its cash limit ($10,000.00). Confirm that your supervisor has 
+                  been notified before you continue.
+              relation: below
+              control: checkbox
+            - strategy: css
+              selector: input[name="ack"]
+            - strategy: point
+              x: 282
+              y: 204
+              bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+          fragile: false
+        - frame:
+            - main
+          locators:
+            - strategy: a11y
+              role: button
+              name: Continue
+            - strategy: anchor
+              anchor_text:
+                - Drawer 04 is over its cash limit ($10,000.00). Confirm that your supervisor has 
+                  been notified before you continue.
+              relation: below
+              control: button
+            - strategy: text
+              text: Continue
+              exact: true
+            - strategy: css
+              selector: input[type="button"][value="Continue"]
+            - strategy: xpath
+              expression: //input[@value='Continue']
+            - strategy: point
+              x: 498
+              y: 231
+              bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+          fragile: false
+    max_per_run: 1
+    fail:
+      category: RECOVERY_EXHAUSTED
+      retryable: false
+    source: human_demonstrated
+step_patches: {}
+source: human_demonstrated

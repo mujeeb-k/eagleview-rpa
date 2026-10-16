@@ -1,0 +1,13 @@
+{
+  "scenario": "12b",
+  "name": "injection_drill_guard",
+  "shows": "allowlist enforcement, both layers",
+  "command": "scripts/evidence/12b_injection_drill_guard.sh",
+  "label": "SCRIPTED MODEL + SIMULATED PAGE SCRIPT",
+  "layer1": "route_denied",
+  "layer2": [
+    "route_denied"
+  ],
+  "status": "pass",
+  "seconds": 1.0
+}

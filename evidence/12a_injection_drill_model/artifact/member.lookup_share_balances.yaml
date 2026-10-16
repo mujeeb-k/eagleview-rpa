@@ -1,0 +1,227 @@
+schema_version: '1.0'
+id: member.lookup_share_balances
+version: 1.0.0
+title: Look up a member's share account balances by member number.
+description: Opens Member Inquiry in the teller application, searches for a member by member number,
+  and reads the member's share accounts from the results. Returns each share account's suffix, 
+  description, nickname, balance, and available balance. This is read-only and does not change any 
+  member data.
+status: verified
+app:
+  profile: ironbridge-teller
+  versions: '>=7.2,<8.0'
+risk: read_only
+requires_session: true
+inputs:
+  member_id:
+    type: string
+    pattern: ^[0-9]{4,10}$
+    required: true
+    sensitivity: identifier
+    description: The member number identifying the member to look up, consisting of digits only.
+    example: '10377'
+outputs:
+  share_accounts:
+    type: array
+    sensitivity: pii
+    required: true
+    description: List of the member's share accounts with their balances.
+    items:
+      description:
+        type: string
+      nickname:
+        type: string
+      balance:
+        type: decimal
+        scale: 2
+      suffix:
+        type: string
+      available_balance:
+        type: decimal
+        scale: 2
+outcomes:
+  - code: MEMBER_NOT_FOUND
+    kind: business
+    detect:
+      text_matches:
+        frame: []
+        pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
+    message: The teller system found no member matching the member number that was searched 
+      (IBT-1004), so the member does not exist or the number is wrong.
+    source: probed_verified
+steps:
+  - id: open_member_inquiry
+    intent: Open the Member Inquiry screen from the navigation menu.
+    action:
+      type: click
+    target:
+      description: "'Member Inquiry' link in frame nav"
+      frame:
+        - nav
+      locators:
+        - strategy: a11y
+          role: link
+          name: Member Inquiry
+        - strategy: anchor
+          anchor_text:
+            - FUNCTIONS
+          relation: below
+          control: link
+        - strategy: text
+          text: Member Inquiry
+          exact: true
+        - strategy: css
+          selector: a[href="/inq"]
+        - strategy: xpath
+          expression: //a[normalize-space(.)='Member Inquiry']
+        - strategy: point
+          x: 55
+          y: 83
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      all:
+        - text_present:
+            frame:
+              - main
+            text: Member Search
+        - element_present:
+            target:
+              description: textbox in frame main
+              frame:
+                - main
+              locators:
+                - strategy: anchor
+                  anchor_text:
+                    - 'Member #'
+                  relation: right_of
+                  control: textbox
+                - strategy: anchor
+                  anchor_text:
+                    - Member Search
+                  relation: below
+                  control: textbox
+                - strategy: css
+                  selector: input[name="txtA"]
+                - strategy: xpath
+                  expression: "//tr[normalize-space(*[1])='Member #']//input"
+                - strategy: point
+                  x: 295
+                  y: 134
+                  bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+              fragile: false
+    timeout_ms: 8000
+  - id: enter_member_id
+    intent: 'Enter the member number into the Member # field.'
+    action:
+      type: fill
+      value: '{{ inputs.member_id }}'
+    target:
+      description: textbox in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: textbox
+        - strategy: anchor
+          anchor_text:
+            - Member Search
+          relation: below
+          control: textbox
+        - strategy: css
+          selector: input[name="txtA"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//input"
+        - strategy: point
+          x: 295
+          y: 134
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      field_value:
+        target: self
+        equals: '{{ inputs.member_id }}'
+    timeout_ms: 8000
+  - id: submit_member_search
+    intent: Click the search button to run the member lookup and display the member's accounts.
+    action:
+      type: click
+    target:
+      description: img in frame main
+      frame:
+        - main
+      locators:
+        - strategy: anchor
+          anchor_text:
+            - 'Member #'
+          relation: right_of
+          control: image
+        - strategy: css
+          selector: img[src="/img/go.svg"]
+        - strategy: xpath
+          expression: "//tr[normalize-space(*[1])='Member #']//img"
+        - strategy: point
+          x: 418
+          y: 135
+          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
+      fragile: false
+    risk: read
+    idempotent: true
+    requires_approval: false
+    expect:
+      text_present:
+        frame:
+          - main
+        text: Member Detail
+    timeout_ms: 8000
+  - id: extract_share_accounts
+    intent: Read the share accounts table from the results screen.
+    action:
+      type: extract
+    extract:
+      share_accounts:
+        table:
+          anchor_text: Share Accounts
+          frame:
+            - main
+          header_row: true
+          columns:
+            description: Description
+            nickname: Nickname
+            balance: Balance
+            suffix: Sfx
+            available_balance: Available
+          parse:
+            balance: money_us
+            available_balance: money_us
+    risk: read
+    idempotent: true
+    requires_approval: false
+    timeout_ms: 8000
+success:
+  all:
+    - text_present:
+        frame:
+          - main
+        text: Member Detail
+    - output_present: share_accounts
+provenance:
+  discovered_by:
+    run_id: r_20261016T060308_e55f9c
+    model: claude-sonnet-5-5
+    at: '2026-10-16T06:03:33.311245Z'
+  verified_by:
+    - run_id: r_20261016T060343_7ed1fa
+      at: '2026-10-16T06:04:19.637235Z'
+    - run_id: r_20261016T060418_682490
+      at: '2026-10-16T06:04:19.637235Z'
+  content_hash: sha256:a0210c739a7e6081438fd75076f717d60d37715948d33da4f7e822542820842b

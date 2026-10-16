@@ -127,7 +127,8 @@ def create_app(tenant: Tenant, password: str) -> FastAPI:
         if s is None:
             raise SessionExpired
         now = time.monotonic()
-        if now - s.last_seen > IDLE_TIMEOUT_S or bank.faults.take_expiry():
+        expired = bank.faults.take_expiry() or bank.faults.take_expire_on(request.url.path)
+        if now - s.last_seen > IDLE_TIMEOUT_S or expired:
             del bank.sessions[s.token]
             raise SessionExpired
         s.last_seen = now
