@@ -45,6 +45,9 @@ class TargetInfo:
 
     label: str | None = None
     role: str | None = None
+    # (method, url) when activating this target makes a form submit itself with no button to
+    # name: Enter in the one text field of a form without a submit button.
+    submits: tuple[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -257,6 +260,16 @@ class PolicyEngine:
         )
         if activates and self.is_irreversible_label(label):
             return self._irreversible(actor, ctx, f"{action.type} on {label!r}")
+        if activates and target is not None and target.submits is not None:
+            # No button to read a label from: judge the submission by where it goes.
+            method, url = target.submits
+            found = self._check_url(ctx.tenant, url, method)
+            if isinstance(found, Decision):
+                return found
+            if found is not None:
+                return self._irreversible(
+                    actor, ctx, f"{action.type} submits {method.upper()} {found.pattern}"
+                )
         return _ALLOW
 
     # --- layer 2: network guard ---------------------------------------------------------------

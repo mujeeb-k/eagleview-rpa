@@ -614,17 +614,29 @@ class PlaywrightSurface:
         grounded: GroundedTarget | None,
         submission: ImplicitSubmission,
     ) -> ActionResult:
-        """Enter on a focused list in a form, the same on every host. The policy check sees the
-        default button Enter would press (so Enter can't post past layer 1); the result still
-        names the focused list, as the recorder and compiler expect of a key press."""
-        seen = submission.button or grounded
-        info = None if seen is None else TargetInfo(seen.policy_label, seen.role)
+        """Enter on a focused field in a form. The policy check sees what Enter would submit: the
+        default button, or, with no button, the form's own method and action. The result always
+        names the focused field, as the recorder and compiler expect of a key press; a refusal
+        names the button in its reason. A text field gets the native key, so the page's keystroke
+        handlers run; a list gets the HTML rule applied here, the same on every host."""
+        if submission.button is not None:
+            seen = submission.button
+            info = TargetInfo(seen.policy_label, seen.role)
+        else:
+            info = TargetInfo(
+                None if grounded is None else grounded.policy_label,
+                None if grounded is None else grounded.role,
+                submits=submission.form_target if submission.mode == "form" else None,
+            )
         decision = self.engine.check(action, actor, replace(ctx, current_url=self.page.url), info)
         if not decision.allowed:
-            return _refused(action, actor, decision, None, seen)
+            return _refused(action, actor, decision, None, grounded)
         self._bind(actor, ctx)
         try:
-            await self.grounder.submit_implicitly(submission)
+            if submission.native:
+                await self.page.keyboard.press(playwright_key(action.key or ""))
+            else:
+                await self.grounder.submit_implicitly(submission)
         except PlaywrightError as exc:
             return ActionResult("error", action, actor, str(exc), None, grounded, decision)
         return ActionResult("done", action, actor, "", None, grounded, decision)

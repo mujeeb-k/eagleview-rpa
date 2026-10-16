@@ -33,5 +33,22 @@ function counted(e) {
 <input type="text" name="a"> <input type="text" name="b">
 </form>
 <select id="loose" onkeydown="keys++;"><option>Savings</option></select>
+<!-- Text fields: Enter is the browser's own key here; only what layer 1 sees changes. -->
+<form id="text_post" onsubmit="return counted(event);">
+<input type="text" name="amount" onkeydown="keys++;"> <textarea name="memo" onkeydown="keys++;"></textarea>
+<input type="submit" value="Post">
+</form>
+<form id="text_go" onsubmit="return counted(event);">
+<input type="search" name="q" onkeydown="keys++;"> <input type="submit" value="Go">
+</form>
+<form id="text_disabled" onsubmit="return counted(event);">
+<input type="text" name="amount" onkeydown="keys++;"> <input type="submit" value="Post" disabled>
+</form>
+<form id="text_alone" method="post" action="/share/post" onsubmit="return counted(event);">
+<input type="text" name="amount" onkeydown="keys++;">
+</form>
+<form id="text_pair" method="post" action="/share/post" onsubmit="return counted(event);">
+<input type="text" name="a" onkeydown="keys++;"> <input type="text" name="b">
+</form>
 </body>
 </html>

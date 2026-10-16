@@ -172,3 +172,15 @@ won per step across runs: a drift signal.
 
 `make check` (`uv run ruff check . && uv run ruff format --check . && uv run pyright && uv run
 pytest`) runs lint, types and the tests.
+
+## How this was built
+
+Eagleview was built with Claude Code under my direction. [CLAUDE.md](CLAUDE.md) holds my
+standing instructions and invariants, and [PLAN.md](PLAN.md) is my build plan, phase by phase.
+Every judgment call the plan didn't settle is recorded in [docs/DECISIONS.md](docs/DECISIONS.md)
+with the alternative considered; the ones tagged [REVIEW] are calls I reviewed myself. Approving a
+capability is always a person's step: nothing in `capabilities/` was approved by the tooling.
+
+## License
+
+MIT; see [LICENSE](LICENSE).

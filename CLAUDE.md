@@ -8,10 +8,10 @@ take over the **same live session** when automation is stuck, then hand it back.
 Full build plan: PLAN.md. Decision log: docs/DECISIONS.md.
 
 ## Voice and framing
-Eagleview is a standalone prototype. Every document in the repo (README, REPORT, evidence index,
-DECISIONS, code comments, commit messages) describes what Eagleview is, how it works, and why it was
-designed this way, written in the first person by the project's author. Name no real companies, banks,
-or vendors; all institutions and data are the fictional ones defined in PLAN.md §1.
+Eagleview is a standalone prototype. Documents in the repo (README, REPORT, evidence index,
+DECISIONS, code comments, commit messages) describe what Eagleview is, how it works, and why it was
+designed this way, in plain language. Name no real companies, banks, or vendors; all institutions
+and data are the fictional ones defined in PLAN.md §1.
 
 ## Non-negotiable invariants
 1. **No LLM on the replay path.** `eagleview.replay`, `eagleview.surfaces`, and `eagleview.safety`

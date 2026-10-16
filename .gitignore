@@ -6,3 +6,6 @@ runs/
 .pytest_cache/
 .ruff_cache/
 .claude/settings.local.json
+
+# macOS Finder metadata
+.DS_Store

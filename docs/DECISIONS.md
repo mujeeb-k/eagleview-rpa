@@ -1169,9 +1169,8 @@ so Enter on a list whose form posts is refused at layer 1, not only by the netwo
 result still names the focused list, so recording and compiling are unchanged. Alternatives:
 branching on the platform (a pass on one host would prove nothing about the other), or
 recompiling the step into a click on Validate (that edits a verified artifact for a host quirk,
-and anything discovered elsewhere would still stall). Not extended: Enter on a text field also
-submits implicitly everywhere, and layer 1 sees the field there, not the default button. The
-network guard covers that case.
+and anything discovered elsewhere would still stall). Extended to text fields later: see "Enter
+in a text field: layer 1 sees what it submits" below.
 
 **[REVIEW] `make evidence` replaces a scenario's evidence only when the new run passed.** Each
 scenario is built in `runs/evidence_staging/`. On pass or pending it replaces its folder in
@@ -1192,3 +1191,31 @@ the run ended, instead of a timeout.
 **The four model scenarios were regenerated too.** 01, 02, 03 and 12a ran again so their records
 go through the redactor and name `evidence/`, not the staging folder; 02 and 03 exercised the new
 Enter rule in real discovery. Spend is now about $0.91 over 18 real runs.
+
+## 2026-10-16 — Enter in a text field: layer 1 sees what it submits
+
+**[REVIEW] Enter in a text field shows layer 1 what it would submit.** The fields are the input
+types the HTML spec lists as "fields that block implicit submission": text, search, tel, url,
+email, password, date, month, week, time, datetime-local and number. For Enter in one of these,
+inside a form, `PolicyEngine.check()` sees the form's default button. So Enter beside a Post
+button needs approval, exactly as clicking Post does. The key itself stays the browser's own,
+so the page's keystroke handlers run, and the result still names the focused field. The
+alternative, emulating the submission as for lists, was rejected: browsers agree on text
+fields, and an emulated key would skip the page's handlers.
+- **A textarea** is not on the list: Enter there is a newline and is checked as a key on the
+  textarea. So are checkboxes, radios and other controls, where some browsers also submit.
+  Layer 2 covers those.
+- **A disabled default button** means nothing is submitted, so layer 1 sees the field, not a
+  button press.
+- **No submit button.** The spec still submits a form with at most one blocking field. I chose
+  the conservative reading: layer 1 judges that submission by the form's own method and action
+  URL against the route rules, so a form that would `POST /share/post` needs approval with no
+  button to name. Alternatives: keep seeing the field, which leaves the case to layer 2 alone;
+  or refuse every buttonless submission, which would block ordinary one-field search forms.
+- **Refusals name the focused field** in `ActionResult.grounded`, for lists too, and the button
+  in the decision's detail. The recorder and compiler read `grounded`. This changes one
+  assertion in the list test: it now checks the field and the detail instead of the button.
+
+**Known limit: a page's own Enter handler.** Layer 1 judges what the HTML rule would submit. A
+page whose Enter handler cancels the submission can be refused for an action that would not have
+posted, which fails safe. A handler that submits somewhere else is caught only by layer 2.

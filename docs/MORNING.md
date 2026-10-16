@@ -130,21 +130,28 @@ These are all 40 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" do
 2. **Approve** what you're happy with. Scenario 14 and the agent demo need an approved lookup.
 
 **Decide**
-3. **A LICENSE file:** the release checklist asks for MIT, and I didn't add one.
-4. **CLAUDE.md's "Voice and framing":** rewrite it in neutral terms, or move CLAUDE.md and PLAN.md
-   under `docs/`. I didn't touch either.
+3. **LICENSE:** done, MIT, in your name, 2026.
+4. **CLAUDE.md's "Voice and framing":** rewritten in neutral terms, as you asked. The README now
+   has a "How this was built" section.
 5. **The demo video:** run `scripts/evidence/demo_video.sh --record-video` when you want it. It
    needs `ffmpeg`.
 
 **Check**
-6. **`gitleaks`** isn't installed here, so it wasn't run. `.env` is not committed, and the PII
-   scan test passes.
-7. **Enter on a text field** still submits by the browser's own rule, and the pre-action check
-   sees the field there, not the button it presses. The network guard covers it. Extending #39
-   to text fields is a small follow-up.
+6. **`gitleaks`** 8.30.1 scanned the full git history (25 commits at the time): no leaks.
+7. **Enter on a text field** is now checked as what it submits: the default button, or with no
+   button, the form's own action (decision "Enter in a text field"). A page's own Enter handler
+   can still make layer 1 refuse something that wouldn't have posted; that is a known limit.
 8. **README and REPORT are drafts.** REPORT is about 1,450 words under PLAN §9's headings, and a
    test checks them. The release checklist asks for README commands copy-pasted from a real
    terminal session: please run them once yourself.
+
+## Known issues
+
+- **`verified_by` timestamps.** In a compiled capability, every `verified_by` entry carries the
+  same `at`. The compiler takes one clock reading after all verify replays and stamps it on
+  each (`src/eagleview/compiler/pipeline.py`, where `verified_by` is built). Each entry should
+  carry its own run's end time. It doesn't affect replay or the content hash (provenance is
+  excluded). Not fixed yet.
 
 ## Commands, in order
 

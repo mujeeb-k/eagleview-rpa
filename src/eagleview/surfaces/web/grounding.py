@@ -76,13 +76,19 @@ class Grounding:
 
 @dataclass(frozen=True)
 class ImplicitSubmission:
-    """What Enter on a focused single-choice list in a form does, decided by the HTML rule rather
-    than by the host's browser build. `mode` is "button" (activate the form's default button,
-    `button`), "form" (no default button, and the form may still submit) or "none"."""
+    """What Enter on a focused field in a form does, by the HTML implicit-submission rule.
+
+    `mode` is "button" (the form's default button is activated: `button`), "form" (no submit
+    button, and the form submits itself: `form_target` is its method and action URL) or "none"
+    (nothing is submitted). `native` is true for a text field: the key goes to the browser as it
+    is, so the page's keystroke handlers run. A single-choice list is never native, because the
+    browser's own answer differs by host (decision #39)."""
 
     mode: Literal["button", "form", "none"]
     button: GroundedTarget | None
     object_id: str | None
+    native: bool = False
+    form_target: tuple[str, str] | None = None
 
 
 class Grounder:
@@ -133,11 +139,12 @@ class Grounder:
 
     @asynccontextmanager
     async def implicit_submission(self) -> AsyncIterator[ImplicitSubmission | None]:
-        """Enter on a focused <select> submits its form on one platform's Chromium and opens the
-        list on another's. Replay must not depend on the host, so for a single-choice list inside
-        a form this applies HTML implicit submission on every host: it names the default button,
-        so the policy check sees what Enter would press. None means the key goes to the browser
-        as it is (any other focus, a select outside a form, a list box)."""
+        """What Enter on the focused field would submit, so the policy check sees that rather
+        than the field. It applies to a single-choice <select> and to the input types the HTML
+        spec lists as "fields that block implicit submission" (text, search, tel, url, email,
+        password, date, month, week, time, datetime-local, number), inside a form. None means
+        Enter submits nothing by that rule: any other focus, a field outside a form, a list box,
+        a textarea (Enter is a newline there)."""
         group = f"ev-{uuid.uuid4().hex}"
         try:
             res = await self.cdp.send(
@@ -145,18 +152,26 @@ class Grounder:
                 {"expression": "(" + _IMPLICIT_SUBMITTER + ")()", "objectGroup": group},
             )
             obj = res.get("result", {})
+            if obj.get("value") == "native":
+                yield None
+                return
+            focus = await self.cdp.send(
+                "Runtime.evaluate",
+                {"expression": "(" + _FOCUSED_FORM + ")()", "returnByValue": True},
+            )
+            tag, method, action = focus.get("result", {}).get("value") or (None, None, None)
+            native = tag != "SELECT"
             if obj.get("subtype") == "node" and "objectId" in obj:
                 info = await self._describe(obj["objectId"], group)
                 if info is None:
-                    yield ImplicitSubmission("none", None, None)
+                    yield ImplicitSubmission("none", None, None, native)
                 else:
-                    yield ImplicitSubmission(
-                        "button", self._target(info, (0, 0), []), obj["objectId"]
-                    )
-            elif obj.get("value") in ("form", "none"):
-                yield ImplicitSubmission(obj["value"], None, None)
+                    target = self._target(info, (0, 0), [])
+                    yield ImplicitSubmission("button", target, obj["objectId"], native)
+            elif obj.get("value") == "form" and method and action:
+                yield ImplicitSubmission("form", None, None, native, (str(method), str(action)))
             else:
-                yield None
+                yield ImplicitSubmission("none", None, None, native)
         finally:
             # A submission that navigated took the context, and the group, with it.
             with suppress(PlaywrightError):
@@ -376,22 +391,35 @@ _DEEP_ACTIVE = """function () {
   return el;
 }"""
 
-# HTML implicit submission for a focused single-choice <select> in a form: the default button is
-# the form's first submit button in tree order; a disabled one means nothing is submitted. With
-# no default button the form submits only if at most one field blocks implicit submission.
+# HTML implicit submission (WHATWG HTML, "Implicit submission") for a focused single-choice
+# <select> or text field in a form: the default button is the form's first submit button in tree
+# order; a disabled one means nothing is submitted. With no submit button the form submits itself
+# only if at most one field blocks implicit submission.
 _IMPLICIT_SUBMITTER = """function () {
   let el = document.activeElement;
   while (el && (el.tagName === 'FRAME' || el.tagName === 'IFRAME') && el.contentDocument) {
     el = el.contentDocument.activeElement;
   }
-  if (!el || el.tagName !== 'SELECT' || el.multiple || el.size > 1 || !el.form) return 'native';
+  const blocking = ['text', 'search', 'url', 'tel', 'email', 'password', 'date', 'month', 'week',
+                    'time', 'datetime-local', 'number'];
+  const list = el && el.tagName === 'SELECT' && !el.multiple && !(el.size > 1);
+  const text = el && el.tagName === 'INPUT' && blocking.includes(el.type);
+  if (!(list || text) || !el.form) return 'native';
   const fields = Array.from(el.form.elements);
   const button = fields.find(e =>
     (e.tagName === 'BUTTON' && e.type === 'submit') ||
     (e.tagName === 'INPUT' && (e.type === 'submit' || e.type === 'image')));
   if (button) return button.disabled ? 'none' : button;
-  const blocking = ['text', 'search', 'url', 'tel', 'email', 'password', 'date', 'month', 'week',
-                    'time', 'datetime-local', 'number'];
   const n = fields.filter(e => e.tagName === 'INPUT' && blocking.includes(e.type)).length;
   return n > 1 ? 'none' : 'form';
+}"""
+
+# The focused field's tag, and its form's own method and action (the URL it would submit to).
+_FOCUSED_FORM = """function () {
+  let el = document.activeElement;
+  while (el && (el.tagName === 'FRAME' || el.tagName === 'IFRAME') && el.contentDocument) {
+    el = el.contentDocument.activeElement;
+  }
+  if (!el) return null;
+  return [el.tagName, el.form ? el.form.method : null, el.form ? el.form.action : null];
 }"""
