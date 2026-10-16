@@ -31,6 +31,19 @@
       "title": "App Profile",
       "type": "string"
     },
+    "app_version": {
+      "anyOf": [
+        {
+          "pattern": "^\\d+\\.\\d+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "App Version"
+    },
     "base_url": {
       "pattern": "^https?://[^/@\\s]+$",
       "title": "Base Url",

@@ -9,3 +9,4 @@ base_url: "http://127.0.0.1:8601"
 credentials:
   username: teller01
   password: secret://lantern_bay_teller_password
+app_version: "7.2"

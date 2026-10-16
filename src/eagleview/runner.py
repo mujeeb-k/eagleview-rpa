@@ -15,12 +15,14 @@ from eagleview.control.interventions import (
     InterventionStore,
 )
 from eagleview.evidence.writer import EvidenceWriter
+from eagleview.overlays.resolve import resolve
 from eagleview.replay.engine import new_run_id, replay
 from eagleview.replay.preflight import RunOptions
 from eagleview.safety.policy_engine import PolicyEngine
 from eagleview.safety.redaction import Redactor
 from eagleview.schema.app_profile import AppProfile
 from eagleview.schema.capability import Capability
+from eagleview.schema.overlay import Overlay
 from eagleview.schema.policy import Policy
 from eagleview.schema.result import RunResult
 from eagleview.schema.tenant import TenantProfile
@@ -55,8 +57,11 @@ async def run_replay(
     desk: InterventionDesk | None = None,
     console_port: int | None = None,
     human_timeout_s: float = DEFAULT_HUMAN_TIMEOUT_S,
+    overlays: list[Overlay] | None = None,
 ) -> RunResult:
     """Replay once. Opens its own browser unless one is passed in.
+
+    `overlays` are applied only when given (P8): the caller decides which tenant overlays apply.
 
     With `console_port`, a human can be brought in: an intervention desk (SQLite under
     `runs_root`) and the operator console run in this process for the length of the run."""
@@ -76,11 +81,14 @@ async def run_replay(
             desk.console_url = url
         if browser is None:
             browser = await stack.enter_async_context(launched_browser(headed=headed))
-        opener = surface_opener(browser, PolicyEngine(policy), sink=writer)
+        effective = resolve(capability, profile, tenant, overlays or [])
+        opener = surface_opener(
+            browser, PolicyEngine(policy), sink=writer, label_aliases=effective.label_aliases
+        )
         return await replay(
-            capability,
+            effective.capability,
             inputs,
-            profile=profile,
+            profile=effective.profile,
             tenant=tenant,
             open_surface=opener,
             writer=writer,
@@ -88,5 +96,7 @@ async def run_replay(
             options=options,
             modified=modified,
             desk=desk,
+            label_aliases=effective.label_aliases,
+            effective_hash=effective.effective_hash,
         )
     raise AssertionError("unreachable")  # pragma: no cover

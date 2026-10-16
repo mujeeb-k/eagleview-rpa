@@ -17,6 +17,7 @@ from eagleview.control.interventions import InterventionDesk
 from eagleview.replay.preflight import RunOptions
 from eagleview.runner import run_replay
 from eagleview.schema.capability import Approval, Capability, Provenance, Verification
+from eagleview.schema.overlay import Overlay
 from eagleview.schema.policy import Policy
 from eagleview.schema.result import RunResult
 from eagleview.schema.tenant import Credentials, TenantProfile
@@ -77,6 +78,7 @@ def make_replayer(browser: Browser, runs_root: Path) -> Replay:
         allow_modified: bool = False,
         environ: dict[str, str] | None = None,
         desk: InterventionDesk | None = None,
+        overlays: list[Overlay] | None = None,
     ) -> Replayed:
         loaded = load_for_run(capability, allow_modified=allow_modified)
         result = await run_replay(
@@ -91,6 +93,7 @@ def make_replayer(browser: Browser, runs_root: Path) -> Replay:
             runs_root=runs_root,
             environ=environ if environ is not None else {bank.tenant.password_env: bank.password},
             desk=desk,
+            overlays=overlays,
         )
         return Replayed(result, runs_root / result.run_id)
 

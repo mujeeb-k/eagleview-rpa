@@ -554,26 +554,31 @@ This app must feel like a real 2004-era core system:
   `probed_verified`, for $0.04. The plan was self-reviewed with the advisor.)*
 
 ### P8: Cross-tenant reuse (extension; runs together with P9)
-- [ ] Overlay model and resolution with tests.
-- [ ] A hand-authored Copperhill overlay at `overlays/copperhill/ironbridge-teller.yaml`, reviewed
+- [x] Overlay model and resolution with tests.
+- [x] A hand-authored Copperhill overlay at `overlays/copperhill/ironbridge-teller.yaml`, reviewed
       like any artifact. It contains label aliases, the Select Branch interstitial handler, and step
       patches keyed by semantic step id.
-- [ ] Proof: the same capability replays successfully on both tenants, each with its own demo member
+- [x] Proof: the same capability replays successfully on both tenants, each with its own demo member
       (10482 at Lantern Bay, 2210236 at Copperhill). Lantern Bay's member replayed at Copperhill
       returns MEMBER_NOT_FOUND.
-- [ ] App fingerprint version check, and per-step locator telemetry (strategy rank histograms) as the
+- [x] App fingerprint version check, and per-step locator telemetry (strategy rank histograms) as the
       drift signal.
 - The automated LLM `eagleview adapt` command is cut. It is listed in REPORT §7 (Cuts) as a next step.
+- **Done when:** the same discovered capability replays on both tenants, each with its own member.
+  *(Done: `tests/overlays/`; the plan was self-reviewed with the advisor.)*
 
 ### P9: Agent-facing catalog (extension; runs together with P8)
-- [ ] The registry lists approved capabilities and maps each to a tool definition: snake_case name;
+- [x] The registry lists approved capabilities and maps each to a tool definition: snake_case name;
       description built from title, description, outcomes, and risk; input JSON Schema; output shape in
       the description.
-- [ ] `eagleview mcp`: an MCP server (FastMCP, stdio) exposing them. Each call runs a replay and
+- [x] `eagleview mcp`: an MCP server (FastMCP, stdio) exposing them. Each call runs a replay and
       returns the RunResult JSON.
-- [ ] `scripts/agent_demo.py "What's in member 10482's savings?"`: Claude (plain tool use, no computer
+- [x] `scripts/agent_demo.py "What's in member 10482's savings?"`: Claude (plain tool use, no computer
       use) picks the tool, replay runs, and Claude answers. A second prompt with a bad member shows the
       agent handling an `outcome`.
+- **Done when:** an agent can find and call an approved capability. *(Built and tested offline
+  with a test-only approved copy, in `tests/catalog/`. No capability is approved yet; approving
+  is the user's step, so the real agent demo, scenario 14, waits for it.)*
 
 ### P10: Evidence generation (runs together with P11)
 - [x] **Screen-level redaction, before any evidence is written (from P4; done before P5).** Replay paints values it

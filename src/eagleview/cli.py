@@ -91,6 +91,9 @@ def replay(
         Path | None, typer.Option(help="A tenant YAML to use instead of tenants/<slug>.yaml.")
     ] = None,
     runs_dir: Annotated[Path, typer.Option(help="Where run evidence is written.")] = Path("runs"),
+    overlays: Annotated[
+        bool, typer.Option(help="Apply the tenant's overlays from overlays/<tenant>/.")
+    ] = True,
     console_port: Annotated[
         int, typer.Option(help="Operator console port, started when a human may be needed.")
     ] = 8700,
@@ -102,6 +105,7 @@ def replay(
         app_profile_path,
         capability_path,
         load_for_run,
+        tenant_overlays,
         tenant_path,
     )
     from eagleview.artifacts.yaml_io import (
@@ -159,6 +163,7 @@ def replay(
                 runs_root=runs_dir,
                 console_port=console_port if wants_console else None,
                 human_timeout_s=human_timeout,
+                overlays=tenant_overlays(tenant_profile.slug) if overlays else None,
             )
         )
     except ConsolePortInUse as exc:
@@ -321,3 +326,72 @@ def approve(
     )
     written = dump_capability(approved, target)
     typer.echo(f"approved {written.ref} by {reviewer}: {target}")
+
+
+@app.command(help="Locator telemetry across runs: which strategy and rank won per step (drift).")
+def telemetry(
+    runs_dir: Annotated[Path, typer.Argument(help="A runs directory.")] = Path("runs"),
+    as_json: Annotated[bool, typer.Option("--json", help="Machine-readable output.")] = False,
+) -> None:
+    import json
+
+    from eagleview.telemetry import collect, report
+
+    stats = collect(runs_dir)
+    if as_json:
+        out = [
+            {
+                "capability": c,
+                "tenant": t,
+                "step": s,
+                "runs": v.runs,
+                "winners": dict(v.winners),
+                "rank0_share": v.rank0_share,
+                "agreement": v.agreement,
+            }
+            for (c, t, s), v in sorted(stats.items())
+        ]
+        typer.echo(json.dumps(out, indent=2))
+    else:
+        typer.echo(report(stats))
+
+
+@app.command(
+    help=(
+        "Serve the agent catalog over MCP (stdio): every approved, non-irreversible capability "
+        "as a tool. Each call is an unattended replay on --tenant and returns the RunResult."
+    )
+)
+def mcp(
+    tenant: Annotated[str, typer.Option(help="Tenant slug, from tenants/.")] = "lantern-bay",
+    capabilities_dir: Annotated[Path, typer.Option(help="Approved capabilities.")] = Path(
+        "capabilities"
+    ),
+    policy: Annotated[Path, typer.Option(help="Safety policy YAML.")] = Path(
+        "policies/default-teller.yaml"
+    ),
+    runs_dir: Annotated[Path, typer.Option(help="Where run evidence is written.")] = Path("runs"),
+) -> None:
+    from eagleview.artifacts.loader import app_profile_path, tenant_overlays, tenant_path
+    from eagleview.artifacts.yaml_io import load_app_profile, load_policy, load_tenant
+    from eagleview.catalog.mcp_server import serve_stdio
+    from eagleview.catalog.registry import approved
+    from eagleview.catalog.runner import Catalog, open_catalog
+    from eagleview.runner import environment
+
+    tenant_profile = load_tenant(tenant_path(tenant))
+    catalog = Catalog(
+        approved(capabilities_dir),
+        profile=load_app_profile(app_profile_path(tenant_profile.app_profile)),
+        tenant=tenant_profile,
+        policy=load_policy(policy),
+        overlays=tenant_overlays(tenant),
+        runs_root=runs_dir,
+        environ=environment(),
+    )
+
+    async def go() -> None:
+        async with open_catalog(catalog):
+            await serve_stdio(catalog)
+
+    asyncio.run(go())

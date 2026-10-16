@@ -1,0 +1,12 @@
+# Copperhill's member search runs from a "Search" button where Lantern Bay has a GO image.
+# Scoped to this capability: its steps are named by the capability, not by the product.
+schema_version: "1.0"
+applies_to: { profile: ironbridge-teller, capabilities: ["member.lookup_share_balances"] }
+tenant: copperhill
+step_patches:
+  submit_member_search:
+    target:
+      locators:
+        prepend:
+          - { strategy: a11y, role: button, name: Search }
+          - { strategy: css, selector: "input[type='submit'][value='Search']" }

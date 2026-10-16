@@ -894,3 +894,97 @@ verify stands, so an irreversible flow is not posted a third time just to re-pro
 `eagleview.compiler` joins the forbidden imports, beside `anthropic` and `eagleview.discovery`.
 
 **Real spend so far: $0.16 over 4 runs.**
+
+## 2026-10-16 — P8 + P9 plan (self-reviewed with the advisor)
+
+**The committed lookup capability comes from discovery.**
+`capabilities/drafts/member.lookup_share_balances.yaml` is the verified draft produced by the real
+P7 pipeline run, copied unchanged and still `verified`. Replay evidence and the Copperhill overlay
+are written against it. Approving it, which promotes it to `capabilities/`, is the user's step.
+
+**Overlay resolution (`eagleview/overlays/`).**
+- **Order:** base capability, then version patches, then the tenant overlay.
+- **Step patches** are keyed by the capability's semantic step ids. They can prepend, append or
+  replace locators, and replace an expect or a timeout. A patch naming a step the capability
+  doesn't have is an error, not a silent no-op.
+- **Global states** from the overlay are added after the app profile's own.
+- **Label aliases** reach the surface (anchor, text and a11y strategies) and the evidence writer
+  (sensitive labels).
+- **The effective hash** covers the patched capability and every overlay applied, so a run
+  records exactly what governed it.
+
+**[REVIEW] Version patches use a version the tenant declares.** `TenantProfile.app_version`
+(`"7.2"`, `"7.4"`) selects which version patches apply before the run, and replay fails
+APP_VERSION_UNSUPPORTED if the screen shows a different version. The alternative, re-resolving
+after the footer is read mid-run, would change the artifact during a run.
+
+**[REVIEW] Copperhill's Select Branch handler chooses a named branch.** It uses `option:
+"Hillcrest"`, not `option_index: 0`. The overlay is tenant-specific anyway, a label is
+reviewable, and choosing by position would need a surface call to list options. That call is not
+built (`option_index` still reports "unsupported").
+
+**The Copperhill overlay is hand-authored and reviewed like any artifact.** It holds:
+- label aliases ("Member #" is "Acct Holder No.", "Member Inquiry" is "Member Lookup");
+- the Select Branch interstitial;
+- one step patch: the search step gets a "Search" button locator, since Copperhill has no GO
+  image.
+
+**Drift telemetry.** `eagleview telemetry <runs dir>` aggregates every run summary's locator report
+per capability, tenant and step: how often each (strategy, rank) won, and the agreement rate.
+When rank 0 stops winning, the screen has drifted.
+
+**Agent catalog (P9).**
+- **[REVIEW]** The registry lists only `approved` capabilities from `capabilities/`. Irreversible
+  ones are left out, because an agent's run is unattended and could only block at the gate.
+- Each capability maps to a tool: a snake_case name, a description built from the title,
+  description, outcomes and risk plus the output shape, and the input JSON Schema.
+- `eagleview mcp` serves the tools over stdio with FastMCP. Each call runs an unattended replay
+  on the configured tenant and returns the RunResult JSON.
+- `scripts/agent_demo.py` has Claude, with plain tool use, pick the tool and answer.
+
+No capability is approved yet, so scenario 14 is built and tested offline (with a test-only
+approved copy) and marked pending the user's approval.
+
+**P8 + P9 plan addendum, from the advisor's review.**
+- **[REVIEW] Copperhill gets two overlays.** One is profile-wide (`capabilities: ["*"]`): label
+  aliases and the Select Branch interstitial. The other is capability-scoped
+  (`capabilities: [member.lookup_share_balances]`): the search step patch. A step patch naming a
+  missing step is an error only when the overlay names that capability explicitly. Under a glob it
+  is skipped, so the profile-wide overlay works for every capability.
+- **Overlays are opt-in.** The CLI and callers load them; `run_replay` never does by default. With
+  no overlay, the effective hash is the content hash, and the P4 "base fails at Copperhill" test
+  stays as it is.
+- **The Select Branch handler has `max_per_run: 3`**, so a relogin after session expiry can pass
+  Select Branch again. Session expiry on Copperhill is tested.
+- **Aliases reach the resolver, the evidence writer and the watcher**, and the overlay's states join
+  the watcher's. A Copperhill run's files are scanned for the member number and name.
+- **The proof checks how the step succeeded**, not only that it did. At Copperhill the anchor "link
+  below FUNCTIONS" would find Cash Drawer, so the test asserts the menu step won by `a11y` at
+  rank 0. The search patch uses an `a11y` "Search" button.
+- **MCP owns stdout during a call.** Nothing else prints there. Tests use the SDK's in-memory
+  client, plus one stdio smoke test.
+- **The agent demo is metered** through the same ledger, uses `tool_choice: auto`, is tested
+  offline, and is not run for real until a capability is approved.
+
+## 2026-10-16 — P8 + P9 as built
+
+**The committed lookup capability came from the real P7 pipeline.** It was copied byte for byte
+to `capabilities/drafts/member.lookup_share_balances.yaml`, and its hash checks out. Its step
+ids (`submit_member_search`) are the ones the Copperhill overlay patches.
+
+**Copperhill's sign-on makes 6 authenticated requests, not 4.** It adds GET and POST `/branch`
+before the frameset. The session-expiry test arms the fault at 6 and shows the relogin passing
+Select Branch a second time, within the handler's budget of 3.
+
+**The proof checks how each step succeeded.** At Copperhill the menu step won by `a11y` at rank 0,
+through the alias "Member Lookup", and the search step by the patched `a11y` "Search" button.
+Copperhill's run files contain neither its member number nor the member's name.
+
+**[REVIEW] MCP is built on the SDK's low-level `Server`.** MCP 2 renamed FastMCP to `MCPServer`,
+which derives each tool's schema from a Python signature. Catalog tools take their JSON Schema,
+patterns included, from each capability, and the low-level server accepts that schema as given.
+The tests use the SDK's in-memory client, plus one stdio round trip that proves stdout carries
+only the protocol.
+
+**The agent demo exists and is tested offline only.** `scripts/agent_demo.py` refuses to run
+until a capability is approved, and its model calls go to the same spend ledger.

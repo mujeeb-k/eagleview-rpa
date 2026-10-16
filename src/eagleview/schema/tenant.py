@@ -23,3 +23,6 @@ class TenantProfile(BaseModel):
     app_profile: Name
     base_url: str = Field(pattern=r"^https?://[^/@\s]+$")  # an origin: no path, no userinfo
     credentials: Credentials
+    # The app version this tenant runs, as MAJOR.MINOR. It selects version patches before a run,
+    # and replay refuses to run if the screen shows another version.
+    app_version: str | None = Field(default=None, pattern=r"^\d+\.\d+$")

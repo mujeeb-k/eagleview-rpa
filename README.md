@@ -68,4 +68,19 @@ takeover that resumed writes the person's clicks to `runs/<run_id>/proposed_over
 for review that is never applied automatically. The console has no login: it binds to loopback,
 and its operators are trusted.
 
+## Discovery, tenants and the agent catalog
+
+- `eagleview discover --goal "..."` lets Claude drive the app once, then compiles, verifies and
+  probes the trace into a capability under `capabilities/drafts/`. It needs `ANTHROPIC_API_KEY`.
+  The real runs so far cost $0.03–0.05 each; spend is capped at $25 and 30 runs, and
+  `runs/discovery_ledger.jsonl` records every call.
+- `eagleview approve <draft> --reviewer <name>` is a person's step. It promotes a verified draft
+  into `capabilities/` as `approved`.
+- `eagleview replay` applies the tenant's overlays from `overlays/<tenant>/`, so the same
+  capability runs at Copperhill. `--no-overlays` turns them off.
+- `eagleview telemetry runs/` shows which locator won per step across runs, as a drift signal.
+- `eagleview mcp` serves approved capabilities to AI agents over MCP. Run
+  `uv run python scripts/agent_demo.py "What's in member 10482's savings?"` once a capability is
+  approved.
+
 All institutions, people, and data in this repository are fictional and synthetic.

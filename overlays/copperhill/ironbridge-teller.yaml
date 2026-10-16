@@ -1,0 +1,27 @@
+# Copperhill Community Credit Union (fictional) on Ironbridge Teller 7.4: what differs from the
+# product's defaults for every capability. Hand-authored and reviewed like any artifact.
+schema_version: "1.0"
+applies_to: { profile: ironbridge-teller, capabilities: ["*"] }
+tenant: copperhill
+label_aliases:
+  "Member #": ["Acct Holder No."]
+  "Member Inquiry": ["Member Lookup"]
+global_states_add:
+  # After sign-on Copperhill asks for a branch. Budget 3, so signing on again after a session
+  # expiry can pass it again.
+  - id: select_branch_interstitial
+    detect: { text_present: { text: "Select Branch" } }
+    recover:
+      type: select_then_click
+      select:
+        target:
+          locators:
+            - { strategy: anchor, anchor_text: ["Branch"], relation: right_of, control: select }
+            - { strategy: css, selector: "select[name='br']" }
+        option: Hillcrest
+      click:
+        locators:
+          - { strategy: a11y, role: button, name: Continue }
+          - { strategy: text, text: Continue }
+    max_per_run: 3
+    fail: { category: RECOVERY_EXHAUSTED }

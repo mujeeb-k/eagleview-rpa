@@ -8,3 +8,4 @@ base_url: "http://127.0.0.1:8602"
 credentials:
   username: tlr2210
   password: secret://copperhill_teller_password
+app_version: "7.4"

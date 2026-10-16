@@ -9,14 +9,17 @@ from eagleview.artifacts.yaml_io import (
     dump_model,
     load_capability,
     load_model,
+    load_overlay,
 )
 from eagleview.schema.capability import Capability
 from eagleview.schema.hashing import with_content_hash
+from eagleview.schema.overlay import Overlay
 
 CAPABILITIES = Path("capabilities")
 DRAFTS = CAPABILITIES / "drafts"
 APP_PROFILES = Path("app_profiles")
 TENANTS = Path("tenants")
+OVERLAYS = Path("overlays")
 DEFAULT_POLICY = Path("policies/default-teller.yaml")
 
 
@@ -78,3 +81,10 @@ def write_draft(capability: Capability, root: Path = DRAFTS) -> Path:
             return path
         except FileExistsError:
             n += 1
+
+
+def tenant_overlays(slug: str, root: Path = OVERLAYS) -> list[Overlay]:
+    """Every overlay a tenant has, from `overlays/<slug>/`. Which ones apply is the resolver's
+    decision (profile, capability, version)."""
+    folder = root / slug
+    return [load_overlay(p) for p in sorted(folder.glob("*.yaml"))] if folder.is_dir() else []

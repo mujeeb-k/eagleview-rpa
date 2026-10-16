@@ -29,7 +29,7 @@ import asyncio
 import re
 import time
 from collections import Counter
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -259,6 +259,8 @@ async def replay(
     options: RunOptions | None = None,
     modified: bool = False,
     desk: InterventionDesk | None = None,
+    label_aliases: Mapping[str, Sequence[str]] | None = None,
+    effective_hash: str | None = None,
 ) -> RunResult:
     """Run `capability` once on `tenant` and return its RunResult. Never raises for anything
     that happens during the run; a misconfigured call (the wrong app profile) is a ValueError.
@@ -278,11 +280,11 @@ async def replay(
         writer,
         opts,
         modified,
-        content_hash(capability),
+        effective_hash or content_hash(capability),
         time.monotonic(),
     )
     writer.redactor.use_capability(capability)
-    writer.use_screen_labels(profile.sensitive_labels)
+    writer.use_screen_labels(profile.sensitive_labels, label_aliases)
     base.event(
         "run.start",
         capability=capability.ref,
@@ -553,6 +555,15 @@ class _Engine:
                     )
                 )
         major, minor, _ = parse_version(version)
+        declared = self.tenant.app_version
+        if declared is not None and parse_version(declared)[:2] != (major, minor):
+            raise _Done(
+                await self._fail(
+                    FailureCategory.APP_VERSION_UNSUPPORTED,
+                    f"{self.tenant.slug} declares {self.profile.id} {declared} but runs {version}; "
+                    "its version patches were chosen for the declared version",
+                )
+            )
         self.surface.app_fingerprint = f"{self.profile.id}@{major}.{minor}/{self.tenant.slug}"
         self._event("app.version", version=version, fingerprint=self.surface.app_fingerprint)
         await self._sign_on()
