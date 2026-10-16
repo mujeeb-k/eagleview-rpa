@@ -244,6 +244,12 @@ def test_run_result_status_matches_payload() -> None:
     _result(status="rejected", rejection={"code": "INPUT_INVALID", "errors": []})
     _result(status="failed", failure={"category": "APP_ERROR", "retryable": False})
     _result(status="needs_human")
+    # A parked run keeps the failure that parked it, and nothing else.
+    parked = _result(status="needs_human", failure={"category": "UNKNOWN_STATE"})
+    assert parked.failure is not None and parked.modified is None
+    with pytest.raises(ValidationError, match="cannot carry outcome data"):
+        _result(status="needs_human", outcome={"code": "X", "message": "x"})
+    assert _result(status="needs_human", modified=True).modified is True
     with pytest.raises(ValidationError, match="needs its success data"):
         _result(status="success")
     with pytest.raises(ValidationError, match="cannot carry failed data"):

@@ -1,0 +1,10 @@
+# Tenant B (fictional): Copperhill Community Credit Union on Ironbridge Teller 7.4. Its relabelled
+# screens and Select Branch interstitial need the tenant overlay that P8 adds.
+schema_version: "1.0"
+slug: copperhill
+name: Copperhill Community Credit Union
+app_profile: ironbridge-teller
+base_url: "http://127.0.0.1:8602"
+credentials:
+  username: tlr2210
+  password: secret://copperhill_teller_password

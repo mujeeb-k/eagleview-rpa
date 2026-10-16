@@ -1,5 +1,7 @@
-# FIXTURE for tests only, modelled on PLAN.md §3.1. P4 verifies the locators against the mock bank
-# before an app profile is committed under app_profiles/.
+# Ironbridge Teller 7: what is true of the product on every tenant, whatever the task. Authored by
+# hand, once per vendor product, and reviewed like any artifact. Every capability on every tenant
+# inherits these global states. tests/replay/test_app_profile.py resolves each locator here
+# against the live mock bank.
 schema_version: "1.0"
 id: ironbridge-teller
 title: Ironbridge Teller 7
@@ -14,7 +16,7 @@ login:
     - id: enter_username
       action: fill
       value: "{{ credentials.username }}"
-      target: { locators: [ { strategy: anchor, anchor_text: ["Operator ID", "User ID"], relation: right_of, control: textbox }, { strategy: css, selector: "input[name='u']" } ] }
+      target: { locators: [ { strategy: anchor, anchor_text: ["Operator ID", "User ID"], relation: right_of, control: textbox }, { strategy: css, selector: "input[name='f1']" } ] }
     - id: enter_password
       action: fill
       value: "{{ credentials.password }}"
@@ -24,11 +26,13 @@ login:
       target: { locators: [ { strategy: a11y, role: button, name: "Sign On" }, { strategy: text, text: "Sign On" } ] }
   success: { text_present: { frame: banner, text: "Teller" } }
 global_states:
+  # Checked in this order during every wait. Signing on again restarts the flow, and is allowed
+  # only before an irreversible step; after one, the engine reports OUTCOME_UNCERTAIN instead.
   - id: session_expired
     detect: { text_present: { text: "SESSION EXPIRED" } }
     recover: { type: relogin_and_restart }
     max_per_run: 1
-    fail: { category: OUTCOME_UNCERTAIN }
+    fail: { category: SESSION_LOST }
   - id: app_error
     detect: { text_present: { text: "SYSTEM ERROR" } }
     recover: { type: retry_step_if_idempotent }

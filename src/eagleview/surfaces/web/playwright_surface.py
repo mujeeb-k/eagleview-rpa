@@ -27,6 +27,7 @@ from playwright.async_api import Browser, BrowserContext, CDPSession, Page
 from playwright.async_api import Error as PlaywrightError
 
 from eagleview.safety.policy_engine import (
+    ApprovalToken,
     Decision,
     PolicyContext,
     PolicyEngine,
@@ -51,6 +52,7 @@ from eagleview.schema.surface import GroundedTarget
 from eagleview.surfaces.base import (
     ActionResult,
     ActStatus,
+    BlockedRequest,
     EventSink,
     HolderGuard,
     NotHolder,
@@ -157,6 +159,11 @@ class PlaywrightSurface:
         self.grounder = Grounder(page, cdp, self.resolver)
         # Discovery sets this so each act() records verified candidate locators for the recorder.
         self.record_candidates = False
+        self._navigations = 0
+        page.on("framenavigated", self._count_navigation)
+
+    def _count_navigation(self, _frame: object) -> None:
+        self._navigations += 1
 
     @classmethod
     async def open(
@@ -213,6 +220,16 @@ class PlaywrightSurface:
     def app_fingerprint(self, value: str | None) -> None:
         self.resolver.app_fingerprint = value
 
+    def grant_approval(self, token: ApprovalToken) -> None:
+        ctx = self.policy_ctx
+        self.policy_ctx = replace(ctx, approvals=ctx.approvals | {token})
+
+    def drain_blocked(self) -> list[BlockedRequest]:
+        return self.guard.drain()
+
+    def navigation_count(self) -> int:
+        return self._navigations
+
     def _emit(self, kind: str, actor: str, **fields: object) -> None:
         if self.sink is not None:
             self.sink.event(kind, actor, **fields)
@@ -249,6 +266,19 @@ class PlaywrightSurface:
             out += boxes
         return out
 
+    async def dom_snapshot(self) -> str:
+        parts: list[str] = []
+        for frame in self.page.frames:
+            path = "/".join(frame_path(frame)) or "top"
+            try:
+                markup = await frame.content()
+            except PlaywrightError as exc:
+                if not is_transient(exc):
+                    raise
+                markup = "(navigating)"
+            parts.append(f"<!-- frame: {path} -->\n{markup}")
+        return "\n".join(parts)
+
     # --- ground and resolve -------------------------------------------------------------------
 
     async def ground(self, x: int, y: int) -> GroundedTarget:
@@ -280,7 +310,10 @@ class PlaywrightSurface:
             point=list(result.point) if result.point else None,
             step_id=step_id,
             target=None if g is None else _loggable(g),
-            text_length=len(action.text) if action.text is not None else None,
+            # The harness types credentials; even a password's length stays off disk.
+            text_length=(
+                len(action.text) if action.text is not None and actor != "harness" else None
+            ),
         )
         return result
 
@@ -504,6 +537,12 @@ class PlaywrightSurface:
     # --- predicates ---------------------------------------------------------------------------
 
     async def check(self, pred: AnyPredicate, ctx: PredicateContext | None = None) -> bool:
+        return (await self.check_all([pred], ctx))[0]
+
+    async def check_all(
+        self, preds: Sequence[AnyPredicate], ctx: PredicateContext | None = None
+    ) -> list[bool]:
+        """One reading of the text on screen serves every predicate in the batch."""
         pctx = ctx or PredicateContext()
         boxes: list[TextBox] | None = None
 
@@ -548,12 +587,12 @@ class PlaywrightSurface:
                 case TitleMatches(title_matches=args):
                     return re.search(args.pattern, await self.page.title()) is not None
                 case OutputPresent(output_present=name):
-                    value = pctx.outputs.get(name)
-                    return value is not None and value != "" and value != []
+                    # Extracted and not null. An empty list is an answer ("no share accounts").
+                    return pctx.outputs.get(name) is not None
                 case _:
                     raise TypeError(f"not a leaf predicate: {type(p).__name__}")
 
-        return await evaluate(pred, leaf)
+        return [await evaluate(pred, leaf) for pred in preds]
 
     # --- extract ------------------------------------------------------------------------------
 

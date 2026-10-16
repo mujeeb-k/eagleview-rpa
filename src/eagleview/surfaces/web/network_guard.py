@@ -22,7 +22,7 @@ from playwright.async_api import APIResponse, BrowserContext, Route
 from playwright.async_api import Error as PlaywrightError
 
 from eagleview.safety.policy_engine import ApprovalToken, Decision, PolicyContext, PolicyEngine
-from eagleview.surfaces.base import EventSink
+from eagleview.surfaces.base import BlockedRequest, EventSink
 
 MAX_REDIRECTS = 10
 
@@ -33,16 +33,6 @@ class GuardState:
 
     actor: str
     ctx: PolicyContext
-
-
-@dataclass(frozen=True)
-class BlockedRequest:
-    method: str
-    url: str
-    actor: str
-    step_id: str | None
-    reason: str
-    detail: str
 
 
 @dataclass

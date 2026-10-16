@@ -144,7 +144,7 @@ steps:
         - { strategy: a11y, role: link, name: "Member Inquiry" }
         - { strategy: text, text: "Member Inquiry", exact: true }
         - { strategy: css, selector: "td.mnu a[href*='inq']" }
-        - { strategy: point, x: 84, y: 212, bound_to_fingerprint: "ironbridge-7.2/lantern-bay" }
+        - { strategy: point, x: 84, y: 212, bound_to_fingerprint: "ironbridge-teller@7.2/lantern-bay" }
     risk: read
     idempotent: true
     expect: { text_present: { frame: main, text: "Member Search" } }
@@ -442,24 +442,44 @@ This app must feel like a real 2004-era core system:
   strategy plus another, and grounding round-trips each one.)*
 
 ### P4: Replay engine (before discovery, so it's testable alone)
-- [ ] The engine from §4, recovery handlers, app profile loading, the login macro, and secret refs.
-- [ ] Hand-write a FIXTURE artifact at `tests/fixtures/` for testing only. The artifacts in
-      `capabilities/` must come from discovery.
-- [ ] Integration tests, one per path: success, MEMBER_NOT_FOUND outcome, INPUT_INVALID rejection,
+- [x] The engine from §4, recovery handlers, app profile loading, the login macro, and secret refs.
+- [x] Hand-write a FIXTURE artifact at `tests/fixtures/` for testing only. The artifacts in
+      `capabilities/` must come from discovery. *(Three fixtures: the lookup, a write flow through
+      Post, and a stale-expect drill. The app profile moved to `app_profiles/`, because it is
+      authored, not discovered; `tenants/` holds both tenant profiles.)*
+- [x] Integration tests, one per path: success, MEMBER_NOT_FOUND outcome, INPUT_INVALID rejection,
       system_notice recovered, session expiry recovered (pre-commit), slow load settled,
       error500-once retried, error500-always APP_ERROR, NOT_PERMITTED, unknown modal UNKNOWN_STATE.
-- [ ] `eagleview replay <cap> --input k=v [--tenant] [--escalate] [--approve-gates]`. Pretty console
+- [x] `eagleview replay <cap> --input k=v [--tenant] [--escalate] [--approve-gates]`. Pretty console
       output plus result JSON.
-- [ ] **Input normalization:** string inputs are trimmed of surrounding whitespace, then validated
+- [x] **Input normalization:** string inputs are trimmed of surrounding whitespace, then validated
       strictly against the schema. There is no other coercion: no case folding, no digit
       extraction, no zero padding. This is documented in the README and in `--help`. A test shows
       `" 10482 "` succeeds and `"10 482"` is rejected (`INPUT_INVALID`).
-- [ ] **Modified approved artifacts:** loading a `verified` or `approved` artifact whose content hash
+- [x] **Modified approved artifacts:** loading a `verified` or `approved` artifact whose content hash
       doesn't match fails with a clear message. The message names the file and says how to
       experiment: set `status: draft`, or pass `--allow-modified`. That flag runs the artifact as a
       draft, records `modified: true` in the result, and is refused for unattended runs.
-- [ ] **`--headed`:** a visible browser, slowed so a person can watch, for observation only. Waits stay
-      predicate-based, so headed and headless runs take the same path.
+- [x] **`--headed`:** a visible browser, slowed so a person can watch, for observation only. Waits stay
+      predicate-based, so headed and headless runs take the same path. *(The flag only sets
+      Playwright's `headless` and `slow_mo`; no test opens a visible window.)*
+- [x] **Approval review additions:**
+  - NOT_PERMITTED returns `status: outcome`, pinned by a test.
+  - The RunResult carries `recoveries` and a `locator_report` (strategy, rank and agreement per
+    step), and both are tested.
+  - A test-only write fixture through Post. With `--approve-gates`, session expiry armed to fire
+    right after the post gives `failed/OUTCOME_UNCERTAIN`, with no retry, and the bank shows
+    exactly one new account.
+  - A stale-state guard: each step's `expect` is evaluated before acting. If it already holds, the
+    step passes only after a frame navigation or a changed fingerprint. A fixture tests it.
+  - After any irreversible action is sent, every non-success result becomes OUTCOME_UNCERTAIN and
+    is never retried. Three variants are tested: session expiry, app error and unknown state.
+  - `--approve-gates` is refused with `--unattended`. Unattended runs block at an irreversible
+    step; later they will escalate to the P5 console.
+  - An overall run deadline (default 120 s, `--deadline`). Passing it fails cleanly at the step
+    reached, and as OUTCOME_UNCERTAIN after an irreversible step.
+- **Done when:** every path above has an integration test against the mock bank with no LLM.
+  *(Done: `tests/replay/`.)*
 
 ### P5: Control and operator console
 - [ ] SessionController with lease and epoch. A state-machine test rejects every invalid transition.
@@ -472,6 +492,10 @@ This app must feel like a real 2004-era core system:
 - [ ] A test drives the operator path with a scripted "human" client over the same HTTP API.
 
 ### P6: Discovery agent loop
+- [ ] **First, one real trace.** Before building the compiler (P7), record one raw discovery trace
+      against the mock bank with the real model, and review it by hand: what the model clicked,
+      what grounding produced, and where it wandered. The compiler is then shaped by a real trace
+      rather than an imagined one.
 - [ ] Before the loop, input extraction: Claude with structured output turns the goal into a typed
       input schema plus values (for example `member_id: "10482"`).
 - [ ] Tools: the computer toolset plus these custom tools:
@@ -620,7 +644,13 @@ This app must feel like a real 2004-era core system:
    session host, webhook routing, real-time co-browsing, auth for the console, and automated
    tenant adaptation (`eagleview adapt`: a bounded authoring-time LLM call per failing step proposes an
    overlay patch, then a replay verifies it). Next: that adapt command, a per-tenant telemetry
-   dashboard, re-discovery on drift, and an approval workflow UI.
+   dashboard, re-discovery on drift, and an approval workflow UI. Also next:
+   - a run-id breadcrumb written into a memo or nickname field, so a posted transaction can be
+     traced back to the run that made it;
+   - automatic read-only reconciliation after OUTCOME_UNCERTAIN, in which a lookup capability
+     checks whether the write landed before a human is asked;
+   - session pooling, for concurrent runs per tenant;
+   - a "start here" reading guide to the repository.
 
 ## 10. Release checklist
 - [ ] Fresh clone: `make demo-offline` passes with no API key.

@@ -226,17 +226,17 @@ async def test_frame_scope_is_exact(open_surface: Any, lantern: Bank) -> None:
 
 
 async def test_point_locator_only_on_its_own_fingerprint(open_surface: Any, lantern: Bank) -> None:
-    surface = await open_surface(lantern, app_fingerprint="ironbridge-7.2/lantern-bay")
+    surface = await open_surface(lantern, app_fingerprint="ironbridge-teller@7.2/lantern-bay")
     link = await resolved(surface, NAV_INQUIRY)
     p = await surface.resolver.point_for(link.element, scroll=False)
     here = {"strategy": "point", "x": p["x"], "y": p["y"]}
     bound = await surface.resolve(
-        spec(here | {"bound_to_fingerprint": "ironbridge-7.2/lantern-bay"})
+        spec(here | {"bound_to_fingerprint": "ironbridge-teller@7.2/lantern-bay"})
     )
     assert isinstance(bound, Unique)
     assert await surface.resolver.same(bound.element, link.element)
     other = await surface.resolve(
-        spec(here | {"bound_to_fingerprint": "ironbridge-7.4/copperhill"})
+        spec(here | {"bound_to_fingerprint": "ironbridge-teller@7.4/copperhill"})
     )
     assert isinstance(other, NotFound)
     assert other.attempts[0].outcome == "skipped"

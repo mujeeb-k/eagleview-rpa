@@ -20,6 +20,7 @@ from eagleview.surfaces.base import FixedHolder
 from eagleview.surfaces.web.playwright_surface import PlaywrightSurface
 from tests.fixtures import POLICY
 from tests.support.bank import Bank
+from tests.support.replay import policy_for
 from tests.support.teller import sign_on
 
 RUN_ID = "r_surface_test"
@@ -36,13 +37,6 @@ class Events:
 
     def of(self, kind: str) -> list[dict[str, Any]]:
         return [r for r in self.records if r["kind"] == kind]
-
-
-def policy_for(*banks: Bank, extra: dict[str, list[str]] | None = None) -> Policy:
-    """The committed default policy, with each tenant's origin moved to its test port."""
-    base = load_policy(POLICY)
-    origins = {b.tenant.slug: [b.url] for b in banks} | (extra or {})
-    return base.model_copy(update={"allowed_origins": origins})
 
 
 OpenSurface = Callable[..., Any]

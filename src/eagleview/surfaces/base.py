@@ -5,11 +5,12 @@ Every UI action, whether it comes from the LLM, from replay or from a human oper
 through `Surface.act()`. That method checks the lease holder and the policy first, and grounds
 the exact point it is about to act on immediately before acting."""
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
-from eagleview.safety.policy_engine import Decision
+from eagleview.safety.policy_engine import ApprovalToken, Decision, PolicyContext
 from eagleview.schema.action import Action, TextBox
 from eagleview.schema.capability import ScalarExtract, TableSpec
 from eagleview.schema.common import SurfaceKind
@@ -45,6 +46,28 @@ class FixedHolder:
             raise NotHolder(
                 f"{actor}@{epoch} does not hold the session ({self.actor}@{self.epoch} does)"
             )
+
+
+@dataclass
+class HandoffHolder:
+    """A lease that moves between actors, one at a time, and bumps the epoch on every move, so a
+    caller holding an old epoch is refused. Replay uses it to hand the session from the harness
+    (sign-on) to automation (the steps) and back. P5's SessionController replaces it with the full
+    lease, pause and takeover model."""
+
+    actor: str
+    epoch: int = 1
+
+    def assert_holder(self, actor: str, epoch: int) -> None:
+        if actor != self.actor or epoch != self.epoch:
+            raise NotHolder(
+                f"{actor}@{epoch} does not hold the session ({self.actor}@{self.epoch} does)"
+            )
+
+    def hand_to(self, actor: str) -> int:
+        self.actor = actor
+        self.epoch += 1
+        return self.epoch
 
 
 class EventSink(Protocol):
@@ -159,6 +182,18 @@ class ActionResult:
 
 
 @dataclass(frozen=True)
+class BlockedRequest:
+    """A request the network guard refused."""
+
+    method: str
+    url: str
+    actor: str
+    step_id: str | None
+    reason: str
+    detail: str
+
+
+@dataclass(frozen=True)
 class PredicateContext:
     """What a predicate may refer to beyond the screen: the current step's own target (for
     `field_value: {target: self}`) and the outputs extracted so far (for `output_present`)."""
@@ -169,6 +204,15 @@ class PredicateContext:
 
 class Surface(Protocol):
     kind: SurfaceKind
+
+    @property
+    def app_fingerprint(self) -> str | None:
+        """`<profile>@<major.minor>/<tenant>` once the running version is known. Point locators
+        are valid only while it equals the fingerprint they were recorded under."""
+        ...
+
+    @app_fingerprint.setter
+    def app_fingerprint(self, value: str | None) -> None: ...
 
     async def observe(self) -> Observation: ...
 
@@ -188,6 +232,34 @@ class Surface(Protocol):
 
     async def check(self, pred: AnyPredicate, ctx: PredicateContext | None = None) -> bool: ...
 
+    async def check_all(
+        self, preds: Sequence[AnyPredicate], ctx: PredicateContext | None = None
+    ) -> list[bool]:
+        """Several predicates against one reading of the screen."""
+        ...
+
     async def extract(self, spec: ScalarExtract | TableSpec) -> RawValue: ...
 
     async def text_boxes(self) -> list[TextBox]: ...
+
+    async def dom_snapshot(self) -> str:
+        """The current document(s) as markup, for failure evidence. Raw: only evidence.writer
+        may persist it, and it scrubs it first."""
+        ...
+
+    def navigation_count(self) -> int:
+        """How many documents have loaded, in any frame, since the surface opened. A reload of the
+        same page counts, which a state fingerprint alone cannot see."""
+        ...
+
+    def drain_blocked(self) -> list[BlockedRequest]:
+        """Requests the network guard blocked since the last drain."""
+        ...
+
+    def grant_approval(self, token: ApprovalToken) -> None:
+        """Let one irreversible request through for this (run, step). The guard spends it once."""
+        ...
+
+
+# Opens a surface for one run, with this holder and policy context, and closes it afterwards.
+SurfaceOpener = Callable[[HolderGuard, PolicyContext], AbstractAsyncContextManager[Surface]]

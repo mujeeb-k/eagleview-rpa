@@ -91,6 +91,7 @@ dependencies = [
     { name = "pillow" },
     { name = "playwright" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
     { name = "ruamel-yaml" },
     { name = "typer" },
     { name = "uvicorn" },
@@ -104,7 +105,6 @@ dev = [
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "python-dotenv" },
     { name = "ruff" },
 ]
 
@@ -117,6 +117,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "playwright", specifier = ">=1.64.0" },
     { name = "pydantic", specifier = ">=2.14.1" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "ruamel-yaml", specifier = ">=0.19.1" },
     { name = "typer", specifier = ">=0.27.3" },
     { name = "uvicorn", specifier = ">=0.54.0" },
@@ -130,7 +131,6 @@ dev = [
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
-    { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "ruff", specifier = ">=0.17.1" },
 ]
 

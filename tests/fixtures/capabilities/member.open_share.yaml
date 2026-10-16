@@ -1,0 +1,104 @@
+# FIXTURE for tests only: a write flow through Post, so replay's approval gate and its rules after an
+# irreversible step can be tested against the real mock bank. Draft, so it never runs unattended.
+schema_version: "1.0"
+id: member.open_share
+version: 0.1.0
+title: Open a new share account for a member
+description: >
+  Looks the member up, opens the Open Share form, chooses a share type, validates, and posts. Posting
+  is irreversible and needs an approval for that step of that run.
+status: draft
+app: { profile: ironbridge-teller, versions: ">=7.2,<8.0" }
+risk: irreversible
+requires_session: true
+
+inputs:
+  member_id: { type: string, pattern: "^[0-9]{4,8}$", sensitivity: identifier, example: "10482" }
+  share_type: { type: string, min_length: 1, max_length: 40, description: The share type label the tenant shows., example: Money Market }
+
+outputs:
+  transaction_number: { type: string, pattern: "^[0-9]+$", sensitivity: none }
+
+outcomes:
+  - code: MEMBER_NOT_FOUND
+    detect: { text_matches: { frame: main, pattern: "(?i)no member(s)? found" } }
+    message: No member exists with that number.
+
+steps:
+  - id: open_member_inquiry
+    action: { type: click }
+    target:
+      frame: ["nav"]
+      locators:
+        - { strategy: a11y, role: link, name: "Member Inquiry" }
+        - { strategy: text, text: "Member Inquiry", exact: true }
+    expect: { text_present: { frame: main, text: "Member Search" } }
+
+  - id: enter_member_id
+    action: { type: fill, value: "{{ inputs.member_id }}" }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: anchor, anchor_text: ["Member #"], relation: right_of, control: textbox }
+        - { strategy: css, selector: "input[name='txtA']" }
+    expect: { field_value: { target: self, equals: "{{ inputs.member_id }}" } }
+
+  - id: submit_search
+    action: { type: click }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: anchor, anchor_text: ["Member #"], relation: right_of, control: image }
+        - { strategy: css, selector: "img[src*='go']" }
+    expect: { text_present: { frame: main, text: "Member Detail" } }
+
+  - id: open_share_form
+    action: { type: click }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: a11y, role: button, name: "Open Share" }
+        - { strategy: text, text: "Open Share" }
+    expect: { text_present: { frame: main, text: "Open Share Account" } }
+
+  - id: choose_share_type
+    action: { type: select, option: "{{ inputs.share_type }}" }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: anchor, anchor_text: ["Share Type"], relation: right_of, control: select }
+        - { strategy: css, selector: "select[name='f3']" }
+    expect: { field_value: { target: self, equals: "{{ inputs.share_type }}" } }
+
+  - id: validate_share
+    action: { type: click }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: a11y, role: button, name: "Validate" }
+        - { strategy: text, text: "Validate" }
+    risk: write_staged
+    expect: { text_present: { frame: main, text: "Review - Open Share" } }
+
+  - id: post_share
+    intent: Post the new share. Irreversible.
+    action: { type: click }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: a11y, role: button, name: "Post" }
+        - { strategy: text, text: "Post" }
+    risk: irreversible
+    idempotent: false
+    requires_approval: true
+    expect: { text_present: { frame: main, text: "Share Account Opened" } }
+
+  - id: read_confirmation
+    action: { type: extract }
+    extract:
+      transaction_number: { target: { frame: ["main"], locators: [ { strategy: anchor, anchor_text: ["Transaction #:"], relation: right_of, control: text } ] } }
+
+success:
+  all:
+    - { text_present: { frame: main, text: "Share Account Opened" } }
+    - { output_present: transaction_number }

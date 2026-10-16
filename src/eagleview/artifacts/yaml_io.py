@@ -99,7 +99,9 @@ def load_capability(path: Path) -> Capability:
         if recorded != actual:
             raise ArtifactHashMismatch(
                 f"{path}: content changed after it was {capability.status} "
-                f"(recorded {recorded}, actual {actual})"
+                f"(recorded {recorded}, actual {actual}). To experiment with an edited copy, "
+                "set `status: draft` in the file, or replay it with --allow-modified, which runs "
+                "it as a draft, records `modified: true`, and is refused for unattended runs."
             )
         return capability
     return with_content_hash(capability)

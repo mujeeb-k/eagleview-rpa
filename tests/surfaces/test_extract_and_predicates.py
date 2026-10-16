@@ -151,9 +151,14 @@ async def test_leaf_predicates(open_surface: Any, lantern: Bank) -> None:
         {"output_present": "share_accounts"},
         PredicateContext(outputs={"share_accounts": [{"x": 1}]}),
     )
-    assert not await holds(
+    # An empty list is an answer, so it is present; a missing or null output is not.
+    assert await holds(
         {"output_present": "share_accounts"}, PredicateContext(outputs={"share_accounts": []})
     )
+    assert not await holds(
+        {"output_present": "share_accounts"}, PredicateContext(outputs={"share_accounts": None})
+    )
+    assert not await holds({"output_present": "share_accounts"})
     combined = {
         "all": [
             not_found,

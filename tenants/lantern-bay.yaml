@@ -1,0 +1,11 @@
+# Tenant A (fictional): Lantern Bay Federal Credit Union on Ironbridge Teller 7.2. The password is
+# a reference only; its value comes from LANTERN_BAY_TELLER_PASSWORD at runtime (`make bank` writes
+# it to the gitignored .env).
+schema_version: "1.0"
+slug: lantern-bay
+name: Lantern Bay Federal Credit Union
+app_profile: ironbridge-teller
+base_url: "http://127.0.0.1:8601"
+credentials:
+  username: teller01
+  password: secret://lantern_bay_teller_password

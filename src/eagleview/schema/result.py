@@ -1,7 +1,8 @@
 """The run result: the replay contract a caller (human, script or agent) receives.
 
 `rejected` is the caller's fault, found before any UI action. `outcome` is a legitimate business
-answer. `failed` is a hard failure with debug detail. `needs_human` is a parked escalation."""
+answer. `failed` is a hard failure with debug detail. `needs_human` is a parked escalation; it
+carries the failure that caused it, so the caller knows why the run stopped."""
 
 from enum import StrEnum
 from typing import Annotated, Literal, Self
@@ -50,6 +51,7 @@ class Rejection(BaseModel):
     model_config = _STRICT
     code: RejectionCode
     errors: list[FieldError] = Field(default_factory=list[FieldError])
+    message: str | None = None
 
 
 class OutcomeResult(BaseModel):
@@ -121,6 +123,8 @@ class RunResult(BaseModel):
     interventions: list[InterventionRecord] = Field(default_factory=list[InterventionRecord])
     locator_report: list[LocatorReport] = Field(default_factory=list[LocatorReport])
     timing_ms: dict[str, int] = Field(default_factory=dict[str, int])
+    # A verified or approved artifact run as a draft with --allow-modified after it was edited.
+    modified: bool | None = None
 
     @model_validator(mode="after")
     def _status_matches_payload(self) -> Self:
@@ -138,6 +142,8 @@ class RunResult(BaseModel):
             "needs_human": None,
         }[self.status]
         for status, is_present in present.items():
+            if status == "failed" and self.status == "needs_human":
+                continue  # a parked run keeps the failure that parked it
             if is_present and status != expected:
                 raise ValueError(f"a {self.status!r} result cannot carry {status} data")
         if expected is not None and not present[expected]:

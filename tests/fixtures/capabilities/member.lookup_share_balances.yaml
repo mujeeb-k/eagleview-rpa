@@ -50,7 +50,7 @@ steps:
         - { strategy: a11y, role: link, name: "Member Inquiry" }
         - { strategy: text, text: "Member Inquiry", exact: true }
         - { strategy: css, selector: "td.mnu a[href*='inq']" }
-        - { strategy: point, x: 84, y: 212, bound_to_fingerprint: "ironbridge-7.2/lantern-bay" }
+        - { strategy: point, x: 84, y: 212, bound_to_fingerprint: "ironbridge-teller@7.2/lantern-bay" }
     risk: read
     idempotent: true
     expect: { text_present: { frame: main, text: "Member Search" } }
@@ -101,4 +101,4 @@ provenance:
   discovered_by: { run_id: "r_fixture_discovery", model: claude-sonnet-5-5, at: "2026-10-15T12:00:00Z" }
   verified_by: [ { run_id: "r_fixture_verify", at: "2026-10-15T12:05:00Z" } ]
   approved_by: null
-  content_hash: sha256:b77ded0fcf2f37e3816b4590412aeeecc683fb0ef90b9100e939acde3fe873d0
+  content_hash: sha256:b19625b0c603893652cf637a79ac575989576fa808de3d3d7bcd1678d608a6cb

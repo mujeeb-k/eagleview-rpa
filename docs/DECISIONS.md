@@ -400,3 +400,97 @@ balance was negative, so nothing else changed. Empty share and activity tables s
 message row ("No share accounts.", "No recent activity."), which table extraction already skips.
 A loans-only member therefore reads as `share_accounts: []`. P4 must decide whether an empty list
 satisfies the success predicate `output_present: share_accounts`. As written, it does not.
+
+## 2026-10-15 — P4 replay engine
+
+**Replay works against the Surface protocol and never imports Playwright.** The engine receives a
+`SurfaceOpener`. `surfaces/web/launch.py` opens the browser and `eagleview.runner` wires up the
+policy, the redactor and the writer, so the CLI and the tests build a run the same way. This lets
+the engine rules run in unit tests on a scripted fake surface in about 2 seconds.
+
+**Every wait uses the same priority order, first match wins.** The order is:
+1. the app profile's hard states, in profile order;
+2. the capability's declared outcomes;
+3. interstitials a handler can clear;
+4. the step's `expect`.
+
+This order applies while waiting for a target and during sign-on, not only after an action. So a
+modal or a maintenance page is reported as itself, never as LOCATOR_NOT_FOUND. A target that is
+already uncovered and unique is used at once. That is what lets a retried click on the nav link go
+ahead while the error page is still showing in another frame.
+
+**The 150 ms poll is the only sleep, and a test enforces it.** `settle.pause()` is the one sleep in
+`eagleview.replay`. An AST test fails on any other `sleep` or `wait_for_timeout` in the package.
+There is no settle delay after an action: the loop moves on the moment a predicate holds.
+
+**A true-before `expect` needs a visible change.** Each step's `expect` is checked before it acts.
+If it already holds, the step passes only once a document has loaded in some frame (a navigation
+counter, because reloading the same page leaves the fingerprint unchanged) or the state
+fingerprint moved. Fill and select are exempt: they change no document or fingerprint, and their
+own result proves the value was set. Without the guard, the stale-expect drill's no-op click passes;
+I checked that the test then fails.
+
+**A commit is a sent irreversible action, and it changes every result after it.** An irreversible
+step counts as committed when `act()` returns `done` or `error`, because a browser error can arrive
+after the click was dispatched. From then on, every non-success result becomes OUTCOME_UNCERTAIN.
+That covers timeouts, app errors, unknown screens, session expiry, invalid output, business outcomes
+and the run deadline. These results are never retryable, and sign-on never runs again. Running out of
+sign-ons before any commit is SESSION_LOST; the app profile now says so instead of
+OUTCOME_UNCERTAIN.
+
+**Retry means running the same step again.** `retry_step_if_idempotent` resolves and acts again.
+If the error page replaced the step's target, waiting for that target finds the error page still
+showing with its budget spent, and the run fails APP_ERROR. The fault test arms `error500_on=/inq`,
+the GET that the first step's click opens. A missing budget (`max_per_run`) means one use.
+
+**An empty list is an answer.** `output_present` now means extracted and not null. A loans-only
+member returns `share_accounts: []` with status success; a missing table still fails extraction.
+
+**Unattended is an explicit flag.** `RunOptions.unattended` (`--unattended`) needs an `approved`
+capability. It never approves its own irreversible steps, so combining it with `--approve-gates`
+is refused, and such a run fails POLICY_BLOCKED at the gate. It also refuses `--allow-modified`.
+Attended runs may use drafts, because P7's verify step replays them. `Rejection` gained an optional
+`message` that says why.
+
+**`--approve-gates` grants one token per gated step, just before that step.** The token is bound to
+(run_id, step_id), and the network guard spends it on the first irreversible request. Each grant is
+recorded as an `approval` intervention. Without the flag, the gated step fails POLICY_BLOCKED before
+it acts.
+
+**`needs_human` carries the failure that parked it.** In P4, `--escalate` turns a hard failure into
+`needs_human` with the failure attached and a `takeover` intervention marked as parked. P5 makes the
+escalation block on a human.
+
+**The run deadline wraps the whole run.** `asyncio.timeout(deadline_s)` covers the version check,
+sign-on and every step; the default is 120 s. Passing it gives STATE_TIMEOUT, with a message naming
+the deadline and the step reached, and OUTCOME_UNCERTAIN after a commit. Evidence is still captured
+after the cancellation.
+
+**Screenshots are written at the end of the run.** They stay in memory until every extracted value
+is registered with the redactor, so the screenshot taken after the search is painted over the
+member's name. **Known limit:** sensitive text on screen that the run never reads or types, such as
+the address on Member Detail, is caught only by the pattern layer. A per-screen redaction list in the
+app profile would close this; I've left it for later.
+
+**The app fingerprint is `<profile>@<major.minor>/<tenant>`.** For example,
+`ironbridge-teller@7.2/lantern-bay`. It is read from the sign-on page footer before signing on. The
+lookup fixture's point locator and the P3 test now use this form.
+
+**Committed configuration.** `app_profiles/ironbridge-teller.yaml` moved out of the test fixtures,
+because app profiles are authored, not discovered. Its username selector is fixed (`f1`), and a
+test resolves every login and dismiss locator, one at a time, on both tenants. `tenants/` holds
+both tenant profiles. `python-dotenv` is now a runtime dependency: the CLI reads `.env`, where
+`make bank` writes the passwords, and variables set in the shell win.
+
+**The sign-on hands off through a `HandoffHolder`.** The harness holds the session during sign-on
+and automation holds it for the steps. Each hand-off bumps the epoch, so a stale caller is refused.
+P5's SessionController replaces it. Harness fills no longer log `text_length`, so not even a
+password's length reaches disk.
+
+**CLI contract.** The result JSON goes to stdout, unredacted, because the caller asked for those
+values. A summary goes to stderr. Everything on disk goes through the writer. The exit codes are 0
+success, 3 outcome, 4 rejected, 5 failed and 6 needs_human; 2 is left to usage errors.
+
+**Until P8, Copperhill stops at Select Branch.** Its handler lives in the tenant overlay, and
+choosing a branch by position needs the overlay's surface support. A test pins the current
+behaviour: UNKNOWN_STATE at sign-on, observed on `/branch`.

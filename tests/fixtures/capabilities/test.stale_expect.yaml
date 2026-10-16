@@ -1,0 +1,47 @@
+# FIXTURE for tests only: steps whose expect is already true before they act. Replay must not
+# accept such a step until the screen has changed, or a click that did nothing would pass.
+schema_version: "1.0"
+id: test.stale_expect
+version: 0.1.0
+title: Stale expect drill
+description: Opens Member Inquiry, then clicks again while its expected text is already showing.
+status: draft
+app: { profile: ironbridge-teller, versions: ">=7.2,<8.0" }
+risk: read_only
+
+inputs:
+  noop_click: { type: boolean, required: false }
+
+steps:
+  - id: open_member_inquiry
+    action: { type: click }
+    target:
+      frame: ["nav"]
+      locators:
+        - { strategy: a11y, role: link, name: "Member Inquiry" }
+        - { strategy: text, text: "Member Inquiry", exact: true }
+    expect: { text_present: { frame: main, text: "Member Search" } }
+
+  # "Member Search" already shows; the click reloads the frame, and that change is what passes it.
+  - id: reopen_member_inquiry
+    when: "not inputs.noop_click"
+    action: { type: click }
+    target:
+      frame: ["nav"]
+      locators:
+        - { strategy: a11y, role: link, name: "Member Inquiry" }
+        - { strategy: text, text: "Member Inquiry", exact: true }
+    expect: { text_present: { frame: main, text: "Member Search" } }
+
+  # A click on a plain caption changes nothing, so the true-before expect must not pass it.
+  - id: click_caption
+    when: "inputs.noop_click"
+    action: { type: click }
+    target:
+      frame: ["main"]
+      locators:
+        - { strategy: text, text: "Search Criteria", exact: true }
+    expect: { text_present: { frame: main, text: "Member Search" } }
+    timeout_ms: 1500
+
+success: { text_present: { frame: main, text: "Member Search" } }

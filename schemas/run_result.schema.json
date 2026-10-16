@@ -319,6 +319,18 @@
           },
           "title": "Errors",
           "type": "array"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message"
         }
       },
       "required": [
@@ -382,6 +394,18 @@
       },
       "title": "Locator Report",
       "type": "array"
+    },
+    "modified": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Modified"
     },
     "outcome": {
       "anyOf": [
