@@ -4,10 +4,10 @@
   "shows": "business outcome is not a failure",
   "command": "scripts/evidence/05_replay_member_not_found.sh",
   "run": {
-    "run_id": "r_20261016T063902_1ce4ce",
+    "run_id": "r_20261016T124524_7b0a10",
     "status": "outcome",
     "outcome": "MEMBER_NOT_FOUND"
   },
   "status": "pass",
-  "seconds": 1.2
+  "seconds": 1.3
 }

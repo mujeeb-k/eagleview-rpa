@@ -3,7 +3,30 @@
   "name": "agent_catalog",
   "shows": "agent-facing interface",
   "command": "scripts/evidence/14_agent_catalog.sh",
-  "pending": "no approved capability yet",
-  "status": "pending",
-  "seconds": 0.0
+  "asked": [
+    {
+      "question": 1,
+      "agent_run": "r_agent_20261016T125013_dac305",
+      "tool_calls": [
+        {
+          "tool": "member_lookup_share_balances",
+          "status": "success",
+          "run_id": "r_20261016T125015_71d7a6"
+        }
+      ]
+    },
+    {
+      "question": 2,
+      "agent_run": "r_agent_20261016T125017_6ffa7c",
+      "tool_calls": [
+        {
+          "tool": "member_lookup_share_balances",
+          "status": "outcome",
+          "run_id": "r_20261016T125018_caf7b5"
+        }
+      ]
+    }
+  ],
+  "status": "pass",
+  "seconds": 11.1
 }

@@ -4,12 +4,12 @@
   "shows": "recoverable condition",
   "command": "scripts/evidence/07_replay_system_notice.sh",
   "run": {
-    "run_id": "r_20261016T063904_b2f2b6",
+    "run_id": "r_20261016T124525_981bab",
     "status": "success",
     "recoveries": [
       "system_notice.dismiss"
     ]
   },
   "status": "pass",
-  "seconds": 1.7
+  "seconds": 1.8
 }

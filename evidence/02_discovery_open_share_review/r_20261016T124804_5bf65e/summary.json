@@ -1,0 +1,52 @@
+{
+  "run_id": "r_20261016T124804_5bf65e",
+  "capability": "share.stage_open_share_money_market@1.0.0",
+  "effective_hash": "sha256:780e3731f8ed55ee57feeb23d6eed7bf494802c3db446732ff6ad7fc04dcba40",
+  "tenant": "lantern-bay",
+  "status": "success",
+  "outputs": {},
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_lookup",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "click_open_share",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "select_share_type",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 476,
+    "open_member_inquiry": 325,
+    "enter_member_id": 234,
+    "submit_member_lookup": 359,
+    "click_open_share": 376,
+    "select_share_type": 265,
+    "validate_open_share_form": 283,
+    "total": 2429
+  }
+}

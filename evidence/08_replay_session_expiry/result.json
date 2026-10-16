@@ -4,12 +4,12 @@
   "shows": "recovery plus the idempotency rule",
   "command": "scripts/evidence/08_replay_session_expiry.sh",
   "run": {
-    "run_id": "r_20261016T063906_d54828",
+    "run_id": "r_20261016T124527_e03ea7",
     "status": "success",
     "recoveries": [
       "session_expired.relogin_and_restart"
     ]
   },
   "status": "pass",
-  "seconds": 2.0
+  "seconds": 2.1
 }

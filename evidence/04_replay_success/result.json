@@ -4,9 +4,9 @@
   "shows": "deterministic replay, typed outputs",
   "command": "scripts/evidence/04_replay_success.sh",
   "run": {
-    "run_id": "r_20261016T063901_3f9c4c",
+    "run_id": "r_20261016T124522_ba978d",
     "status": "success"
   },
   "status": "pass",
-  "seconds": 1.5
+  "seconds": 1.9
 }

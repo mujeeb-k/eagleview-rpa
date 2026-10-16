@@ -1,0 +1,40 @@
+{
+  "run_id": "r_20261016T124819_6811da",
+  "capability": "share.stage_open_share_money_market@1.0.0",
+  "effective_hash": "sha256:46b7838c95feb0ff80c3dda1f28bb6b62fd172935837a3c12d2345c88c13bd04",
+  "tenant": "lantern-bay",
+  "status": "outcome",
+  "outcome": {
+    "code": "MEMBER_NOT_FOUND",
+    "message": "The teller system reported that no member exists for the member number that was searched (IBT-1004), so the lookup returned no result.",
+    "at_step": "submit_member_lookup"
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_lookup",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 443,
+    "open_member_inquiry": 278,
+    "enter_member_id": 231,
+    "total": 1179
+  }
+}

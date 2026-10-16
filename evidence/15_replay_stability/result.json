@@ -6,9 +6,9 @@
   "runs": 20,
   "successes": 20,
   "distinct_outputs": 1,
-  "ms_min": 1297,
-  "ms_max": 1528,
-  "ms_mean": 1360,
+  "ms_min": 1331,
+  "ms_max": 1493,
+  "ms_mean": 1385,
   "status": "pass",
-  "seconds": 28.9
+  "seconds": 29.4
 }

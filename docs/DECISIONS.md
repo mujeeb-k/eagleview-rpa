@@ -1219,3 +1219,17 @@ fields, and an emulated key would skip the page's handlers.
 **Known limit: a page's own Enter handler.** Layer 1 judges what the HTML rule would submit. A
 page whose Enter handler cancels the submission can be refused for an action that would not have
 posted, which fails safe. A handler that submits somewhere else is caught only by layer 2.
+
+## 2026-10-16 — Evidence with the approved lookup
+
+**Scenario 14 ran for real.** The user approved `member.lookup_share_balances` themselves; the
+approved file is committed as written by `eagleview approve`. `make evidence` passed all 16
+scenarios: the agent answered one question with a successful lookup and the other with
+MEMBER_NOT_FOUND. Six real runs, about $0.25.
+
+**The agent demo checks the bank before it spends.** Its one run failed with APP_UNAVAILABLE
+because the mock bank wasn't running (`make bank`); the agent reported that honestly. Rerunning
+would have broken the session's run budget, so it was not rerun; the demo video's agent
+segment exercises the same path with a bank up. The script now refuses, before any model call,
+when the teller app isn't answering. The alternative, starting a bank inside the demo, would
+hide which bank (and which `.env` password) a person's question really ran against.

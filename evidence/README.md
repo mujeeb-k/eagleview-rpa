@@ -25,7 +25,7 @@ All institutions, people and data are fictional and synthetic. Runs use the trai
 | 12a | [injection_drill_model](12a_injection_drill_model/) | `scripts/evidence/12a_injection_drill_model.sh` | pass | the model and the injected note |
 | 12b | [injection_drill_guard](12b_injection_drill_guard/) | `scripts/evidence/12b_injection_drill_guard.sh` | pass | allowlist enforcement, both layers |
 | 13 | [tenant_reuse](13_tenant_reuse/) | `scripts/evidence/13_tenant_reuse.sh` | pass | cross-tenant reuse; data never crosses tenants |
-| 14 | [agent_catalog](14_agent_catalog/) | `scripts/evidence/14_agent_catalog.sh` | pending | agent-facing interface |
+| 14 | [agent_catalog](14_agent_catalog/) | `scripts/evidence/14_agent_catalog.sh` | pass | agent-facing interface |
 | 15 | [replay_stability](15_replay_stability/) | `scripts/evidence/15_replay_stability.sh` | pass | determinism over 20 runs |
 
 ## Held-out discovery check

@@ -4,7 +4,7 @@
   "shows": "hard failure evidence",
   "command": "scripts/evidence/09_replay_app_error.sh",
   "run": {
-    "run_id": "r_20261016T063908_46b29f",
+    "run_id": "r_20261016T124529_0ed427",
     "status": "failed",
     "category": "APP_ERROR",
     "step_id": "open_member_inquiry",

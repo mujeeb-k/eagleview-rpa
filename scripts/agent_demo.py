@@ -10,6 +10,8 @@ import asyncio
 import sys
 from pathlib import Path
 
+import httpx2
+
 from eagleview.artifacts.loader import app_profile_path, tenant_overlays, tenant_path
 from eagleview.artifacts.yaml_io import load_app_profile, load_policy, load_tenant
 from eagleview.catalog.agent import ask, describe
@@ -21,6 +23,14 @@ from eagleview.runner import environment
 from eagleview.safety.redaction import Redactor
 
 
+def reachable(url: str) -> bool:
+    try:
+        httpx2.get(url, timeout=3, follow_redirects=False)
+    except httpx2.HTTPError:
+        return False
+    return True
+
+
 async def main(question: str, tenant_slug: str = "lantern-bay") -> int:
     entries = approved()
     if not entries:
@@ -30,6 +40,13 @@ async def main(question: str, tenant_slug: str = "lantern-bay") -> int:
         return 2
     env = environment()
     tenant = load_tenant(tenant_path(tenant_slug))
+    if not reachable(tenant.base_url):
+        # Checked before any model call, so a missing bank never spends a run.
+        print(
+            f"The teller app at {tenant.base_url} isn't answering: start it with `make bank`.",
+            file=sys.stderr,
+        )
+        return 2
     catalog = Catalog(
         entries,
         profile=load_app_profile(app_profile_path(tenant.app_profile)),

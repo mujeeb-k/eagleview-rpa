@@ -1,0 +1,34 @@
+{
+  "run_id": "r_20261016T124838_b9e91d",
+  "goal": "For member [member], open a Money Market share account and post it.",
+  "status": "success",
+  "stop_reason": "declared_success",
+  "model": "claude-sonnet-5-5",
+  "served_models": [
+    "claude-sonnet-5-5"
+  ],
+  "effort": "medium",
+  "fallbacks": true,
+  "inputs": {
+    "member_id": {
+      "type": "string",
+      "required": true,
+      "sensitivity": "identifier",
+      "description": "Member number for whom the account is opened"
+    },
+    "share_account_type": {
+      "type": "string",
+      "required": true,
+      "sensitivity": "none",
+      "description": "Type of share account to open"
+    }
+  },
+  "outputs": [],
+  "success_marked": true,
+  "turns": 7,
+  "actions": 9,
+  "tool_calls": 21,
+  "policy_blocks": 0,
+  "usd": "0.061090",
+  "seconds": 33.5
+}

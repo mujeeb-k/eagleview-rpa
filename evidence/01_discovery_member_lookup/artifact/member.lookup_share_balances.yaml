@@ -1,10 +1,10 @@
 schema_version: '1.0'
 id: member.lookup_share_balances
 version: 1.0.0
-title: Look up a member by number and read their share account balances.
+title: Look up a member's share accounts and read their balances.
 description: Opens Member Inquiry in the teller application, searches for a member by member number,
-  and extracts the member's share accounts. Returns each share account's suffix, description, 
-  nickname, balance, and available balance. It is read-only and does not change any member data.
+  and reads the share account table. Returns each share account's suffix, description, nickname, 
+  balance, and available balance. This is read-only and does not change any member data.
 status: verified
 app:
   profile: ironbridge-teller
@@ -17,14 +17,15 @@ inputs:
     pattern: ^[0-9]{4,10}$
     required: true
     sensitivity: identifier
-    description: The member number identifying the member to look up, consisting of digits only.
+    description: Member number identifying the member whose share accounts are to be read.
     example: '10482'
 outputs:
   share_accounts:
     type: array
     sensitivity: pii
     required: true
-    description: List of the member's share accounts with their balances.
+    description: List of the member's share accounts with their balances as shown on the Member 
+      Inquiry screen.
     items:
       description:
         type: string
@@ -43,10 +44,11 @@ outcomes:
     kind: business
     detect:
       text_matches:
-        frame: []
+        frame:
+          - main
         pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
-    message: No member exists for the member number that was searched, so the lookup returned no 
-      result.
+    message: The teller system reported that no member exists for the member number that was 
+      searched (IBT-1004), so the lookup returned no result.
     source: probed_verified
 steps:
   - id: open_member_inquiry
@@ -114,7 +116,7 @@ steps:
               fragile: false
     timeout_ms: 8000
   - id: enter_member_id
-    intent: 'Enter the member number into the Member # field.'
+    intent: 'Fill the Member # field with the member number to look up.'
     action:
       type: fill
       value: '{{ inputs.member_id }}'
@@ -183,7 +185,7 @@ steps:
         text: Member Detail
     timeout_ms: 8000
   - id: extract_share_accounts
-    intent: Read the share account rows shown for the member.
+    intent: Read the share accounts table from the results screen.
     action:
       type: extract
     extract:
@@ -215,12 +217,12 @@ success:
     - output_present: share_accounts
 provenance:
   discovered_by:
-    run_id: r_20261016T065530_773c3e
+    run_id: r_20261016T124636_906ce9
     model: claude-sonnet-5-5
-    at: '2026-10-16T06:55:47.163148Z'
+    at: '2026-10-16T12:46:52.685034Z'
   verified_by:
-    - run_id: r_20261016T065555_e6cbf8
-      at: '2026-10-16T06:56:34.099394Z'
-    - run_id: r_20261016T065632_144d6a
-      at: '2026-10-16T06:56:34.099394Z'
-  content_hash: sha256:cdbb743a374ae2aeea4a8ca21f1f18f8067106f8c0f3621904fbcdff14f86089
+    - run_id: r_20261016T124700_65ac43
+      at: '2026-10-16T12:47:31.239360Z'
+    - run_id: r_20261016T124729_1d9b18
+      at: '2026-10-16T12:47:31.239360Z'
+  content_hash: sha256:f11e2971558a3e80300a08703a18ff84b855aaacdc9195cdeea097676ab8541d
