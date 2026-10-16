@@ -2,7 +2,7 @@
 
 Every real API response is priced from its usage and appended to a ledger the moment it arrives,
 so a crash still records the spend. Before every real request the ledger is checked against the
-limits: at most $25 in total and at most 30 runs, where a run counts once it has made its first
+limits: at most $25 in total and at most 33 runs, where a run counts once it has made its first
 real call. Tests inject a meter that never touches the real ledger."""
 
 import json
@@ -36,7 +36,7 @@ PRICES: dict[str, Price] = {
 @dataclass(frozen=True)
 class Limits:
     max_usd: Decimal = Decimal("25")
-    max_runs: int = 30
+    max_runs: int = 33  # 30, raised by the user's authorisation (docs/DECISIONS.md)
 
 
 class BudgetExceeded(Exception):

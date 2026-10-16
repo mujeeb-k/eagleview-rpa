@@ -180,6 +180,7 @@ async def discover(
     desk: InterventionDesk | None = None,
     http_client: httpx2.AsyncClient | None = None,
     run_id: str | None = None,
+    record_video_dir: Path | None = None,
 ) -> DiscoveryResult:
     writer = EvidenceWriter(runs_root, run_id or new_run_id(), Redactor.from_policy(policy))
     rid = writer.run_id
@@ -205,7 +206,12 @@ async def discover(
         writer.event(
             "discovery.inputs", "system", declared={k: v.type for k, v in goal.specs.items()}
         )
-        opener = surface_opener(browser, PolicyEngine(policy), sink=writer)
+        opener = surface_opener(
+            browser,
+            PolicyEngine(policy),
+            sink=writer,
+            record_video_dir=record_video_dir,  # the demo video only; never set by default
+        )
         async with open_session(
             profile=profile,
             tenant=tenant,

@@ -84,6 +84,7 @@ async def discover_and_compile(
     drafts_root: Path = DRAFTS,
     desk: InterventionDesk | None = None,
     http_client: httpx2.AsyncClient | None = None,
+    record_video_dir: Path | None = None,
 ) -> PipelineResult:
     found = await discover(
         config,
@@ -96,6 +97,7 @@ async def discover_and_compile(
         runs_root=runs_root,
         desk=desk,
         http_client=http_client,
+        record_video_dir=record_video_dir,  # the demo video only; never set by default
     )
     result = PipelineResult(found, "failed", usd=found.usd)
     if found.status != "success":

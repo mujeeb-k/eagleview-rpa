@@ -1,7 +1,7 @@
 # Morning summary
 
-Plain-language status after the overnight run, as you asked: what is done, every judgment call
-for you to review, what is left for you, and the exact commands in order.
+Plain-language status, kept current: what is done, every judgment call for you to review, what
+is left for you, and the exact commands in order. Last updated after the demo video.
 
 ## What is done
 
@@ -29,28 +29,36 @@ bottom).
   small reviewed overlay: two label renames, its Select Branch screen, and its Search button.
   Lantern Bay's member at Copperhill returns "not found", never a plausible answer.
 - **P9, the agent catalog.** An MCP server and an agent demo expose **approved** capabilities as
-  tools. They are built and tested offline; none are approved yet.
+  tools. You approved the lookup; the agent now answers through it.
 - **P10 and P11, evidence and docs.**
-  - 16 evidence scenarios plus a held-out check, each checking its own result: 15 pass, and 14
-    waits for your approval.
+  - 16 evidence scenarios plus a held-out check, each checking its own result: all 16 pass,
+    scenario 14 (the agent catalog) included.
   - `make evidence`, `make demo-offline` (no API key, no person; runs in CI on every push) and
     `make demo-handoff`.
   - A PII scan test over `evidence/`, plus README and REPORT drafts.
+- **Since then.** Enter in a text field is checked as what it submits (#41); MIT LICENSE;
+  CLAUDE.md's voice section rewritten; gitleaks over the full history found nothing.
+- **The demo video**, `evidence/demo.mp4`: 3:00, 2.9 MB, linked from the README. Six steps:
+  discovery with "AI:" subtitles from the run's own redacted rationale, replay with no model, a
+  member who doesn't exist, the Post gate, a person taking over in the console, and the agent.
+  The raw clips are kept in `runs/demo_video/`, so it can be re-edited with
+  `scripts/evidence/demo_video.sh --build` and no new recording.
 
-**Committed artifacts.** Both came from real discovery, are copied unchanged, and stay
-`verified`. I approved nothing.
-- `capabilities/drafts/member.lookup_share_balances.yaml`
-- `capabilities/drafts/member.open_share_account.yaml`, the post flow, where Post needs approval
+**Committed artifacts.** Both came from real discovery and are copied unchanged. I approved
+nothing; you approved the lookup.
+- `capabilities/member.lookup_share_balances.yaml`: **approved** by you (the draft stays in
+  `capabilities/drafts/`).
+- `capabilities/drafts/member.open_share_account.yaml`: the post flow, `verified`, where Post needs
+  approval.
 
-**Spend.** About $0.91 over 18 real runs, out of your $25 / 30-run budget, so 12 runs remain.
-A full `make evidence` uses 4 runs (about $0.25), and 6 once scenario 14 can run (its two
-agent questions), about $0.30. The cap lives
-in your local ledger, `runs/discovery_ledger.jsonl`. It is unchanged; to reset it, move that file
-aside. There was no blocker, so there is no `docs/STATUS.md`.
+**Spend.** About $1.26 over 29 real runs. The cap is $25 and 33 runs: you raised the run cap
+from 30 for the video, so 4 runs remain. A full `make evidence` uses 6 runs (about $0.30). The
+count lives in your local ledger, `runs/discovery_ledger.jsonl`, which has never been edited;
+the cap itself is `Limits` in `src/eagleview/discovery/meter.py`.
 
 ## Every [REVIEW] item, one line each
 
-These are all 40 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" docs/DECISIONS.md`).
+These are all 45 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" docs/DECISIONS.md`).
 
 **Redaction**
 1. Sensitive labels are listed per screen, named by its heading, rather than as one global list.
@@ -121,32 +129,44 @@ These are all 40 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" do
 40. `make evidence` replaces a scenario's evidence only when its new run passed; a failed attempt
     is kept in `runs/evidence_failed/`.
 
+**Afterwards**
+
+41. Enter in a text field shows the policy check the form's default button, or with no button,
+    the form's own method and action against the route rules (the conservative reading).
+42. The video's raw clips are kept under `runs/demo_video/` (gitignored), so edits never need a
+    new recording.
+43. Video zooms target what the run's own final screen shows, read from its text boxes.
+44. The video's "In control" label follows the controller's state from the run log: No one
+    while waiting, Person while the operator holds it, Automation otherwise.
+45. On-screen reading time is per piece of text; pieces shown together share the longer time.
+
 ## What is left for you
 
-**Review and approve**
-1. **Review the two verified drafts** in `capabilities/drafts/`. Each holds its steps, locators,
-   expected results, outputs, and the probed MEMBER_NOT_FOUND outcome. Approving is your call
-   alone.
-2. **Approve** what you're happy with. Scenario 14 and the agent demo need an approved lookup.
+**Review**
+1. **Watch `evidence/demo.mp4`** (3:00). Captions I changed to match the footage are listed in
+   docs/DECISIONS.md, "The demo video, re-edited".
+2. **The post flow draft**, `capabilities/drafts/member.open_share_account.yaml`, is still
+   `verified`. Approving it is optional: the agent catalog leaves irreversible capabilities out
+   by design, and replay of it always needs an approval at Post.
+3. **The [REVIEW] items above**, especially #41 to #45, which are new since your last review.
 
 **Decide**
-3. **LICENSE:** done, MIT, in your name, 2026.
-4. **CLAUDE.md's "Voice and framing":** rewritten in neutral terms, as you asked. The README now
-   has a "How this was built" section.
-5. **The demo video:** run `scripts/evidence/demo_video.sh --record-video` when you want it. It
-   needs `ffmpeg`.
+4. **The repository is private**, but the video's closing card shows its URL. Make it public,
+   or tell me to change that card (a free `--build`, no new recording).
+5. **The agent demo's one run in Part 4 failed** with APP_UNAVAILABLE, because the mock bank
+   wasn't running. The script now refuses before spending when the bank is down. Rerunning it
+   with `make bank` up costs one run; the video and scenario 14 already show it working.
 
 **Check**
-6. **`gitleaks`** 8.30.1 scanned the full git history (25 commits at the time): no leaks.
-7. **Enter on a text field** is now checked as what it submits: the default button, or with no
-   button, the form's own action (decision "Enter in a text field"). A page's own Enter handler
-   can still make layer 1 refuse something that wouldn't have posted; that is a known limit.
-8. **README and REPORT are drafts.** REPORT is about 1,450 words under PLAN §9's headings, and a
-   test checks them. The release checklist asks for README commands copy-pasted from a real
-   terminal session: please run them once yourself.
+6. **README and REPORT are drafts.** The release checklist asks for README commands
+   copy-pasted from a real terminal session: please run them once yourself.
 
 ## Known issues
 
+- **The console banner trails the controller by up to a second**, because the page refreshes
+  once a second. The video's "In control" label is exact; the banner beside it can lag.
+- **A page's own Enter handler** can make layer 1 refuse an Enter that wouldn't have posted
+  (#41). It fails safe; a handler that submits elsewhere is caught only by layer 2.
 - **`verified_by` timestamps.** In a compiled capability, every `verified_by` entry carries the
   same `at`. The compiler takes one clock reading after all verify replays and stamps it on
   each (`src/eagleview/compiler/pipeline.py`, where `verified_by` is built). Each entry should
@@ -164,15 +184,11 @@ make demo-offline
 ```
 
 ```bash
-uv run eagleview approve capabilities/drafts/member.lookup_share_balances.yaml --reviewer <your-name>
-```
-
-```bash
-make evidence
-```
-
-```bash
 make check
+```
+
+```bash
+make bank
 ```
 
 ```bash
@@ -184,15 +200,13 @@ make demo-handoff
 ```
 
 - `make demo-offline` needs no key and no person.
-- After the approve, `make evidence` regenerates everything and now runs scenario 14 for real.
-  It spends about $0.30. A scenario that fails keeps its old evidence and makes the command
-  exit non-zero; the failed attempt is in `runs/evidence_failed/`.
-- `make check` afterwards runs the PII scan over the new evidence.
-- The agent demo answers through the catalog. It spends a few cents.
+- `make check` runs lint, types and the tests, including the PII scan over `evidence/`.
+- The agent demo needs the mock bank: start `make bank` in another terminal first. It spends
+  one run.
 - `make demo-handoff` is optional: take over a stuck run yourself at http://127.0.0.1:8700.
-
-The post flow can be approved the same way, but the catalog leaves irreversible capabilities
-out, by design.
+- `make evidence` regenerates everything (6 runs, about $0.30); a scenario that fails keeps its
+  old evidence and makes the command exit non-zero.
+- `scripts/evidence/demo_video.sh --build` re-edits the video from the kept raw clips, free.
 
 ## CI
 
@@ -206,5 +220,8 @@ out, by design.
 - **The evidence regeneration (`b797bf4`): failed** (run 38865333365). A path fix I made in
   that commit crashed on `make demo-offline`'s relative `--out runs/demo`. I had not rerun
   `demo-offline` locally after that change. The next commit fixes it, with a test.
-- This file is in that next commit; its CI result is in my closing message, not
-  here, because a file can't report the CI run of the commit that contains it.
+- **The relative-path fix (`b438473`): green** (run 38867482127).
+- **Enter in a text field, LICENSE and docs (`506124b`): green** (run 38900825158).
+- **Evidence with the approved lookup (`2f03b63`): green** (run 38904314299).
+- This file is in the demo-video commit; its CI result is in my closing message, because a file
+  can't report the CI run of the commit that contains it.

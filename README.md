@@ -6,6 +6,11 @@ versioned **capability artifact**. Production replays that artifact **determinis
 LLM**, and a person can take over the same live session when automation is stuck, then hand it
 back.
 
+**Watch the 3-minute demo: [evidence/demo.mp4](evidence/demo.mp4).** It shows discovery by the
+model, replay with no model, a "member not found" answer, the approval gate on Post, a person
+taking over in the operator console, and an AI assistant using the approved capability. It is
+recorded from the mock bank only, by `scripts/evidence/demo_video.sh`.
+
 All institutions, people and data in this repository are fictional and synthetic. The app being
 automated is "Ironbridge Teller 7", a mock legacy teller system in `mock_bank/`, run as two
 fictional credit unions.
@@ -130,7 +135,7 @@ overwriting a file.
 - about $0.03–0.05 for discovery alone;
 - about $0.04–0.07 for the whole pipeline (discover, compile, verify, probe).
 
-Every call is recorded in `runs/discovery_ledger.jsonl`, and discovery stops at $25 total or 30
+Every call is recorded in `runs/discovery_ledger.jsonl`, and discovery stops at $25 total or 33
 runs.
 
 **Approving is a person's step:**

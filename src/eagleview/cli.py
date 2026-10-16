@@ -206,7 +206,7 @@ def _summary(result: RunResult, runs_dir: Path) -> str:
         "once through the screen, every action is grounded and recorded, and the trace becomes a "
         "capability under capabilities/drafts/ (never overwriting a file). Needs "
         "ANTHROPIC_API_KEY. Spend is ledgered in runs/discovery_ledger.jsonl and capped at $25 "
-        "and 30 runs. The operator console runs while it works, for hand-overs and approvals."
+        "and 33 runs. The operator console runs while it works, for hand-overs and approvals."
     )
 )
 def discover(

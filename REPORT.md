@@ -157,7 +157,7 @@ review is in `docs/DISCOVERY_TRACE_REVIEW.md`.
 
 **Held-out check** ("List member 10482's loans", a goal outside the evidence set): passed. Both
 runs gave `member.list_loans@1.0.0`, verified, with MEMBER_NOT_FOUND probed and confirmed, at
-$0.045 each. Total real spend across development and evidence was about $0.91 over 18 runs.
+$0.045 each. Total real spend across development and evidence was about $1.26 over 29 runs.
 
 ## Cuts
 

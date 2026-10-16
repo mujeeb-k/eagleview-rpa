@@ -33,6 +33,7 @@ class Catalog:
     runs_root: Path = RUNS
     environ: Mapping[str, str] | None = None
     browser: Browser | None = None
+    record_video_dir: Path | None = None  # the demo video only; never set by default
 
     def entry(self, tool: str) -> Entry:
         for e in self.entries:
@@ -53,6 +54,7 @@ class Catalog:
             runs_root=self.runs_root,
             environ=self.environ,
             overlays=self.overlays,
+            record_video_dir=self.record_video_dir,
         )
 
 

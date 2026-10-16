@@ -1233,3 +1233,48 @@ would have broken the session's run budget, so it was not rerun; the demo video'
 segment exercises the same path with a bank up. The script now refuses, before any model call,
 when the teller app isn't answering. The alternative, starting a bank inside the demo, would
 hide which bank (and which `.env` password) a person's question really ran against.
+
+## 2026-10-16 — Run cap raised for the demo video
+
+**The run cap is 33, up from 30.** The user authorised up to 6 more paid runs to fix and finish
+the demo video, with the $25 cap unchanged. 27 runs were used, so the cap in
+`eagleview.discovery.meter.Limits` is now 33: the authorisation is enforced by the meter itself,
+not by care. `runs/discovery_ledger.jsonl` is unchanged; nothing was deleted or rewritten. The
+alternative, moving the ledger aside to reset the count, would lose the record of what was spent.
+
+## 2026-10-16 — The demo video, re-edited
+
+**[REVIEW] Raw clips are kept, under `runs/demo_video/` (gitignored).** Each segment records
+into its own folder: its webm, a small `meta.json` (zoom rectangle, result lines), and its
+redacted run folder. `--build` re-edits the film from those with no new recording. The first
+recording's clips were lost because they lived in a temporary folder, which cost two paid runs
+to redo. The alternative, keeping only the final mp4, makes every caption edit a new recording.
+This stays inside the demo-video exception to invariant 4: mock bank only, opt-in, never
+committed. `record_video_dir` gained a pass-through on `discover_and_compile` and the catalog
+runner, off by default; a test pins that only the demo script ever sets it.
+
+**[REVIEW] Zoom targets come from the run's own screen.** The script replays through the engine
+with an opener that reads the final screen's text boxes just before the page closes, and zooms
+onto the Share Accounts table, the IBT-1004 banner, the Post button with its warning, and the
+cleared Member Detail. The alternative, fixed pixel rectangles, would silently drift if a screen
+changed.
+
+**[REVIEW] "In control" follows the controller's state, from the run log.** Polling the
+console's holder field missed the 40 ms automation held the lease after the hand-back, and the
+holder is empty while a run waits, while automation validates the screen, and after it
+completes. So: AWAITING_HUMAN reads "No one", HUMAN reads "Person", every other state reads
+"Automation", timed from the run log's own transitions. The console banner, which refreshes
+once a second, can trail the label by up to a second. The alternative, the raw holder field,
+would end the handoff on "No one" although automation finished the task.
+
+**[REVIEW] Reading time is per piece of text.** Each piece stays up for at least words ÷ 2.5
+seconds, minimum 3. Pieces shown together (a headline and its system output, a card and its
+footnote, a step's name and its sentence) share the time of the longer one. Summing them was
+the alternative; it put the film at 3:45.
+
+**Captions changed to match the footage.** Step 1's "a person reviews it before anyone can use
+it" became "a person must approve it before it runs unattended": a verified draft can be
+replayed by a person at the CLI. The redaction beat names what is painted out, since balances
+stay readable on the training tenant (`redact_amounts: false`). The opening was tightened and
+its disclaimer became a footnote, to bring the film to 3:00. Step 4's bracketed sentence is
+accurate (with a console attached, a gated step waits for approval) and is kept.
