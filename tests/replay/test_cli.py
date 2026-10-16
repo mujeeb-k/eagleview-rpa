@@ -1,6 +1,7 @@
 """`eagleview replay` end to end: result JSON on stdout, the summary on stderr, exit codes."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -14,8 +15,9 @@ from tests.support.replay import policy_for, tenant_for
 
 
 def flat(text: str) -> str:
-    """Rich boxes and wraps usage errors; compare words only."""
-    return " ".join(text.replace("│", " ").split())
+    """Rich boxes, wraps and (on CI) colours usage errors; compare words only."""
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    return " ".join(plain.replace("│", " ").split())
 
 
 @pytest.fixture
