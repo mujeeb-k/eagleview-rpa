@@ -98,6 +98,7 @@ from eagleview.surfaces.base import (
     SurfaceOpener,
     Unique,
 )
+from eagleview.surfaces.capture import capture
 from eagleview.surfaces.extract import ExtractError, parse, parse_rows
 from eagleview.surfaces.predicates import describe
 
@@ -191,12 +192,12 @@ class _Shot:
 class _Run:
     """What every result names, whether or not the UI was ever touched."""
 
-    capability: Capability
+    ref: str  # "<id>@<version>"
     tenant: TenantProfile
     writer: EvidenceWriter
     options: RunOptions
     modified: bool
-    effective_hash: str
+    effective_hash: str | None
     started: float
 
     @property
@@ -223,7 +224,7 @@ class _Run:
         timing["total"] = int((time.monotonic() - self.started) * 1000)
         return RunResult(
             run_id=self.run_id,
-            capability=self.capability.ref,
+            capability=self.ref,
             effective_hash=self.effective_hash,
             tenant=self.tenant.slug,
             status=status,
@@ -268,7 +269,7 @@ async def replay(
         raise ValueError(f"tenant {tenant.slug!r} runs {tenant.app_profile!r}, not {profile.id!r}")
     opts = options or RunOptions()
     base = _Run(
-        capability,
+        capability.ref,
         tenant,
         writer,
         opts,
@@ -306,7 +307,9 @@ async def replay(
     secrets = SecretResolver(environ, on_resolve=writer.redactor.register_secret)
     ctx = PolicyContext(tenant=tenant.slug, mode="replay", run_id=writer.run_id)
     async with open_surface(controller, ctx) as surface:
-        engine = _Engine(base, profile, surface, controller, secrets, dict(inputs), desk)
+        engine = _Engine(
+            base, capability, profile, surface, controller, secrets, dict(inputs), desk
+        )
         if desk is not None:
             desk.attach(LiveSession(writer.run_id, capability.ref, surface, controller))
         try:
@@ -322,6 +325,7 @@ class _Engine:
     def __init__(
         self,
         base: _Run,
+        capability: Capability | None,
         profile: AppProfile,
         surface: Surface,
         controller: SessionController,
@@ -330,7 +334,7 @@ class _Engine:
         desk: InterventionDesk | None = None,
     ) -> None:
         self.base = base
-        self.cap = base.capability
+        self.cap = capability  # None: only open and sign on (discovery)
         self.tenant = base.tenant
         self.options = base.options
         self.profile = profile
@@ -340,8 +344,9 @@ class _Engine:
         self.desk = desk
         self.secrets = secrets
         self.inputs = inputs
-        self.rendered: Rendered = render(self.cap, inputs)
-        self.watch = Watcher(profile.global_states, self.rendered.outcomes)
+        self.rendered: Rendered | None = render(capability, inputs) if capability else None
+        outcomes = self.plan.outcomes if self.rendered else []
+        self.watch = Watcher(profile.global_states, outcomes)
 
         self.outputs: dict[str, object] = {}
         self.recoveries: list[RecoveryRecord] = []
@@ -387,7 +392,7 @@ class _Engine:
         await self._open_app()
         self.timing["sign_on"] = int((time.monotonic() - started) * 1000)
         self._hand_to(AUTOMATION)
-        steps = self.rendered.steps
+        steps = self.plan.steps
         i = 0
         while i < len(steps):
             try:
@@ -531,10 +536,10 @@ class _Engine:
                     "the running version could not be read off the entry page",
                 )
             )
-        for owner, allowed in (
-            (self.cap.ref, self.cap.app.versions),
-            (self.profile.id, self.profile.versions),
-        ):
+        ranges = [(self.profile.id, self.profile.versions)]
+        if self.cap is not None:
+            ranges.insert(0, (self.cap.ref, self.cap.app.versions))
+        for owner, allowed in ranges:
             if not version_in_range(version, allowed):
                 raise _Done(
                     await self._fail(
@@ -712,30 +717,23 @@ class _Engine:
         return await self._fail(category, message, expected=expected)
 
     async def _before(self, expect_held: bool, *, shot: bool) -> Before:
-        obs = await self.surface.observe()
         if shot and self.desk is not None:
             # What a person could read before this step, so a takeover can tell what is new.
             self._visible_before = {b.text for b in await self.surface.text_boxes()}
         if shot:
+            obs, boxes = await capture(self.surface)
             self._shot_no += 1
-            self.shots.append(
-                _Shot(
-                    self._shot_no,
-                    "before",
-                    obs.screenshot,
-                    await self.surface.text_boxes(every=True),
-                )
-            )
+            self.shots.append(_Shot(self._shot_no, "before", obs.screenshot, boxes))
+        else:
+            obs = await self.surface.observe()
         return Before(obs.fingerprint, self.surface.navigation_count(), expect_held)
 
     async def _shot(self, *, new: bool = False) -> int:
         """An `after` screenshot: for the step that just acted, or under a new number."""
-        obs = await self.surface.observe()
+        obs, boxes = await capture(self.surface)
         if new or self._shot_no == 0:
             self._shot_no += 1
-        self.shots.append(
-            _Shot(self._shot_no, "after", obs.screenshot, await self.surface.text_boxes(every=True))
-        )
+        self.shots.append(_Shot(self._shot_no, "after", obs.screenshot, boxes))
         return self._shot_no
 
     # --- states and recovery ------------------------------------------------------------------
@@ -884,7 +882,7 @@ class _Engine:
         iv = self.desk.open(
             kind="approval",
             run_id=self.base.run_id,
-            capability=self.cap.ref,
+            capability=self.base.ref,
             step_id=step.id,
             reason="APPROVAL_REQUIRED",
             state_summary=(await self.surface.observe()).summary(),
@@ -939,7 +937,7 @@ class _Engine:
         from, after resume validation; raises _Done when the run ends instead."""
         assert self.desk is not None
         self.takeovers += 1
-        steps = self.rendered.steps
+        steps = self.plan.steps
         paused = steps[min(i, len(steps) - 1)]
         self._paused_frame = "/".join(paused.target.frame) if paused.target else None
         visible_now = await self.surface.text_boxes()
@@ -954,7 +952,7 @@ class _Engine:
         iv = self.desk.open(
             kind="takeover",
             run_id=self.base.run_id,
-            capability=self.cap.ref,
+            capability=self.base.ref,
             step_id=paused.id,
             reason=reason,
             state_summary=summary,
@@ -1028,7 +1026,7 @@ class _Engine:
         continue after the latest step, from the paused one on, whose `expect` holds. Failing
         that, run the paused step again if its target is back and running it again is safe: it
         was never sent, or it is idempotent and nothing is committed."""
-        steps = self.rendered.steps
+        steps = self.plan.steps
         seen = await self.watch.look(self.surface, None, self._pctx(None), with_outcomes=False)
         if seen.kind == "hard":
             return None
@@ -1150,17 +1148,17 @@ class _Engine:
 
     async def _finish(self) -> RunResult:
         self.at_step = None
-        values, errors = validate_outputs(self.cap.outputs, self.outputs)
+        values, errors = validate_outputs(self.plan_capability.outputs, self.outputs)
         if errors:
             problems = "; ".join(f"{e.field}: {e.code}" for e in errors)
             raise _Done(await self._fail(FailureCategory.OUTPUT_INVALID, problems))
         self.base.writer.redactor.register_outputs(values)
-        if not await self.surface.check(self.rendered.success, PredicateContext(outputs=values)):
+        if not await self.surface.check(self.plan.success, PredicateContext(outputs=values)):
             raise _Done(
                 await self._fail(
                     FailureCategory.UNKNOWN_STATE,
                     "the success condition does not hold",
-                    expected=describe(self.rendered.success),
+                    expected=describe(self.plan.success),
                 )
             )
         return self._result("success", outputs=values)
@@ -1269,6 +1267,29 @@ class _Engine:
             timing_ms=self.timing,
         )
 
+    @property
+    def plan(self) -> Rendered:
+        assert self.rendered is not None, "this engine only opens a session"
+        return self.rendered
+
+    @property
+    def plan_capability(self) -> Capability:
+        assert self.cap is not None, "this engine only opens a session"
+        return self.cap
+
+    async def prepare(self) -> RunResult | None:
+        """Open the app, check its version and sign on, as `run()` does first. None when the
+        session is ready; otherwise the failed result."""
+        remaining = self.options.deadline_s - (time.monotonic() - self.base.started)
+        try:
+            async with asyncio.timeout(remaining):
+                await self._open_app()
+                return None
+        except _Done as done:
+            return done.result
+        except TimeoutError:
+            return await self._fail(FailureCategory.STATE_TIMEOUT, "sign-on took too long")
+
     def _pctx(self, step: Step | None) -> PredicateContext:
         return PredicateContext(
             self_target=step.target if step is not None else None, outputs=self.outputs
@@ -1280,3 +1301,50 @@ class _Engine:
 
     def _event(self, kind: str, **fields: object) -> None:
         self.base.event(kind, **fields)
+
+
+class SessionNotReady(Exception):
+    """The app could not be opened and signed on. Carries the failure, as replay reports it."""
+
+    def __init__(self, failure: Failure) -> None:
+        super().__init__(f"{failure.category}: {failure.message}")
+        self.failure = failure
+
+
+@dataclass
+class OpenSession:
+    surface: Surface
+    controller: SessionController
+    engine: "_Engine"
+
+
+@asynccontextmanager
+async def open_session(
+    *,
+    profile: AppProfile,
+    tenant: TenantProfile,
+    open_surface: SurfaceOpener,
+    writer: EvidenceWriter,
+    environ: Mapping[str, str] | None = None,
+    actor: str = "llm",
+    mode: Literal["discovery", "replay"] = "discovery",
+    desk: InterventionDesk | None = None,
+) -> AsyncGenerator[OpenSession]:
+    """A signed-on session for an actor other than replay (discovery's `llm`). The harness opens
+    the app, checks its version and signs on exactly as replay does; the session is handed to
+    `actor` only afterwards, so the LLM never sees a credential. Evidence is flushed on exit."""
+    writer.use_screen_labels(profile.sensitive_labels)
+    base = _Run("session.open@0.0.0", tenant, writer, RunOptions(), False, None, time.monotonic())
+    controller = SessionController(writer.run_id, sink=writer, actor=HARNESS)
+    secrets = SecretResolver(environ, on_resolve=writer.redactor.register_secret)
+    ctx = PolicyContext(tenant=tenant.slug, mode=mode, run_id=writer.run_id)
+    async with open_surface(controller, ctx) as surface:
+        engine = _Engine(base, None, profile, surface, controller, secrets, {}, desk)
+        try:
+            failed = await engine.prepare()
+            if failed is not None and failed.failure is not None:
+                raise SessionNotReady(failed.failure)
+            engine._hand_to(actor)  # pyright: ignore[reportPrivateUsage]
+            yield OpenSession(surface, controller, engine)
+        finally:
+            engine.flush_evidence()

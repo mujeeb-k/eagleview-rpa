@@ -633,3 +633,110 @@ checks it before the overlay is ever used (P8).
 **P4 behaviour holds without a desk.** All P4 replay tests pass unedited: `--escalate` without a
 console still parks, and a gated step without `--approve-gates` still fails POLICY_BLOCKED.
 `HandoffHolder` is gone; the SessionController's `hand_to` does that job.
+
+## 2026-10-16 — P6 plan (self-reviewed with the advisor)
+
+**Order.**
+1. Build the loop: tools, prompts, recorder, sign-on reuse and the spend ledger.
+2. Test it offline with a scripted fake model.
+3. Record **one real trace** for the PLAN §0 goal and write `docs/DISCOVERY_TRACE_REVIEW.md` from it.
+4. Adjust the loop from the review, then commit.
+
+No compiler code before the review is committed.
+
+**The spend limit is enforced on every real request.** A ledger at `runs/discovery_ledger.jsonl`
+(gitignored) gets one line per real API response, written as the response arrives, so a crash
+still records the spend. Before every real request (input extraction, probes, each loop turn)
+the ledger total must stay under $25. A run counts toward the 30-run cap as soon as it makes its
+first real call. Crossing either limit stops discovery cleanly, and docs/STATUS.md says where it
+stopped. The meter is injected, so fake-transport tests never touch the real ledger.
+
+Each turn is priced from its usage:
+
+| Usage | Sonnet 5.5 | Opus 5.5 |
+|---|---|---|
+| Input | $2.00 | $4.00 |
+| Cache writes (5-minute) | $2.50 | $5.00 |
+| Cache reads | $0.20 | $0.20 |
+| Output | $10.00 | $20.00 |
+
+Dollars per million tokens; thinking is billed as output.
+
+**[REVIEW] Model and effort.** The model is `EAGLEVIEW_MODEL` or `--model`, default
+`claude-sonnet-5-5` (CLAUDE.md). Effort is set explicitly to `medium`, the starting point the
+API guidance gives for multi-step tool use after Sonnet 5.5 recalibrated its levels. Leaving the
+default (`high`) was the alternative; it costs more on a 40-action loop. Both values are recorded
+in provenance.
+
+**[REVIEW] Refusal fallbacks are on: `fallbacks: "default"`.** The API guidance recommends this
+for Sonnet 5.5 on the Claude API, so a policy decline is retried on another model. If a fallback
+serves a turn, the turn is priced at the dearer of the two models, and every serving model is
+recorded. If the API rejects fallbacks alongside the computer toolset, that call is still
+ledgered; fallbacks are switched off and recorded here, with no retry loop.
+
+**[REVIEW] Toolset members the policy denies are disabled.** These are:
+- `right_click`, `middle_click` and `left_click_drag`;
+- `left_mouse_down` and `left_mouse_up`;
+- `hold_key` and `cursor_position`.
+
+The model cannot try what would only be refused. `zoom`, `wait` and `scroll` stay.
+
+**[REVIEW] What counts toward the limits.** The 40-action cap and the "same fingerprint after 4
+actions" rule count only actions that can change the screen: clicks, type, key, scroll,
+mouse_move and `fill_input`. Screenshot, zoom and wait only look. A separate cap of 80 tool calls
+of any kind bounds the cost of a model that only looks.
+
+**Credentials.** The API key comes from the merged environment (the shell over `.env`), is passed
+to the client explicitly, is registered with the redactor as a secret, and is never logged. The
+optional `ANTHROPIC_WORKSPACE_ID` is sent as a header (Spike C).
+
+**Policy mode is `discovery`.** An irreversible action returns `escalate`. With a desk attached it
+becomes an approval intervention (P5). Without one, it is an `is_error` result and counts toward
+the stop rule of 2 policy blocks.
+
+**Tool results follow the toolset contract exactly.**
+- Computer members' results echo `toolset_name: "computer"`; results of custom tools never do.
+- Each turn's results go back in one user message, in order.
+- After a failure, the remaining computer members get the exact halt text and the remaining
+  custom tools get `is_error`.
+- If the batch didn't end with a screenshot, a fresh one is attached to the last result.
+
+History is append-only: `response.content` is appended verbatim, and screenshots are never pruned.
+
+**Sign-on is shared, one way.** Replay exposes `open_session()`: open the surface, check the
+version, and sign on as the harness. Discovery imports it; replay never imports discovery. The LLM
+gets the session only after sign-on, as the actor `llm`.
+
+**Not doing:** server-side context editing. 40 actions with screenshots fit easily in the 1M
+window, and CLAUDE.md asks for it only if context grows.
+
+## 2026-10-16 — P6 as built, after the real trace
+
+The review is in `docs/DISCOVERY_TRACE_REVIEW.md`. Two real runs cost $0.08 in total, and both
+succeeded in 3–5 turns.
+
+**Screenshots are painted with boxes read on both sides of them.** The first real run caught an
+after-screenshot taken mid-load, whose paint boxes came from the loaded page. `surfaces/capture.py`
+reads text boxes before and after each screenshot and merges them, in replay and discovery alike.
+Painting slightly too much is the safe direction.
+
+**[REVIEW] Discovery lets the screen settle before recording an after-state.** It waits until the
+fingerprint holds twice, or 3 s pass. This sleep happens in authoring only; replay still waits on
+predicates alone. The alternative, recording immediately, left the compiler looking at
+half-loaded pages.
+
+**[REVIEW] One sentence of rationale per batch, by prompt.** At effort `medium` the model returned
+neither thinking nor text, so the trace had no rationale. The system prompt now asks for one short
+sentence before each batch. Raising the effort to get summarized thinking was the alternative; it
+costs more on every turn, and the sentence is what a reviewer actually reads.
+
+**[REVIEW] A marked output is registered with the redactor the moment it is marked.** The model
+quoted the balances it had marked in its `declare_success` description, and they reached the trace
+readable. Marked values are now registered as personal data, and a marked table's amounts go
+through the amount rule, so they follow `redact_amounts`.
+
+**Drafts never overwrite.** `write_draft` creates `capabilities/drafts/<id>.yaml` exclusively,
+and adds `.2`, `.3`, … when the name is taken. P7's compiler writes through it.
+
+**The intervention store accepts a discovery goal.** `request_human` during discovery opens a
+takeover naming the goal rather than a capability, and it waits at most `human_timeout_s`.

@@ -153,6 +153,18 @@ class EvidenceWriter:
         path.write_text(json.dumps(redacted, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return path
 
+    def append_jsonl(self, name: str, record: Mapping[str, object]) -> Path:
+        """One redacted line in `<name>.jsonl`, such as discovery's `trace.jsonl`."""
+        checked = self._checked(name)
+        if checked == "run":
+            raise ValueError("run.jsonl is written by event()")
+        path = self.run_dir / f"{checked}.jsonl"
+        redacted = self.redactor.redact_tree(dict(record))
+        line = json.dumps(redacted, ensure_ascii=False, separators=(",", ":"))
+        with self._lock, path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+        return path
+
     def write_yaml(self, name: str, model: BaseModel) -> Path:
         """A reviewable artifact, such as a proposed overlay: written as `<name>.yaml`. The data is
         redacted before it is serialized, so a placeholder can never break the YAML."""

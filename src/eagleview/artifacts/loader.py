@@ -6,6 +6,7 @@ from pathlib import Path
 
 from eagleview.artifacts.yaml_io import (
     ArtifactHashMismatch,
+    dump_model,
     load_capability,
     load_model,
 )
@@ -13,6 +14,7 @@ from eagleview.schema.capability import Capability
 from eagleview.schema.hashing import with_content_hash
 
 CAPABILITIES = Path("capabilities")
+DRAFTS = CAPABILITIES / "drafts"
 APP_PROFILES = Path("app_profiles")
 TENANTS = Path("tenants")
 DEFAULT_POLICY = Path("policies/default-teller.yaml")
@@ -58,3 +60,21 @@ def app_profile_path(profile: str, root: Path = APP_PROFILES) -> Path:
 
 def tenant_path(slug: str, root: Path = TENANTS) -> Path:
     return root / f"{slug}.yaml"
+
+
+def write_draft(capability: Capability, root: Path = DRAFTS) -> Path:
+    """Write a compiled capability under `capabilities/drafts/`, never over an existing file: a
+    name that is taken gets a numbered suffix (`<id>.2.yaml`, ...). The file is created
+    exclusively, so two writers cannot clobber each other either. Promoting a draft into
+    `capabilities/` is a reviewed step, never done here."""
+    root.mkdir(parents=True, exist_ok=True)
+    text = dump_model(with_content_hash(capability))
+    n = 1
+    while True:
+        path = root / (f"{capability.id}.yaml" if n == 1 else f"{capability.id}.{n}.yaml")
+        try:
+            with path.open("x", encoding="utf-8") as fh:
+                fh.write(text)
+            return path
+        except FileExistsError:
+            n += 1

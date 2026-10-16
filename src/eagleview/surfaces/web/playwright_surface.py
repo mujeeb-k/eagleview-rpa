@@ -313,6 +313,29 @@ class PlaywrightSurface:
         grounding = await self.grounder.at_point(x, y)
         return await self.grounder.with_candidates(grounding, self.app_fingerprint)
 
+    async def table_at(self, x: int, y: int) -> dict[str, Any] | None:
+        """The table under a point: its header cells and the caption text just above it, so a
+        marked table can be compiled into an anchored table extract. Web only; for discovery."""
+        grounding = await self.grounder.at_point(x, y)
+        return await grounding.element.handle.evaluate(
+            element_fn(
+                """
+                const t = el.closest('table');
+                if (!t || !t.rows.length) return null;
+                const headers = Array.from(t.rows[0].cells).map(c => EV.norm(c.innerText || ''));
+                let caption = null;
+                for (let n = t; n && !caption; n = n.parentElement) {
+                  let p = n.previousElementSibling;
+                  for (; p && !caption; p = p.previousElementSibling) {
+                    const text = EV.norm(p.innerText || '');
+                    if (text) caption = text;
+                  }
+                }
+                return {headers, caption, rows: t.rows.length - 1};
+                """
+            )
+        )
+
     async def resolve(self, target: TargetSpec) -> Resolution:
         return await self.resolver.resolve(target)
 

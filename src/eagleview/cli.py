@@ -193,3 +193,65 @@ def _summary(result: RunResult, runs_dir: Path) -> str:
         lines.append("  modified: an edited artifact, run as a draft")
     lines.append(f"  evidence: {runs_dir / result.run_id}")
     return "\n".join(lines)
+
+
+@app.command(
+    help=(
+        "Discover a task with Claude: it drives the app once through the screen, and every "
+        "action is grounded and recorded to runs/<run_id>/trace.jsonl. Needs ANTHROPIC_API_KEY. "
+        "Spend is ledgered in runs/discovery_ledger.jsonl and capped at $25 and 30 runs."
+    )
+)
+def discover(
+    goal: Annotated[str, typer.Option(help="What a teller wants done, in plain words.")],
+    tenant: Annotated[str, typer.Option(help="Tenant slug, from tenants/.")] = "lantern-bay",
+    model: Annotated[
+        str | None, typer.Option(help="Model id; default EAGLEVIEW_MODEL, else claude-sonnet-5-5.")
+    ] = None,
+    effort: Annotated[str, typer.Option(help="Effort level for the loop.")] = "medium",
+    policy: Annotated[Path, typer.Option(help="Safety policy YAML.")] = Path(
+        "policies/default-teller.yaml"
+    ),
+    tenant_file: Annotated[
+        Path | None, typer.Option(help="A tenant YAML to use instead of tenants/<slug>.yaml.")
+    ] = None,
+    runs_dir: Annotated[Path, typer.Option(help="Where run evidence is written.")] = Path("runs"),
+    headed: Annotated[bool, typer.Option(help="Show the browser.")] = False,
+) -> None:
+    from eagleview.artifacts.loader import app_profile_path, tenant_path
+    from eagleview.artifacts.yaml_io import load_app_profile, load_policy, load_tenant
+    from eagleview.discovery.agent_loop import DiscoveryConfig, DiscoveryResult
+    from eagleview.discovery.agent_loop import discover as run_discovery
+    from eagleview.discovery.client import model_from
+    from eagleview.discovery.meter import Ledger, LedgerMeter
+    from eagleview.runner import environment
+    from eagleview.surfaces.web.launch import launched_browser
+
+    env = environment()
+    tenant_profile = load_tenant(tenant_file or tenant_path(tenant))
+    profile = load_app_profile(app_profile_path(tenant_profile.app_profile))
+    config = DiscoveryConfig(goal=goal, model=model_from(env, model), effort=effort)
+    meter = LedgerMeter(Ledger(runs_dir / "discovery_ledger.jsonl"))
+
+    async def go() -> DiscoveryResult:
+        async with launched_browser(headed=headed) as browser:
+            return await run_discovery(
+                config,
+                profile=profile,
+                tenant=tenant_profile,
+                policy=load_policy(policy),
+                browser=browser,
+                meter=meter,
+                environ=env,
+                runs_root=runs_dir,
+            )
+
+    result = asyncio.run(go())
+    typer.echo(result.model_dump_json(indent=2))
+    spend = meter.ledger.spend()
+    typer.echo(
+        f"discovery {result.status} ({result.stop_reason}); "
+        f"this run ${result.usd}; all discovery ${spend.usd:.2f} over {spend.runs} runs",
+        err=True,
+    )
+    raise typer.Exit(0 if result.status == "success" else 5)

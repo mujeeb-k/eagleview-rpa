@@ -51,7 +51,7 @@ TRANSITIONS: dict[ControlState, frozenset[ControlState]] = {
 }
 
 # Who may act in each state. None: nobody, while the session changes hands or after it ends.
-AUTOMATION_ACTORS = frozenset({"automation", "harness"})
+AUTOMATION_ACTORS = frozenset({"automation", "harness", "llm"})
 
 
 class InvalidTransition(Exception):
@@ -78,7 +78,8 @@ class SessionController:
             raise NotHolder(f"{actor}@{epoch} does not hold the session ({current} does)")
 
     def hand_to(self, actor: str) -> int:
-        """Pass the lease between the harness (sign-on) and automation (the steps)."""
+        """Pass the lease between the harness (sign-on) and an automated actor: replay's
+        `automation`, or discovery's `llm`."""
         if self.state is not S.AUTOMATION or actor not in AUTOMATION_ACTORS:
             raise InvalidTransition(f"hand_to({actor!r}) is not allowed in {self.state}")
         self.holder = actor
