@@ -32,6 +32,7 @@ from eagleview.schema.policy import Policy, SensitivityPattern
 
 MIN_VALUE_LENGTH = 3  # shorter values would scrub half the screen
 MIN_NAME_TOKEN_LENGTH = 3  # shorter tokens ("Li", "Q") would hit ordinary words
+_FIELD_NAME = re.compile(r"[a-z][a-z0-9_]*")
 _SCRUBBED = (Sensitivity.identifier, Sensitivity.pii, Sensitivity.secret)
 _PLACEHOLDER = re.compile(r"(\[[a-z0-9_.]+\])")
 
@@ -301,9 +302,27 @@ class Redactor:
                 if key in exempt:
                     out[key] = v
                 else:
-                    out[self.redact_text(key)] = self._walk(self._typed(key, v))
+                    out[self._key(key)] = self._walk(self._typed(key, v))
             return out
         return self._walk(value)
+
+    def _key(self, key: str) -> str:
+        """A mapping key that is a field name (snake_case, as step ids, input, output and timing
+        names are) is not redacted: scrubbing a value that happens to appear inside one corrupts
+        it (`submit_member_search` once became `submit_member_[acct_holder_no]`, because
+        "Search" was on screen beside a sensitive label). Two exceptions keep personal data out:
+        a field-name-shaped key carrying a registered number (`member_10482`), or containing a
+        word of a registered person's name (a member named "Member" makes `member_id` reveal
+        it), is scrubbed. Any other key (spaces, punctuation, a name) is scrubbed like a value."""
+        if _FIELD_NAME.fullmatch(key):
+            numbers = re.findall(r"\d{4,}", key)
+            words = re.findall(r"[a-z]+", key)
+            carries_data = any(n in self._values or n in self._tokens for n in numbers) or any(
+                w in self._tokens for w in words
+            )
+            if not carries_data:
+                return key
+        return self.redact_text(key)
 
     def _walk(self, value: object) -> object:
         if isinstance(value, BaseModel):
@@ -321,8 +340,7 @@ class Redactor:
         if isinstance(value, Mapping):
             mapping = cast(Mapping[object, object], value)
             return {
-                self.redact_text(str(k)): self._walk(self._typed(str(k), v))
-                for k, v in mapping.items()
+                self._key(str(k)): self._walk(self._typed(str(k), v)) for k, v in mapping.items()
             }
         if isinstance(value, list | tuple | set | frozenset):
             return [self._walk(v) for v in cast(Iterable[object], value)]

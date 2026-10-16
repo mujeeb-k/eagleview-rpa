@@ -214,3 +214,23 @@ def test_luhn() -> None:
     assert luhn_ok("4111111111111111")
     assert not luhn_ok("4111111111111112")
     assert not luhn_ok("12345")
+
+
+def test_field_names_are_never_redacted_only_values(redactor: Redactor) -> None:
+    """At Copperhill the screen text "Search" sat beside the sensitive label "Acct Holder No.",
+    was registered as that field's value, and was then scrubbed out of the run log's key
+    `submit_member_search`. A field name stays whole. Values are scrubbed as before, and keys that
+    are data (a member number, or a field-name-shaped key carrying one) are still replaced."""
+    redactor.register("Search", Sensitivity.pii, "acct_holder_no")
+    redactor.register("10482", Sensitivity.identifier, "member")
+    out = redactor.redact_tree(
+        {
+            "timing_ms": {"submit_member_search": 588, "open_member_inquiry": 547},
+            "note": "clicked Search for member 10482",
+            "by_member": {"10482": "seen", "member_10482": "seen"},
+        }
+    )
+    assert isinstance(out, dict)
+    assert out["timing_ms"] == {"submit_member_search": 588, "open_member_inquiry": 547}
+    assert "Search" not in out["note"] and "10482" not in out["note"]
+    assert "10482" not in str(out["by_member"])

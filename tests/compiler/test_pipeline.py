@@ -1,6 +1,8 @@
 """discover -> compile -> verify -> probe, offline: the scripted fake model plays Claude for the
 loop and for every structured call, and verify and probe are real replays against the mock bank."""
 
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -149,3 +151,42 @@ async def test_a_discovery_compiles_into_a_verified_probed_capability(
 def _fresh(fake: FakeModel) -> Any:
     fake.requests.clear()
     return fake.client()
+
+
+async def test_each_verification_is_stamped_with_its_own_runs_completion(
+    browser: Browser, lantern: Bank, tmp_path: Path
+) -> None:
+    """The verify replay and the final verify finish at different times, and each `verified_by`
+    entry says when its own run ended, not one clock reading taken after both."""
+    desk = InterventionDesk(InterventionStore(tmp_path / "iv.sqlite"), notify=lambda _l: None)
+    fake = FakeModel(desk, INPUTS, [click_menu, search, finish])
+    fake.structured = {"capability_id": NAMES, "probes": PROBES, "business_outcome": NOT_FOUND}
+    result = await discover_and_compile(
+        DiscoveryConfig(goal=GOAL, model=MODEL),
+        profile=load_app_profile(APP_PROFILE),
+        tenant=tenant_for(lantern),
+        policy=policy_for(lantern),
+        browser=browser,
+        meter=MemoryMeter(),
+        environ={"ANTHROPIC_API_KEY": "sk-fake", lantern.tenant.password_env: lantern.password},
+        runs_root=tmp_path / "runs",
+        drafts_root=tmp_path / "drafts",
+        desk=desk,
+        http_client=fake.client(),
+    )
+    assert result.status == "verified", result.review()
+    assert result.path is not None
+    first, final = load_capability(result.path).provenance.verified_by
+    assert (first.run_id, final.run_id) == (
+        result.replays["verify"],
+        result.replays["final_verify"],
+    )
+    assert first.at < final.at
+    for v in (first, final):
+        log = tmp_path / "runs" / v.run_id / "run.jsonl"
+        end = next(
+            e for e in map(json.loads, log.read_text().splitlines()) if e["kind"] == "run.end"
+        )
+        ended = datetime.fromisoformat(end["ts"])
+        assert ended <= v.at, (v.run_id, ended, v.at)
+        assert (v.at - ended).total_seconds() < 2.0, (v.run_id, ended, v.at)

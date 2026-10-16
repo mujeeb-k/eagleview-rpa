@@ -132,8 +132,11 @@ async def discover_and_compile(
         return _done(result, meter)
     result.capability, result.status = cap, "draft"
 
+    finished: dict[str, datetime] = {}
+
     async def replay(c: Capability, inputs: dict[str, str], options: RunOptions) -> RunResult:
-        return await run_replay(
+        """A verify or probe replay; its completion time is kept for its `verified_by` entry."""
+        done = await run_replay(
             c,
             inputs,
             profile=profile,
@@ -145,6 +148,8 @@ async def discover_and_compile(
             environ=environ,
             desk=None if options.probe else desk,
         )
+        finished[done.run_id] = datetime.now(UTC)
+        return done
 
     needs_person = cap.risk == "irreversible"
     if needs_person and desk is None:
@@ -181,9 +186,9 @@ async def discover_and_compile(
             result.capability, result.path = cap, write_draft(cap, drafts_root)
             return _done(result, meter)
         verified_runs.append(final.run_id)
-    at = datetime.now(UTC)
+    # Each verification is stamped with its own run's completion time, not one shared reading.
     provenance = cap.provenance.model_copy(
-        update={"verified_by": [Verification(run_id=r, at=at) for r in verified_runs]}
+        update={"verified_by": [Verification(run_id=r, at=finished[r]) for r in verified_runs]}
     )
     verified = Capability.model_validate(
         cap.model_copy(update={"provenance": provenance}).model_dump() | {"status": "verified"}

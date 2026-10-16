@@ -1,0 +1,3 @@
+# The narrated demo video project (Remotion, TypeScript) is tooling, not the product:
+# keep it out of the repository's language statistics.
+video/** linguist-vendored

@@ -1311,3 +1311,23 @@ thoughts end before the next action. One timeline drives both footage and overla
 check fails the build unless every overlaid action's held frame is the screen before it. The
 alternative, shifting overlays earlier by a fixed amount, would still put most of each ripple on
 the next screen, because the screen changes almost at once. The holds lengthen the story to 2:08.
+
+## 2026-10-16 — Two fixes from review
+
+**Each verification carries its own run's completion time.** The compiler used to read the clock
+once, after every verify replay, and stamp that time on each `verified_by` entry. It now records
+the time each replay finishes. A test checks the entries against each run's own `run.end` and
+that the first verify finished before the final one. The committed artifacts are unchanged: they
+were verified and approved as they are, and editing them would break their content hashes.
+
+**[REVIEW] Field names are never redacted, only values.** At Copperhill, "Search" sat on screen
+beside the sensitive label "Acct Holder No.", was registered as that field's value, and was then
+scrubbed out of a run-log key, `submit_member_search`. Keys shaped like field names (snake_case:
+step ids, input, output and timing names) are now kept whole. Two exceptions remain, because the
+writer and property tests pin them and must not be weakened: a field-name-shaped key carrying a
+registered number (`member_10482`), or a word of a registered person's name (a member named
+"Member" would otherwise be revealed by `member_id`), is scrubbed. Any other key (with spaces or
+punctuation, or a name) is scrubbed like a value, as before. The alternative, never touching keys at all, would let a key built from
+data (`"row 10482"`) through. The over-match that registered "Search" as a value (a button label
+inside a sensitive label's value region) remains: it hides the word in free text on that screen,
+which errs towards hiding.

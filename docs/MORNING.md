@@ -167,11 +167,7 @@ These are all 45 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" do
   once a second. The video's "In control" label is exact; the banner beside it can lag.
 - **A page's own Enter handler** can make layer 1 refuse an Enter that wouldn't have posted
   (#41). It fails safe; a handler that submits elsewhere is caught only by layer 2.
-- **`verified_by` timestamps.** In a compiled capability, every `verified_by` entry carries the
-  same `at`. The compiler takes one clock reading after all verify replays and stamps it on
-  each (`src/eagleview/compiler/pipeline.py`, where `verified_by` is built). Each entry should
-  carry its own run's end time. It doesn't affect replay or the content hash (provenance is
-  excluded). Not fixed yet.
+- **`verified_by` timestamps:** fixed; each entry now carries its own run's completion time.
 
 ## Commands, in order
 
