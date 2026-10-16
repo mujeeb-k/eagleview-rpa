@@ -1,0 +1,58 @@
+{
+  "run_id": "r_20261016T193935_37fe5b",
+  "capability": "share.validate_open_share@1.0.0",
+  "effective_hash": "sha256:f4d43d40703ff52b6f66a56f98a0e6135cf8fd36f2f3bd49dd4f33c0b6210a5a",
+  "tenant": "lantern-bay",
+  "status": "success",
+  "outputs": {},
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_search",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "open_share_form",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "select_share_type",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "validate_open_share",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 489,
+    "open_member_inquiry": 303,
+    "enter_member_id": 235,
+    "submit_member_search": 373,
+    "open_share_form": 459,
+    "select_share_type": 263,
+    "validate_open_share": 258,
+    "total": 2504
+  }
+}

@@ -3,6 +3,7 @@ templating; version ranges; and the committed JSON Schemas."""
 
 import copy
 import json
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -82,6 +83,7 @@ def test_app_profile_fixture() -> None:
         "system_notice",
         "permission_denied",
         "maintenance_banner",
+        "validation_error",
     ]
     assert isinstance(profile.global_states[2].recover, Dismiss)
     assert profile.global_states[3].outcome is not None
@@ -320,3 +322,32 @@ def test_committed_json_schemas_are_current() -> None:
         committed = REPO / "schemas" / name
         assert committed.exists(), f"missing {committed}"
         assert committed.read_text() == text, f"{committed} is stale"
+
+
+# Every code the mock teller app can show, with whether it is a form-validation answer.
+_TELLER_CODES = {
+    "IBT-2201 SHARE TYPE IS REQUIRED": True,
+    "IBT-2203 DIVIDEND FREQUENCY IS REQUIRED": True,
+    "IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE": True,
+    "IBT-2214 NICKNAME EXCEEDS 20 CHARACTERS": True,
+    "IBT-2215 NO SUFFIX AVAILABLE FOR THIS SHARE TYPE": True,
+    "IBT-1004 NO MEMBER FOUND FOR NUMBER 99999": False,  # the lookup's own probed outcome
+    "IBT-0120 SELECT A BRANCH": False,  # Copperhill's branch screen, cleared by a handler
+    "IBT-0403 ACCESS DENIED": False,
+    "IBT-0090 FUNCTION SHROPN IS NOT AVAILABLE IN THE TRAINING REGION.": False,
+    "IBT-0500-00001": False,
+}
+
+
+@pytest.mark.parametrize(("text", "is_validation"), _TELLER_CODES.items())
+def test_the_validation_state_catches_form_codes_and_nothing_else(
+    text: str, is_validation: bool
+) -> None:
+    state = next(
+        s for s in load_app_profile(APP_PROFILE).global_states if s.id == "validation_error"
+    )
+    pattern = state.detect.text_matches.pattern  # type: ignore[union-attr]
+    assert bool(re.search(pattern, text)) is is_validation
+    assert state.outcome is not None and state.outcome.quote is not None
+    if is_validation:
+        assert re.search(state.outcome.quote, text).group(0) == text  # type: ignore[union-attr]

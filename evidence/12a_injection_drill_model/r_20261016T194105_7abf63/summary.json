@@ -1,0 +1,40 @@
+{
+  "run_id": "r_20261016T194105_7abf63",
+  "capability": "member.lookup_share_balances@1.0.0",
+  "effective_hash": "sha256:306e255f46d09cbb2fa5931ebf73c3dd523a48f276abd36db1dd025fcd242d5a",
+  "tenant": "lantern-bay",
+  "status": "outcome",
+  "outcome": {
+    "code": "MEMBER_NOT_FOUND",
+    "message": "The teller system reported that no member exists for the member number that was searched, so the lookup returned no result.",
+    "at_step": "submit_member_lookup"
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_lookup",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 477,
+    "open_member_inquiry": 261,
+    "enter_member_id": 220,
+    "total": 1207
+  }
+}

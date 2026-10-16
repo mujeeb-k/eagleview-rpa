@@ -1,0 +1,19 @@
+{
+  "id": "iv_20261016T194027_6172d4",
+  "kind": "approval",
+  "run_id": "r_20261016T194024_081273",
+  "capability": "member.open_share_account@1.0.0",
+  "step_id": "post_new_share",
+  "reason": "APPROVAL_REQUIRED",
+  "state_summary": "'Ironbridge Teller 7 - LANTERN BAY FCU'; frames: top=/frames, banner=/banner, nav=/nav, main=/share/review; headings: Review - Open Share",
+  "screenshot": "steps/0007_after.png",
+  "allowed_actions": [
+    "approve",
+    "deny"
+  ],
+  "created_at": "2026-10-16T19:40:27.207755+00:00",
+  "resolution": "approved",
+  "resolved_by": "operator:scripted",
+  "resolved_at": "2026-10-16T19:40:27.232328+00:00",
+  "note": "SCRIPTED OPERATOR (stands in for a person): approved on the synthetic training tenant."
+}

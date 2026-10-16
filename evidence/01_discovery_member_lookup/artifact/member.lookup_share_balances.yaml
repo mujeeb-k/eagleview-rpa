@@ -1,10 +1,10 @@
 schema_version: '1.0'
 id: member.lookup_share_balances
 version: 1.0.0
-title: Look up a member's share accounts and read their balances.
-description: Opens Member Inquiry in the teller application, searches for a member by member number,
-  and reads the share account table. Returns each share account's suffix, description, nickname, 
-  balance, and available balance. This is read-only and does not change any member data.
+title: Look up a member by number and read their share account balances.
+description: Opens Member Inquiry in the teller application, searches for the given member number, 
+  and reads the member's share accounts table. Returns each share account's suffix, description, 
+  nickname, balance, and available balance. It is read-only and does not change any member data.
 status: verified
 app:
   profile: ironbridge-teller
@@ -17,15 +17,14 @@ inputs:
     pattern: ^[0-9]{4,10}$
     required: true
     sensitivity: identifier
-    description: Member number identifying the member whose share accounts are to be read.
+    description: The member number identifying the member to look up, consisting of digits only.
     example: '10482'
 outputs:
   share_accounts:
     type: array
     sensitivity: pii
     required: true
-    description: List of the member's share accounts with their balances as shown on the Member 
-      Inquiry screen.
+    description: List of the member's share accounts as shown on the Member Inquiry screen.
     items:
       description:
         type: string
@@ -47,8 +46,8 @@ outcomes:
         frame:
           - main
         pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
-    message: The teller system reported that no member exists for the member number that was 
-      searched (IBT-1004), so the lookup returned no result.
+    message: The teller system reports that no member exists for the member number that was searched
+      (IBT-1004).
     source: probed_verified
 steps:
   - id: open_member_inquiry
@@ -76,7 +75,7 @@ steps:
         - strategy: xpath
           expression: //a[normalize-space(.)='Member Inquiry']
         - strategy: point
-          x: 55
+          x: 54
           y: 83
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
@@ -111,12 +110,12 @@ steps:
                   expression: "//tr[normalize-space(*[1])='Member #']//input"
                 - strategy: point
                   x: 295
-                  y: 135
+                  y: 134
                   bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
               fragile: false
     timeout_ms: 8000
   - id: enter_member_id
-    intent: 'Fill the Member # field with the member number to look up.'
+    intent: 'Enter the member number into the Member # field.'
     action:
       type: fill
       value: '{{ inputs.member_id }}'
@@ -141,7 +140,7 @@ steps:
           expression: "//tr[normalize-space(*[1])='Member #']//input"
         - strategy: point
           x: 295
-          y: 135
+          y: 134
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -153,7 +152,7 @@ steps:
         equals: '{{ inputs.member_id }}'
     timeout_ms: 8000
   - id: submit_member_search
-    intent: Click GO to run the member search and display the member's accounts.
+    intent: Click the search button to run the member lookup and load the member's details.
     action:
       type: click
     target:
@@ -172,7 +171,7 @@ steps:
           expression: "//tr[normalize-space(*[1])='Member #']//img"
         - strategy: point
           x: 418
-          y: 135
+          y: 134
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -185,7 +184,7 @@ steps:
         text: Member Detail
     timeout_ms: 8000
   - id: extract_share_accounts
-    intent: Read the share accounts table from the results screen.
+    intent: Read the share accounts table from the member record on screen.
     action:
       type: extract
     extract:
@@ -217,12 +216,12 @@ success:
     - output_present: share_accounts
 provenance:
   discovered_by:
-    run_id: r_20261016T124636_906ce9
+    run_id: r_20261016T193732_fb928b
     model: claude-sonnet-5-5
-    at: '2026-10-16T12:46:52.685034Z'
+    at: '2026-10-16T19:37:47.850589Z'
   verified_by:
-    - run_id: r_20261016T124700_65ac43
-      at: '2026-10-16T12:47:31.239360Z'
-    - run_id: r_20261016T124729_1d9b18
-      at: '2026-10-16T12:47:31.239360Z'
-  content_hash: sha256:f11e2971558a3e80300a08703a18ff84b855aaacdc9195cdeea097676ab8541d
+    - run_id: r_20261016T193752_0ee5fe
+      at: '2026-10-16T19:37:54.119030Z'
+    - run_id: r_20261016T193829_1b8624
+      at: '2026-10-16T19:38:30.760803Z'
+  content_hash: sha256:8d9f676f934830674c6bcd4456697147a7891feabdb76d16d917900dc97311d6

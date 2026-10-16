@@ -159,6 +159,9 @@ class OutcomeSpec(BaseModel):
     model_config = _STRICT
     code: Code
     message: str
+    # Every visible line this pattern matches is appended to `message`, so the outcome carries
+    # the app's own words, e.g. `IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE`.
+    quote: Regex | None = None
 
 
 class GlobalState(BaseModel):

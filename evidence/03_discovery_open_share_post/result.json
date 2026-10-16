@@ -8,9 +8,9 @@
     "takeover/APPROVAL_REQUIRED",
     "approval/APPROVAL_REQUIRED"
   ],
-  "irreversible_step": "post_share_account",
-  "review": "discovery success (declared_success)\nmember.open_share_account@1.0.0: verified, risk irreversible\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_search: click\n  click_open_share: click\n  select_share_type: select\n  validate_share_form: click\n  post_share_account: click\n  outputs: (none)\n  outcomes: (none)\n  written to evidence/03_discovery_open_share_post/artifact/member.open_share_account.yaml\n  note: probing skipped: an irreversible capability is never probed\n  model spend this pipeline: $0.072348",
-  "usd": "0.072348",
+  "irreversible_step": "post_new_share",
+  "review": "discovery success (declared_success)\nmember.open_share_account@1.0.0: verified, risk irreversible\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_lookup: click\n  click_open_share: click\n  select_share_type: select\n  confirm_share_type_entry: press\n  post_new_share: click\n  outputs: (none)\n  outcomes: (none)\n  written to evidence/03_discovery_open_share_post/artifact/member.open_share_account.yaml\n  note: probing skipped: an irreversible capability is never probed\n  model spend this pipeline: $0.065279",
+  "usd": "0.065279",
   "status": "pass",
-  "seconds": 43.7
+  "seconds": 50.1
 }

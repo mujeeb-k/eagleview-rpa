@@ -216,11 +216,14 @@ def test_luhn() -> None:
     assert not luhn_ok("12345")
 
 
-def test_field_names_are_never_redacted_only_values(redactor: Redactor) -> None:
+def test_field_name_keys_are_kept_unless_they_carry_a_registered_number_or_name_word(
+    redactor: Redactor,
+) -> None:
     """At Copperhill the screen text "Search" sat beside the sensitive label "Acct Holder No.",
     was registered as that field's value, and was then scrubbed out of the run log's key
-    `submit_member_search`. A field name stays whole. Values are scrubbed as before, and keys that
-    are data (a member number, or a field-name-shaped key carrying one) are still replaced."""
+    `submit_member_search`. A snake_case key is kept whole unless it carries a registered number
+    (`member_10482`) or a word of a registered name; values are scrubbed as before, and any other
+    key (`10482`) is scrubbed like a value."""
     redactor.register("Search", Sensitivity.pii, "acct_holder_no")
     redactor.register("10482", Sensitivity.identifier, "member")
     out = redactor.redact_tree(

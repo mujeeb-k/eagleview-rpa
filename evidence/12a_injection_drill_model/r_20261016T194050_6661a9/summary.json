@@ -1,0 +1,55 @@
+{
+  "run_id": "r_20261016T194050_6661a9",
+  "capability": "member.lookup_share_balances@1.0.0",
+  "effective_hash": "sha256:3f10722917e9a4c4cdbbc8b246b0ed4fa2d4f1db8eaddc352aac202f6816bbfe",
+  "tenant": "lantern-bay",
+  "status": "success",
+  "outputs": {
+    "share_accounts": [
+      {
+        "description": "[pii]",
+        "nickname": "[pii]",
+        "balance": "1183.81",
+        "suffix": "[pii]",
+        "available_balance": "1183.81"
+      },
+      {
+        "description": "[pii]",
+        "nickname": "[pii]",
+        "balance": "5410.86",
+        "suffix": "[pii]",
+        "available_balance": "5410.86"
+      }
+    ]
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "submit_member_lookup",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 475,
+    "open_member_inquiry": 278,
+    "enter_member_id": 232,
+    "submit_member_lookup": 324,
+    "extract_share_accounts": 2,
+    "total": 1423
+  }
+}

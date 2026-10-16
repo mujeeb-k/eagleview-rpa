@@ -6,6 +6,8 @@ the RunResult contract: status, payload, recoveries and the locator report."""
 from decimal import Decimal
 from functools import cache
 
+import pytest
+
 from mock_bank.config import all_tenants
 from mock_bank.seed import Member, generate
 from tests.support.bank import Bank
@@ -209,8 +211,37 @@ async def test_maintenance_fails_app_unavailable_and_retryable(
     assert r.status == "failed"
     assert r.failure is not None
     assert r.failure.category == "APP_UNAVAILABLE" and r.failure.retryable
-    assert r.failure.step_id is None  # stopped before the first step
+    assert r.failure.step_id == "open_app"  # stopped before the first step
     assert not run.of("step.start")
+
+
+@pytest.mark.parametrize(
+    ("faults", "environ", "category", "step_id"),
+    [
+        ({"error500_on": "/inq"}, None, "APP_ERROR", "open_member_inquiry"),
+        ({"unknown_modal_on": "/member"}, None, "UNKNOWN_STATE", "submit_search"),
+        ({"maintenance": "on"}, None, "APP_UNAVAILABLE", "open_app"),
+        ({}, {}, "SESSION_LOST", "sign_on"),  # no password in the environment
+    ],
+    ids=["app_error", "unknown_state", "maintenance", "no_password"],
+)
+async def test_every_hard_failure_states_its_step_what_was_expected_and_what_was_seen(
+    replay: Replay,
+    lantern: Bank,
+    faults: dict[str, str],
+    environ: dict[str, str] | None,
+    category: str,
+    step_id: str,
+) -> None:
+    if faults:
+        lantern.set_faults(**faults)
+    run = await replay(lantern, {"member_id": DEMO}, environ=environ)
+    r = run.result
+    assert r.status == "failed"
+    assert r.failure is not None
+    assert (r.failure.category, r.failure.step_id) == (category, step_id)
+    assert r.failure.expected, "a hard failure says what was expected"
+    assert r.failure.observed, "a hard failure says what was on screen"
 
 
 async def test_escalate_parks_the_failure_for_a_human(replay: Replay, lantern: Bank) -> None:

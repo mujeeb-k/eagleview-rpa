@@ -4,7 +4,7 @@
   "shows": "recovery plus the idempotency rule",
   "command": "scripts/evidence/08_replay_session_expiry.sh",
   "run": {
-    "run_id": "r_20261016T124527_e03ea7",
+    "run_id": "r_20261016T193621_77831c",
     "status": "success",
     "recoveries": [
       "session_expired.relogin_and_restart"

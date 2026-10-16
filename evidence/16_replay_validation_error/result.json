@@ -1,0 +1,15 @@
+{
+  "scenario": "16",
+  "name": "replay_validation_error",
+  "shows": "app validation error is an outcome",
+  "command": "scripts/evidence/16_replay_validation_error.sh",
+  "run": {
+    "run_id": "r_20261016T193730_36ac42",
+    "status": "outcome",
+    "outcome": "VALIDATION_ERROR"
+  },
+  "app_code": "IBT-2210",
+  "at_step": "confirm_share_type_selection",
+  "status": "pass",
+  "seconds": 2.5
+}

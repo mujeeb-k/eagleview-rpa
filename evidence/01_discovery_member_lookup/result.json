@@ -4,8 +4,8 @@
   "shows": "LLM-driven discovery, artifact, grounding",
   "command": "scripts/evidence/01_discovery_member_lookup.sh",
   "artifact": "artifact/member.lookup_share_balances.yaml",
-  "review": "discovery success (declared_success)\nmember.lookup_share_balances@1.0.0: verified, risk read_only\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_search: click\n  extract_share_accounts: extract\n  outputs: share_accounts\n  outcomes: MEMBER_NOT_FOUND [probed_verified]\n  written to evidence/01_discovery_member_lookup/artifact/member.lookup_share_balances.yaml\n  model spend this pipeline: $0.051748",
-  "usd": "0.051748",
+  "review": "discovery success (declared_success)\nmember.lookup_share_balances@1.0.0: verified, risk read_only\n  open_member_inquiry: click\n  enter_member_id: fill\n  submit_member_search: click\n  extract_share_accounts: extract\n  outputs: share_accounts\n  outcomes: MEMBER_NOT_FOUND [probed_verified]\n  written to evidence/01_discovery_member_lookup/artifact/member.lookup_share_balances.yaml\n  note: probe 2: ok\n  model spend this pipeline: $0.048460",
+  "usd": "0.048460",
   "status": "pass",
-  "seconds": 55.2
+  "seconds": 58.4
 }

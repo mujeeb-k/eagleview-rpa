@@ -27,6 +27,7 @@ All institutions, people and data are fictional and synthetic. Runs use the trai
 | 13 | [tenant_reuse](13_tenant_reuse/) | `scripts/evidence/13_tenant_reuse.sh` | pass | cross-tenant reuse; data never crosses tenants |
 | 14 | [agent_catalog](14_agent_catalog/) | `scripts/evidence/14_agent_catalog.sh` | pass | agent-facing interface |
 | 15 | [replay_stability](15_replay_stability/) | `scripts/evidence/15_replay_stability.sh` | pass | determinism over 20 runs |
+| 16 | [replay_validation_error](16_replay_validation_error/) | `scripts/evidence/16_replay_validation_error.sh` | pass | app validation error is an outcome |
 
 ## Held-out discovery check
 

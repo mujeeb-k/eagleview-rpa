@@ -361,6 +361,10 @@ class _Engine:
         self.timing: dict[str, int] = {}
         self.spent: Counter[str] = Counter()
         self.at_step: str | None = None
+        # Where a failure is reported when no capability step is running (`open_app`, `sign_on`,
+        # `check_success`), and what the engine was waiting for, so every failure says both.
+        self._phase: str | None = None
+        self._expecting: str | None = None
         self.committed: str | None = None  # the irreversible step whose action was sent
         self.sent: set[str] = set()
         self._visible_before: set[str] = set()
@@ -430,6 +434,7 @@ class _Engine:
             self._event("step.skip", step_id=step.id, when=step.when)
             return
         self.at_step = step.id
+        self._expecting = describe(step.expect) if step.expect is not None else step.intent
         if self.desk is not None:
             self.desk.session(self.base.run_id).at_step = step.id
         self._event("step.start", step_id=step.id, action=step.action.type, risk=step.risk)
@@ -519,12 +524,15 @@ class _Engine:
                 category,
                 f"{result.action.type} was refused or failed ({result.status}): {result.reason}",
                 step_id=step.id,
+                expected=f"the {result.action.type} is allowed and sent",
             )
         )
 
     # --- opening the app and signing on -------------------------------------------------------
 
     async def _open_app(self) -> None:
+        self._phase = "open_app"
+        self._expecting = f"the entry page of {self.profile.id} opens"
         await self._navigate_entry()
         await self._settle(
             self.profile.fingerprint.detect,
@@ -566,7 +574,10 @@ class _Engine:
             )
         self.surface.app_fingerprint = f"{self.profile.id}@{major}.{minor}/{self.tenant.slug}"
         self._event("app.version", version=version, fingerprint=self.surface.app_fingerprint)
+        self._phase = "sign_on"
+        self._expecting = describe(self.profile.login.success)
         await self._sign_on()
+        self._phase = None
 
     async def _navigate_entry(self) -> None:
         url = urljoin(self.tenant.base_url + "/", self.profile.login.entry_path.lstrip("/"))
@@ -664,6 +675,8 @@ class _Engine:
         screen is classified like any settle, so a modal or an error page is reported as itself,
         never as a missing locator."""
         deadline = time.monotonic() + timeout_ms / 1000
+        what = spec.description or ", ".join(loc.strategy for loc in spec.locators)
+        self._expecting = f"exactly one uncovered element: {what}"
         while True:
             found = await self.surface.resolve(spec)
             if isinstance(found, Unique) and not found.occluded:
@@ -674,7 +687,6 @@ class _Engine:
             )
             await self._react(seen, step, login=login)
             if time.monotonic() >= deadline:
-                what = spec.description or ", ".join(loc.strategy for loc in spec.locators)
                 if isinstance(found, Ambiguous):
                     category = FailureCategory.LOCATOR_AMBIGUOUS
                     message = f"{found.count} elements match the target; replay never picks one"
@@ -698,6 +710,8 @@ class _Engine:
         what: str = "",
     ) -> None:
         deadline = time.monotonic() + timeout_ms / 1000
+        if expect is not None:
+            self._expecting = describe(expect)
         while True:
             await self._check_blocked()
             seen = await self.watch.look(
@@ -771,7 +785,11 @@ class _Engine:
     async def _hard(self, state: GlobalState, step: Step | None, *, login: bool) -> None:
         self._event("state.detected", state=state.id, step_id=self.at_step)
         if state.outcome is not None:
-            raise _Done(await self._outcome(state.outcome.code, state.outcome.message))
+            message = state.outcome.message
+            if state.outcome.quote is not None:
+                quoted = await self._quote(state.outcome.quote)
+                message += f": {'; '.join(quoted)}" if quoted else ""
+            raise _Done(await self._outcome(state.outcome.code, message))
         handler = state.recover
         if not self.committed:
             if isinstance(handler, ReloginAndRestart) and not login and self._spend(state):
@@ -787,6 +805,17 @@ class _Engine:
                 self._recovered(state, handler.type)
                 raise _Retry()
         raise _Done(await self._fail_state(state))
+
+    async def _quote(self, pattern: str) -> list[str]:
+        """The app's own words for an outcome: each visible line the pattern matches, once."""
+        rx = re.compile(pattern)
+        quoted: list[str] = []
+        for box in await self.surface.text_boxes():
+            for match in rx.finditer(box.text):
+                text = match.group(0).strip()
+                if text and text not in quoted:
+                    quoted.append(text)
+        return quoted
 
     async def _interstitial(self, state: GlobalState) -> None:
         self._event("state.detected", state=state.id, step_id=self.at_step)
@@ -905,8 +934,10 @@ class _Engine:
             allowed=["approve", "deny"],
         )
         self._event("approval.requested", intervention=iv.id, step_id=step.id)
+        self._keep_request(iv.id)
         async with self._deadline_paused():
             done = await self.desk.wait(iv.id)
+        self._keep_request(iv.id)
         by = done.resolved_by or "system"
         self.interventions.append(
             InterventionRecord(id=iv.id, kind="approval", resolution=f"{done.resolution} by {by}")
@@ -975,6 +1006,28 @@ class _Engine:
             allowed=["take_control", "resume", "abort"],
         )
         self._event("takeover.requested", intervention=iv.id, reason=reason, step_id=paused.id)
+        self._keep_request(iv.id)
+        try:
+            return await self._handed_back(
+                i, iv.id, failure, reason, session, acted_before, visible_now
+            )
+        finally:
+            self._keep_request(iv.id)
+
+    async def _handed_back(
+        self,
+        i: int,
+        iv_id: str,
+        failure: Failure | None,
+        reason: str,
+        session: LiveSession,
+        acted_before: int,
+        visible_now: list[TextBox],
+    ) -> int:
+        """The takeover after its request is open: wait for the handback, then validate."""
+        assert self.desk is not None
+        steps = self.plan.steps
+        paused = steps[min(i, len(steps) - 1)]
         async with self._deadline_paused():
             ended = await self._wait_for_handback()
         human_actions = session.actions[acted_before:]
@@ -986,10 +1039,10 @@ class _Engine:
                 self.ctl.abort("system")
             elif self.ctl.state is ControlState.AWAITING_HUMAN:
                 self.ctl.fail("system")
-            pending = self.desk.store.get(iv.id)
+            pending = self.desk.store.get(iv_id)
             if pending is not None and pending.resolution is None:
-                self.desk.resolve(iv.id, "timed_out", "system")
-            self._record_takeover(iv.id, "timed_out", len(human_actions))
+                self.desk.resolve(iv_id, "timed_out", "system")
+            self._record_takeover(iv_id, "timed_out", len(human_actions))
             category = failure.category if failure else FailureCategory.UNKNOWN_STATE
             raise _Done(
                 await self._park(
@@ -999,28 +1052,29 @@ class _Engine:
                     "takeover timed out",
                 )
             )
-        done = self.desk.store.get(iv.id)
+        done = self.desk.store.get(iv_id)
         by = (done.resolved_by if done else None) or "operator"
         if ended is ControlState.ABORTED:
-            self._record_takeover(iv.id, f"aborted by {by}", len(human_actions))
+            self._record_takeover(iv_id, f"aborted by {by}", len(human_actions))
             raise _Done(await self._fail(FailureCategory.ABORTED_BY_OPERATOR, f"aborted by {by}"))
         self.ctl.start_validation()
         resume_at = await self._validate(i)
         if resume_at is None:
             self.ctl.fail()
-            self._record_takeover(iv.id, f"resumed by {by}; state mismatch", len(human_actions))
+            self._record_takeover(iv_id, f"resumed by {by}; state mismatch", len(human_actions))
             raise _Done(
                 await self._fail(
                     FailureCategory.HANDOFF_STATE_MISMATCH,
                     "after the handback, no step's expected state holds",
                     step_id=paused.id,
+                    expected="the expected state of the paused step or a later one holds",
                 )
             )
         self.ctl.resume_automation()
         self.actor = AUTOMATION
-        self._record_takeover(iv.id, f"resumed by {by}", len(human_actions))
+        self._record_takeover(iv_id, f"resumed by {by}", len(human_actions))
         where = steps[resume_at].id if resume_at < len(steps) else "the end"
-        self._event("takeover.resumed", intervention=iv.id, resume_at=where)
+        self._event("takeover.resumed", intervention=iv_id, resume_at=where)
         self._propose_patch(human_actions, visible_now)
         return resume_at
 
@@ -1059,6 +1113,14 @@ class _Engine:
             return i if paused.action.type == "extract" else None
         found = await self.surface.resolve(paused.target)
         return i if isinstance(found, Unique) and not found.occluded else None
+
+    def _keep_request(self, iv_id: str) -> None:
+        """The request for a person, as it stands, kept in the run folder through the writer, so it
+        is redacted like all evidence. The desk's SQLite store is a working file, not evidence."""
+        assert self.desk is not None
+        iv = self.desk.store.get(iv_id)
+        if iv is not None:
+            self.base.writer.write_json(f"intervention_{iv.id.lower()}", iv)
 
     def _record_takeover(self, iv_id: str, resolution: str, human_actions: int) -> None:
         self.interventions.append(
@@ -1163,10 +1225,13 @@ class _Engine:
 
     async def _finish(self) -> RunResult:
         self.at_step = None
+        self._phase = "check_success"
+        self._expecting = "the outputs match the capability's contract"
         values, errors = validate_outputs(self.plan_capability.outputs, self.outputs)
         if errors:
             problems = "; ".join(f"{e.field}: {e.code}" for e in errors)
             raise _Done(await self._fail(FailureCategory.OUTPUT_INVALID, problems))
+        self._expecting = describe(self.plan.success)
         self.base.writer.redactor.register_outputs(values)
         if not await self.surface.check(self.plan.success, PredicateContext(outputs=values)):
             raise _Done(
@@ -1211,12 +1276,13 @@ class _Engine:
             message += ". Check the app before trying again: replay never retries after a commit"
             retryable = False
         evidence, observed = await self._capture_failure()
+        step_id = step_id or self.at_step or self._phase or "run"
         if self.options.probe and category in _PROBED:
-            await self._write_probe(category, step_id or self.at_step)
+            await self._write_probe(category, step_id)
         failure = Failure(
             category=category,
-            step_id=step_id or self.at_step,
-            expected=expected,
+            step_id=step_id,
+            expected=expected or self._expecting or "the run reaches its success condition",
             observed=observed,
             message=message,
             retryable=retryable,
@@ -1257,7 +1323,7 @@ class _Engine:
             self.doms.append(("failure", await self.surface.dom_snapshot()))
         except Exception as exc:  # evidence is best effort; the result must still come back
             self._event("evidence.error", error=type(exc).__name__)
-            return FailureEvidence(events="run.jsonl"), None
+            return FailureEvidence(events="run.jsonl"), f"the screen could not be read: {exc}"
         return (
             FailureEvidence(
                 screenshot=f"steps/{number:04d}_after.png",

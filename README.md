@@ -139,7 +139,7 @@ overwriting a file.
 - about $0.03–0.05 for discovery alone;
 - about $0.04–0.07 for the whole pipeline (discover, compile, verify, probe).
 
-Every call is recorded in `runs/discovery_ledger.jsonl`, and discovery stops at $25 total or 33
+Every call is recorded in `runs/discovery_ledger.jsonl`, and discovery stops at $25 total or 45
 runs.
 
 **Approving is a person's step:**

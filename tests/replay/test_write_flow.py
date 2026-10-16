@@ -77,6 +77,26 @@ async def test_access_denied_is_an_outcome_not_a_failure(replay: Replay, lantern
     assert (r.outcome.code, r.outcome.at_step) == ("NOT_PERMITTED", "open_share_form")
 
 
+async def test_a_form_the_app_refuses_is_a_validation_outcome_quoting_the_app(
+    replay: Replay, lantern: Bank
+) -> None:
+    """The demo member already has a Holiday Club share, so the app refuses a second one with
+    IBT-2210 and keeps the form on screen. That is the app's answer, not a timeout."""
+    before = share_rows(lantern, DEMO)
+    inputs = {"member_id": DEMO, "share_type": "Holiday Club"}
+    run = await replay(lantern, inputs, capability=OPEN_SHARE, options=APPROVED)
+    r = run.result
+    assert r.status == "outcome", r.failure
+    assert r.failure is None
+    assert r.outcome is not None
+    assert (r.outcome.code, r.outcome.at_step) == ("VALIDATION_ERROR", "validate_share")
+    assert r.outcome.message == (
+        "The teller app refused the form: IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE"
+    )
+    assert not [e for e in run.of("surface.act") if e.get("step_id") == "post_share"]
+    assert share_rows(lantern, DEMO) == before
+
+
 @pytest.mark.parametrize(
     ("faults", "cause"),
     [

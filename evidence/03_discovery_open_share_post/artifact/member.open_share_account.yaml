@@ -1,10 +1,10 @@
 schema_version: '1.0'
 id: member.open_share_account
 version: 1.0.0
-title: Open a share account of a chosen type for a member.
-description: 'Looks up a member by member number in Member Inquiry, opens a new share account of the requested
-  type (for example Money Market), validates the form and posts it. This changes data: it creates a new
-  share account for the member. No data is returned.'
+title: Open a new share account of a given type for a member.
+description: Looks up a member by member number in Member Inquiry, opens the Open Share form, 
+  selects the requested share type, and clicks Post. This changes data by creating and posting a new
+  share account for the member. It returns no data.
 status: verified
 app:
   profile: ironbridge-teller
@@ -19,12 +19,12 @@ inputs:
     sensitivity: identifier
     description: Member number identifying the member who will own the new share account.
     example: '10482'
-  share_account_type:
+  account_type:
     type: string
-    pattern: ^[A-Za-z][A-Za-z0-9 &/\-]{1,39}$
+    pattern: ^[A-Za-z][A-Za-z0-9 &/\-]{1,40}$
     required: true
     sensitivity: none
-    description: Name of the share account type to open, as shown in the Share Type drop-down.
+    description: Share type name to open, as shown in the Share Type list.
     example: Money Market
 outputs: {}
 outcomes: []
@@ -94,7 +94,7 @@ steps:
               fragile: false
     timeout_ms: 8000
   - id: enter_member_id
-    intent: 'Enter the member number in the Member # field.'
+    intent: 'Enter the member number in the Member # field to look up the member.'
     action:
       type: fill
       value: '{{ inputs.member_id }}'
@@ -130,8 +130,8 @@ steps:
         target: self
         equals: '{{ inputs.member_id }}'
     timeout_ms: 8000
-  - id: submit_member_search
-    intent: Click the search control to load the member's detail page.
+  - id: submit_member_lookup
+    intent: Click the GO image button to run the lookup and load the member detail.
     action:
       type: click
     target:
@@ -190,7 +190,7 @@ steps:
               fragile: false
     timeout_ms: 8000
   - id: click_open_share
-    intent: Click Open Share on the member detail page to start a new share account.
+    intent: Click the Open Share button to start a new share account for the member.
     action:
       type: click
     target:
@@ -254,10 +254,10 @@ steps:
               fragile: false
     timeout_ms: 8000
   - id: select_share_type
-    intent: Choose the requested share type in the Share Type drop-down.
+    intent: Choose the requested account type in the Share Type list.
     action:
       type: select
-      option: '{{ inputs.share_account_type }}'
+      option: '{{ inputs.account_type }}'
     target:
       description: combobox in frame main
       frame:
@@ -282,43 +282,19 @@ steps:
           y: 166
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
-    risk: read
+    risk: write_staged
     idempotent: true
     requires_approval: false
     expect:
       field_value:
         target: self
-        equals: '{{ inputs.share_account_type }}'
+        equals: '{{ inputs.account_type }}'
     timeout_ms: 8000
-  - id: validate_share_form
-    intent: Click Validate to check the new share account details before posting.
+  - id: confirm_share_type_entry
+    intent: Press a key to confirm the share type selection in the form.
     action:
-      type: click
-    target:
-      description: "'Validate' button in frame main"
-      frame:
-        - main
-      locators:
-        - strategy: a11y
-          role: button
-          name: Validate
-        - strategy: anchor
-          anchor_text:
-            - Monthly
-          relation: below
-          control: button
-        - strategy: text
-          text: Validate
-          exact: true
-        - strategy: css
-          selector: input[type="submit"][value="Validate"]
-        - strategy: xpath
-          expression: //input[@value='Validate']
-        - strategy: point
-          x: 337
-          y: 251
-          bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
-      fragile: false
+      type: press
+      key: Return
     risk: write_staged
     idempotent: true
     requires_approval: false
@@ -350,7 +326,7 @@ steps:
                   bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
               fragile: false
     timeout_ms: 8000
-  - id: post_share_account
+  - id: post_new_share
     intent: Click Post to commit the new share account.
     action:
       type: click
@@ -390,10 +366,10 @@ success:
     text: Share Account Opened
 provenance:
   discovered_by:
-    run_id: r_20261016T124838_b9e91d
+    run_id: r_20261016T193937_ac058c
     model: claude-sonnet-5-5
-    at: '2026-10-16T12:49:12.269483Z'
+    at: '2026-10-16T19:40:20.028549Z'
   verified_by:
-    - run_id: r_20261016T124918_4c5d79
-      at: '2026-10-16T12:49:22.171827Z'
-  content_hash: sha256:c2c5f8518e610666e42254a7a0fe38ad4df370e92e3d489e1c46123319401717
+    - run_id: r_20261016T194024_081273
+      at: '2026-10-16T19:40:27.860469Z'
+  content_hash: sha256:7286410908ffa780469bdafae47b25864014f06038548ee6a34f7534a24e8712

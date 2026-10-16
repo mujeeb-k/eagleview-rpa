@@ -5,11 +5,11 @@
   "command": "scripts/evidence/13_tenant_reuse.sh",
   "base_at_copperhill": "UNKNOWN_STATE",
   "runs": {
-    "base": "r_20261016T124546_92dec2",
-    "lantern": "r_20261016T124601_8c125e",
-    "copperhill": "r_20261016T124603_b99fe1",
-    "crossed": "r_20261016T124605_62db1c"
+    "base": "r_20261016T193639_0f83ca",
+    "lantern": "r_20261016T193655_0b5d99",
+    "copperhill": "r_20261016T193656_a4d4a7",
+    "crossed": "r_20261016T193658_4c9c3f"
   },
   "status": "pass",
-  "seconds": 20.2
+  "seconds": 20.7
 }

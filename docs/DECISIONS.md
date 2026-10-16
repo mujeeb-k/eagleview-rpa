@@ -1320,17 +1320,23 @@ the time each replay finishes. A test checks the entries against each run's own 
 that the first verify finished before the final one. The committed artifacts are unchanged: they
 were verified and approved as they are, and editing them would break their content hashes.
 
-**[REVIEW] Field names are never redacted, only values.** At Copperhill, "Search" sat on screen
-beside the sensitive label "Acct Holder No.", was registered as that field's value, and was then
-scrubbed out of a run-log key, `submit_member_search`. Keys shaped like field names (snake_case:
-step ids, input, output and timing names) are now kept whole. Two exceptions remain, because the
-writer and property tests pin them and must not be weakened: a field-name-shaped key carrying a
-registered number (`member_10482`), or a word of a registered person's name (a member named
-"Member" would otherwise be revealed by `member_id`), is scrubbed. Any other key (with spaces or
-punctuation, or a name) is scrubbed like a value, as before. The alternative, never touching keys at all, would let a key built from
-data (`"row 10482"`) through. The over-match that registered "Search" as a value (a button label
-inside a sensitive label's value region) remains: it hides the word in free text on that screen,
-which errs towards hiding.
+**[REVIEW] Field-name keys are kept whole unless they carry a registered value.** At Copperhill,
+"Search" sat on screen beside the sensitive label "Acct Holder No.", was registered as that
+field's value, and was then scrubbed out of a run-log key, `submit_member_search`. The exact rule,
+in `Redactor._key`: a mapping key that is lowercase snake_case (`[a-z][a-z0-9_]*`: step ids,
+input, output and timing names) is kept whole, unless
+- it contains a run of 4 or more digits that is a registered value or amount (`member_10482`), or
+- one of its letter runs is a word of a registered person's name (a member named "Member" would
+  otherwise be revealed by `member_id`).
+
+Such a key, and every key of any other shape (with spaces, capitals or punctuation, or a bare
+number such as `"10482"`), is redacted exactly like a value. Values are redacted as before. So
+"field names are never redacted" is not quite true: the two exceptions exist because the writer
+and property tests pin them, and weakening those tests was ruled out. The alternative, never
+touching keys at all, would let a key built from data (`"row 10482"`) through. The over-match that
+registered "Search" as a value (a button label inside a sensitive label's value region) remains:
+it hides the word in free text on that screen, which errs towards hiding. The test is
+`test_field_name_keys_are_kept_unless_they_carry_a_registered_number_or_name_word`.
 
 ## 2026-10-16 — The narrated demo, finished
 
@@ -1358,3 +1364,46 @@ button for GO; the card shows all four, from the overlay files.
 **The film is rendered by the evidence script.** `scripts/evidence/demo_video.sh` now only
 records footage (opt-in) and then renders the story with Remotion to `evidence/demo.mp4` and
 `evidence/demo_poster.png`; the old ffmpeg assembly was removed with the film it made.
+
+## 2026-10-16 — Closing the audit's gaps
+
+**[REVIEW] App validation errors are a business outcome, detected by the app profile.** Ironbridge
+shows a refused form field as an `IBT-2xxx` code in red, with the form still on screen. The
+profile now has a `validation_error` global state matching `IBT-2\d{3}`, whose outcome is
+`VALIDATION_ERROR`, and a new `quote` field puts every matching line in the message: "The teller
+app refused the form: IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE". It lives in the profile,
+so the committed capabilities and their hashes are unchanged. The pattern is deliberately narrow.
+Profile states are checked before a capability's own outcomes, so a broad `IBT-\d{4}` would turn
+IBT-1004, the lookup's probed MEMBER_NOT_FOUND, into a validation error. It would also catch
+IBT-0xxx system codes such as Copperhill's branch screen. A test pins which codes match. Evidence
+16 opens a second Holiday Club for the demo member, the real duplicate rule of the mock bank,
+rather than a fault: IBT-2201 can't be reached through the recipe's own select step.
+
+**[REVIEW] Every hard failure names its step, what was expected, and what was seen.** The engine
+now remembers what it is waiting for (the step's `expect`, a target, the sign-on success, the
+output contract), and `_fail` uses that when a call site gives nothing. That was the gap in
+evidence 09: a failure pre-empted by a hard state carried no `expected`. A failure before the
+first step or after the last names a phase as its step: `open_app`, `sign_on` or
+`check_success`. The alternative, leaving the step empty there, is what the audit flagged. The
+old maintenance test asserted an empty step; it now asserts `open_app`. If the screen can't be
+read at all, `observed` says so.
+
+**Every request for a person is kept in the run folder.** The engine and discovery write each
+intervention to `intervention_<id>.json` through the evidence writer, so it is redacted like
+everything else. It is written when it opens and again when it is resolved. The desk's SQLite
+store is still deleted after an evidence scenario, because it is a working file the writer never
+redacted. Evidence 10 checks that the kept request shows the capability, step, reason, state
+summary and screenshot.
+
+**[REVIEW] A stalled discovery goes to a person, and the model is not resumed.** No progress over
+4 actions, the action or tool-call limit, and the 600 s limit now open a `DISCOVERY_STALLED`
+takeover on the live screen, with a redacted screenshot. The run ends `needs_human`, keeping the
+stall as its stop reason, whether the person hands back, aborts, or doesn't answer. Their actions
+are recorded in the trace. Resuming the model after a handback was rejected, because the limits
+are cost guards: resuming would quietly extend them. Time a person holds the session no longer
+counts towards the 600 s, for model requests and approvals too. Without a desk the run still ends
+`needs_human`. The tests use the scripted fake model and a fake discovery clock (`_clock`), with
+no paid runs.
+
+**The run cap is 45, up from 33.** The user authorised paid runs to regenerate all evidence with
+`make evidence`, about 6 runs, on top of the 31 already in the ledger. The ledger is unchanged.

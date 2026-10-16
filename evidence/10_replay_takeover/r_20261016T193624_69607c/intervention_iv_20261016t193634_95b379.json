@@ -1,0 +1,20 @@
+{
+  "id": "iv_20261016T193634_95b379",
+  "kind": "takeover",
+  "run_id": "r_20261016T193624_69607c",
+  "capability": "member.lookup_share_balances@1.0.0",
+  "step_id": "submit_member_search",
+  "reason": "UNKNOWN_STATE",
+  "state_summary": "'Ironbridge Teller 7 - LANTERN BAY FCU'; frames: top=/frames, banner=/banner, nav=/nav, main=/member; headings: (no headings)",
+  "screenshot": "steps/0005_after.png",
+  "allowed_actions": [
+    "take_control",
+    "resume",
+    "abort"
+  ],
+  "created_at": "2026-10-16T19:36:34.217891+00:00",
+  "resolution": "resumed",
+  "resolved_by": "operator:scripted",
+  "resolved_at": "2026-10-16T19:36:34.372277+00:00",
+  "note": "SCRIPTED OPERATOR (stands in for a person): supervisor notified; cleared the drawer alert."
+}

@@ -3,6 +3,7 @@ in the same event loop, and a SCRIPTED operator driving it over the console's HT
 
 import asyncio
 import base64
+import json
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -96,6 +97,17 @@ async def test_operator_clears_an_unknown_modal_and_the_run_completes(
     assert state.source == "human_demonstrated"
     assert state.detect.model_dump() == {"text_present": {"frame": [], "text": "Cash Drawer Alert"}}
     assert isinstance(state.recover, ClickSequence) and len(state.recover.clicks) == 2
+
+    # The request itself is kept in the run folder, written through the redacting writer.
+    kept = json.loads((run.run_dir / f"intervention_{iv['id'].lower()}.json").read_text())
+    assert kept["capability"] == r.capability
+    assert (kept["kind"], kept["step_id"], kept["reason"]) == (
+        "takeover",
+        "submit_search",
+        "UNKNOWN_STATE",
+    )
+    assert kept["state_summary"] and (run.run_dir / kept["screenshot"]).is_file()
+    assert (kept["resolution"], kept["resolved_by"]) == ("resumed", "operator:scripted")
 
 
 async def test_abort_ends_the_run_aborted_by_operator(

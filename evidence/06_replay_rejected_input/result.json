@@ -4,7 +4,7 @@
   "shows": "preflight validation, UI never touched",
   "command": "scripts/evidence/06_replay_rejected_input.sh",
   "run": {
-    "run_id": "r_20261016T124525_f0525f",
+    "run_id": "r_20261016T193619_63dbbc",
     "status": "rejected",
     "rejection": "INPUT_INVALID"
   },

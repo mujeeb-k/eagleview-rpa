@@ -8,12 +8,13 @@
     "takeover/UNKNOWN_STATE"
   ],
   "run": {
-    "run_id": "r_20261016T124530_23fd96",
+    "run_id": "r_20261016T193624_69607c",
     "status": "success",
     "interventions": [
       "takeover: resumed by operator:scripted"
     ]
   },
+  "intervention_request": "r_20261016T193624_69607c/intervention_iv_20261016t193634_95b379.json",
   "status": "pass",
   "seconds": 10.5
 }

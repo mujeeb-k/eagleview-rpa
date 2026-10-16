@@ -1,0 +1,19 @@
+{
+  "id": "iv_20261016T194014_2da8a8",
+  "kind": "takeover",
+  "run_id": "r_20261016T193937_ac058c",
+  "goal": "For member [member], open a Money Market share account and post it.",
+  "reason": "APPROVAL_REQUIRED",
+  "state_summary": "'Ironbridge Teller 7 - LANTERN BAY FCU'; frames: top=/frames, banner=/banner, nav=/nav, main=/share/review; headings: Review - Open Share",
+  "screenshot": "steps/0010_before.png",
+  "allowed_actions": [
+    "take_control",
+    "resume",
+    "abort"
+  ],
+  "created_at": "2026-10-16T19:40:14.610640+00:00",
+  "resolution": "resumed",
+  "resolved_by": "operator:scripted",
+  "resolved_at": "2026-10-16T19:40:14.768124+00:00",
+  "note": "SCRIPTED OPERATOR (stands in for a person): checked the review screen and posted."
+}

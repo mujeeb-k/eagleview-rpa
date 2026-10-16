@@ -1,0 +1,55 @@
+{
+  "run_id": "r_20261016T193730_36ac42",
+  "capability": "member.open_share_account@1.0.0",
+  "effective_hash": "sha256:5f448f369f661e8de8d78b44799a12c677bec2db697a3bdae8670050bcbc5d03",
+  "tenant": "lantern-bay",
+  "status": "outcome",
+  "outcome": {
+    "code": "VALIDATION_ERROR",
+    "message": "The teller app refused the form: IBT-2210 MEMBER ALREADY HAS A HOLIDAY CLUB SHARE",
+    "at_step": "confirm_share_type_selection"
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "enter_member_id",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "select_member_result",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "click_open_share",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    },
+    {
+      "step_id": "select_share_type",
+      "strategy": "anchor",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 464,
+    "open_member_inquiry": 259,
+    "enter_member_id": 218,
+    "select_member_result": 509,
+    "click_open_share": 410,
+    "select_share_type": 250,
+    "total": 2303
+  }
+}

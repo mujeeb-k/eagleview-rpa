@@ -2,10 +2,9 @@ schema_version: '1.0'
 id: member.lookup_share_balances
 version: 1.0.0
 title: Look up a member's share account balances by member number.
-description: Opens Member Inquiry in the teller application, searches for the given member number, 
-  and reads the member's share accounts from the results. Returns each share account's suffix, 
-  description, nickname, balance, and available balance. This is read-only and does not change any 
-  member data.
+description: Opens Member Inquiry in the teller application, enters the supplied member number, and 
+  runs the lookup. Returns the list of the member's share accounts with suffix, description, 
+  nickname, balance, and available balance. This is read-only and does not change any member data.
 status: verified
 app:
   profile: ironbridge-teller
@@ -18,15 +17,15 @@ inputs:
     pattern: ^[0-9]{4,10}$
     required: true
     sensitivity: identifier
-    description: The member number identifying the member to look up, digits only.
+    description: The member number identifying the member whose share accounts are to be looked up, 
+      digits only.
     example: '10377'
 outputs:
   share_accounts:
     type: array
     sensitivity: pii
     required: true
-    description: List of the member's share accounts with their balances as shown on the Member 
-      Inquiry screen.
+    description: List of the member's share accounts as shown on the Member Inquiry screen.
     items:
       description:
         type: string
@@ -47,12 +46,12 @@ outcomes:
       text_matches:
         frame: []
         pattern: (?i)IBT-1004\s+NO MEMBER FOUND FOR NUMBER
-    message: The member search found no member matching the member number that was entered 
-      (IBT-1004), so the member does not exist or the number is incorrect.
+    message: The teller system reported that no member exists for the member number that was 
+      searched, so the lookup returned no result.
     source: probed_verified
 steps:
   - id: open_member_inquiry
-    intent: Open the Member Inquiry screen from the navigation menu.
+    intent: Open the Member Inquiry screen from the left navigation menu.
     action:
       type: click
     target:
@@ -76,8 +75,8 @@ steps:
         - strategy: xpath
           expression: //a[normalize-space(.)='Member Inquiry']
         - strategy: point
-          x: 54
-          y: 82
+          x: 55
+          y: 83
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -111,7 +110,7 @@ steps:
                   expression: "//tr[normalize-space(*[1])='Member #']//input"
                 - strategy: point
                   x: 295
-                  y: 134
+                  y: 135
                   bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
               fragile: false
     timeout_ms: 8000
@@ -141,7 +140,7 @@ steps:
           expression: "//tr[normalize-space(*[1])='Member #']//input"
         - strategy: point
           x: 295
-          y: 134
+          y: 135
           bound_to_fingerprint: ironbridge-teller@7.2/lantern-bay
       fragile: false
     risk: read
@@ -152,8 +151,8 @@ steps:
         target: self
         equals: '{{ inputs.member_id }}'
     timeout_ms: 8000
-  - id: submit_member_search
-    intent: Click the search button to run the member lookup and display the member's accounts.
+  - id: submit_member_lookup
+    intent: Click the search image button to run the member lookup and load the member's accounts.
     action:
       type: click
     target:
@@ -185,7 +184,7 @@ steps:
         text: Member Detail
     timeout_ms: 8000
   - id: extract_share_accounts
-    intent: Read the share accounts table from the results screen.
+    intent: Read the share account rows from the screen.
     action:
       type: extract
     extract:
@@ -213,16 +212,16 @@ success:
     - text_present:
         frame:
           - main
-        text: Share Accounts
+        text: Member Detail
     - output_present: share_accounts
 provenance:
   discovered_by:
-    run_id: r_20261016T124922_f2665b
+    run_id: r_20261016T194028_0539f4
     model: claude-sonnet-5-5
-    at: '2026-10-16T12:49:40.769397Z'
+    at: '2026-10-16T19:40:46.207957Z'
   verified_by:
-    - run_id: r_20261016T124945_99487b
-      at: '2026-10-16T12:50:13.568382Z'
-    - run_id: r_20261016T125012_e8b7a7
-      at: '2026-10-16T12:50:13.568382Z'
-  content_hash: sha256:674890272bf58125e715aa08a8626155dd482f98b383fa9d55fc2088d01e4b65
+    - run_id: r_20261016T194050_6661a9
+      at: '2026-10-16T19:40:51.856216Z'
+    - run_id: r_20261016T194115_66d6f1
+      at: '2026-10-16T19:41:17.363232Z'
+  content_hash: sha256:8f92ce2ead47325c5ef43cea6db6b59b4e1ed3f808d13ce59c0190475e7004da

@@ -11,8 +11,13 @@ Per the Claude API facts in CLAUDE.md:
 - thinking is adaptive with summarized display, and the summaries are logged as the rationale.
 
 Stop conditions: declare_success; 40 screen-changing actions; 80 tool calls of any kind; 10
-minutes; no progress over 4 screen-changing actions; 2 policy blocks; request_human without a
-person; a turn that ends without declare_success; a refusal; the spend limits."""
+minutes, not counting time a person holds the session; no progress over 4 screen-changing actions;
+2 policy blocks; request_human without a person; a turn that ends without declare_success; a
+refusal; the spend limits.
+
+A stall (no progress, or the action, tool-call or time limit) never just ends: the live session
+goes to a person with a DISCOVERY_STALLED request, and the run ends `needs_human`. The model does
+not resume afterwards, because the limits are cost guards."""
 
 import asyncio
 import base64
@@ -64,6 +69,9 @@ QUIET_POLL_S = 0.25
 QUIET_MAX_S = 3.0
 LLM = "llm"
 _POLICY = frozenset({"blocked", "needs_approval", "escalate"})
+STALLS = frozenset({"no_progress", "action_limit", "tool_call_limit", "time_limit"})
+# The discovery clock. A module attribute, so a test can move time without touching asyncio's.
+_clock = time.monotonic
 
 Status = Literal["success", "failed", "needs_human", "budget_stopped"]
 
@@ -184,7 +192,7 @@ async def discover(
 ) -> DiscoveryResult:
     writer = EvidenceWriter(runs_root, run_id or new_run_id(), Redactor.from_policy(policy))
     rid = writer.run_id
-    started = time.monotonic()
+    started = _clock()
     result = DiscoveryResult(
         run_id=rid,
         goal=config.goal,
@@ -244,7 +252,7 @@ async def discover(
         result.served_models = sorted(loop.served)
         result.usd = loop.usd
         result.fallbacks = loop.cfg.fallbacks
-    result.seconds = round(time.monotonic() - started, 1)
+    result.seconds = round(_clock() - started, 1)
     writer.event("discovery.end", "system", status=result.status, stop_reason=result.stop_reason)
     writer.summary(result)
     return result
@@ -286,6 +294,29 @@ class _Loop:
     # --- the conversation ---------------------------------------------------------------------
 
     async def run(self) -> None:
+        try:
+            await self._converse()
+        except _Stop as stop:
+            if stop.reason in STALLS:
+                await self._stalled(stop)
+            raise
+
+    async def _stalled(self, stop: _Stop) -> None:
+        """Hand a stalled run to a person on the screen it stalled on. They may finish the step by
+        hand (recorded in the trace) or abort; either way the run ends `needs_human`."""
+        detail = stop.message or stop.reason
+        self.writer.event("discovery.stalled", "system", stop_reason=stop.reason, detail=detail)
+        if self.desk is None:
+            raise _Stop("needs_human", stop.reason, f"stalled: {detail}; no person is attached")
+        try:
+            handed = await self._hand_over("DISCOVERY_STALLED", detail)
+        except _Stop as answer:
+            why = "nobody answered" if answer.reason == "no_human" else answer.reason
+            raise _Stop("needs_human", stop.reason, f"stalled: {detail}; {why}") from None
+        self._record_human(handed)
+        raise _Stop("needs_human", stop.reason, f"stalled: {detail}; a person handed back")
+
+    async def _converse(self) -> None:
         self.surface.record_candidates = True
         self.tools = [TOOLSET, *custom_tools(list(self.goal.values))]
         obs = await self.surface.observe()
@@ -299,8 +330,8 @@ class _Loop:
             }
         )
         while True:
-            if time.monotonic() - self.started > self.cfg.max_seconds:
-                raise _Stop("failed", "time_limit")
+            if _clock() - self.started > self.cfg.max_seconds:
+                raise _Stop("failed", "time_limit", f"{self.cfg.max_seconds:g} s without success")
             response = await self._call()
             self.turns += 1
             self.messages.append({"role": "assistant", "content": response.content})
@@ -524,27 +555,36 @@ class _Loop:
         ctl = self.session.controller
         session = self.desk.session(self.run_id)
         acted_before = len(session.actions)
-        self.desk.open(
+        obs = await self.surface.observe()
+        shot = self._write_shot("before", obs.screenshot, await self.surface.text_boxes())
+        iv = self.desk.open(
             kind="takeover",
             run_id=self.run_id,
             capability=None,
             goal=self.cfg.goal,
             step_id=None,
             reason=reason,
-            state_summary=(await self.surface.observe()).summary(),
-            screenshot=None,
+            state_summary=obs.summary(),
+            screenshot=shot,
             allowed=["take_control", "resume", "abort"],
         )
-        self.writer.event("discovery.handover", "system", reason=reason, detail=detail)
+        self.writer.event(
+            "discovery.handover", "system", reason=reason, detail=detail, intervention=iv.id
+        )
+        self._keep_request(iv.id)
         ctl.escalate()
+        waited_from = _clock()
         try:
             async with asyncio.timeout(self.desk.human_timeout_s):
                 state = await ctl.wait_for({ControlState.RESUME_REQUESTED, ControlState.ABORTED})
         except TimeoutError:
-            for iv in self.desk.open_for(self.run_id):
-                self.desk.resolve(iv.id, "timed_out", "system")
+            for open_iv in self.desk.open_for(self.run_id):
+                self.desk.resolve(open_iv.id, "timed_out", "system")
             ctl.fail("system")
             raise _Stop("needs_human", "no_human", reason) from None
+        finally:
+            self.started += _clock() - waited_from  # a person's time is not the model's
+            self._keep_request(iv.id)
         if state is ControlState.ABORTED:
             raise _Stop("needs_human", "aborted_by_operator", reason)
         ctl.start_validation()
@@ -651,11 +691,15 @@ class _Loop:
         # Money: at least one amount, and every non-empty cell one. An empty column is text.
         return [spec.columns[k] for k, n in parsed.items() if n and k not in refused]
 
-    async def _ask_human(self, block: Any, reason: str) -> tuple[dict[str, Any], bool]:
-        self._record("request_human", "custom", {"reason": reason}, status="requested")
-        if self.desk is None:
-            raise _Stop("needs_human", "request_human", reason)
-        handed = await self._hand_over("MODEL_REQUEST", reason)
+    def _keep_request(self, iv_id: str) -> None:
+        """The request for a person, as it stands, in the run folder through the redacting
+        writer. The desk's SQLite store is a working file, not evidence."""
+        assert self.desk is not None
+        iv = self.desk.store.get(iv_id)
+        if iv is not None:
+            self.writer.write_json(f"intervention_{iv.id.lower()}", iv)
+
+    def _record_human(self, handed: list[HumanAction] | None) -> None:
         for human in handed or []:
             self._record(
                 human.action.type,
@@ -666,6 +710,12 @@ class _Loop:
                 grounded=human.grounded.model_dump(mode="json") if human.grounded else None,
                 decision=_decision(human.decision),
             )
+
+    async def _ask_human(self, block: Any, reason: str) -> tuple[dict[str, Any], bool]:
+        self._record("request_human", "custom", {"reason": reason}, status="requested")
+        if self.desk is None:
+            raise _Stop("needs_human", "request_human", reason)
+        self._record_human(await self._hand_over("MODEL_REQUEST", reason))
         done = self.desk.store.list(run_id=self.run_id)
         note = (done[-1].note if done else None) or "no note"
         return _result(block, f"A person handed control back. Their note: {note}"), True

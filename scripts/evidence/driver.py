@@ -367,9 +367,13 @@ async def s09(ctx: Ctx, out: Path) -> dict[str, Any]:
     expect(r.status == "failed" and r.failure is not None, f"{r.status}")
     f = r.failure
     expect(f.category == "APP_ERROR", f"{f.category}")  # type: ignore[union-attr]
+    # A hard failure states where it stopped, what it was waiting for, and what it saw. The
+    # detail is in the run's summary.json; result.json only records that it is there.
+    filled = {k: bool(getattr(f, k)) for k in ("step_id", "expected", "observed")}
+    expect(all(filled.values()), f"failure detail missing: {filled}")
     ev = f.evidence  # type: ignore[union-attr]
     expect(bool(ev.screenshot and ev.dom_snapshot), "screenshot and DOM snapshot")
-    return {"run": brief(r)}
+    return {"run": brief(r), "failure_states": sorted(filled)}
 
 
 async def s10(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -384,7 +388,18 @@ async def s10(ctx: Ctx, out: Path) -> dict[str, Any]:
         done = await answered(answering, brief(r))
     expect(r.status == "success", f"{r.status}: {r.failure}")
     expect((out / r.run_id / "proposed_overlay.yaml").is_file(), "a proposed patch")
-    return {"operator": LABEL, "operator_did": done, "run": brief(r)}
+    # The request for a person, kept (redacted, by the writer) in the run folder.
+    [kept] = sorted((out / r.run_id).glob("intervention_*.json"))
+    request = json.loads(kept.read_text())
+    shown = ("capability", "step_id", "reason", "state_summary", "screenshot")
+    expect(all(request.get(k) for k in shown), f"the request lacks {shown}: {sorted(request)}")
+    expect((out / r.run_id / request["screenshot"]).is_file(), "the request's screenshot")
+    return {
+        "operator": LABEL,
+        "operator_did": done,
+        "run": brief(r),
+        "intervention_request": str(kept.relative_to(out)),
+    }
 
 
 async def s11(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -410,6 +425,20 @@ async def s11(ctx: Ctx, out: Path) -> dict[str, Any]:
     expect(r.recoveries == [], "recovered after the commit")
     expect(bank.share_rows("10482") == before + 1, "exactly one new share")
     return {"operator": LABEL, "operator_did": done, "run": brief(r)}
+
+
+async def s16(ctx: Ctx, out: Path) -> dict[str, Any]:
+    """The demo member already has a Holiday Club share: the app refuses a second one with an
+    IBT-2xxx code, and replay returns that as a business outcome quoting the app."""
+    bank = ctx.banks["lantern-bay"]
+    before = bank.share_rows("10482")
+    inputs = {**example_inputs(OPEN_SHARE), "share_account_type": "Holiday Club"}
+    r = await ctx.replay(out, OPEN_SHARE, inputs)
+    expect(r.status == "outcome" and r.outcome is not None, f"{r.status}: {r.failure}")
+    expect(r.outcome.code == "VALIDATION_ERROR", f"{r.outcome}")  # type: ignore[union-attr]
+    expect("IBT-2210" in r.outcome.message, f"{r.outcome.message}")  # type: ignore[union-attr]
+    expect(bank.share_rows("10482") == before, "nothing was opened")
+    return {"run": brief(r), "app_code": "IBT-2210", "at_step": r.outcome.at_step}  # type: ignore[union-attr]
 
 
 async def s12b(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -566,6 +595,7 @@ SCENARIOS = [
     Scenario("13", "tenant_reuse", "cross-tenant reuse; data never crosses tenants", s13),
     Scenario("14", "agent_catalog", "agent-facing interface", s14, True),
     Scenario("15", "replay_stability", "determinism over 20 runs", s15),
+    Scenario("16", "replay_validation_error", "app validation error is an outcome", s16),
 ]
 
 

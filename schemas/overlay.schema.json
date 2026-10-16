@@ -695,6 +695,18 @@
         "message": {
           "title": "Message",
           "type": "string"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote"
         }
       },
       "required": [

@@ -51,6 +51,16 @@ global_states:
   - id: maintenance_banner
     detect: { text_matches: { pattern: "(?i)unavailable for scheduled maintenance" } }
     fail: { category: APP_UNAVAILABLE, retryable: true }
+  # Form validation: Ironbridge reports a field it refuses as an IBT-2xxx code in red above the
+  # form, and the form stays on screen. That is the app's answer, so the outcome quotes it.
+  # IBT-0xxx codes are system states (above), and IBT-10xx inquiry codes, such as IBT-1004 "no
+  # member found", are each capability's own probed outcomes.
+  - id: validation_error
+    detect: { text_matches: { pattern: "IBT-2\\d{3}\\s+[A-Z]" } }
+    outcome:
+      code: VALIDATION_ERROR
+      message: "The teller app refused the form"
+      quote: "IBT-2\\d{3}\\s+[A-Z0-9][A-Z0-9 ,'/&.-]*[A-Z0-9]"
 # Personal data shown beside these labels is painted out of every screenshot and scrubbed from every
 # DOM snapshot, whether or not a run reads it. A screen is named by its heading.
 sensitive_labels:

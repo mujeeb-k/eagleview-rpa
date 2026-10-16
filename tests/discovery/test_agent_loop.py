@@ -1,7 +1,10 @@
 """The discovery loop offline: a scripted fake model drives the real mock bank through the real
 SDK client, so batches, tool-result shapes, recording and stop conditions are tested for free."""
 
+import asyncio
 import json
+import time
+from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -11,6 +14,7 @@ from playwright.async_api import Browser
 
 from eagleview.artifacts.yaml_io import load_app_profile
 from eagleview.control.interventions import InterventionDesk, InterventionStore
+from eagleview.discovery import agent_loop
 from eagleview.discovery.agent_loop import DiscoveryConfig, DiscoveryResult, discover
 from eagleview.discovery.meter import Limits, MemoryMeter
 from eagleview.discovery.tools import HALT_TEXT
@@ -90,10 +94,9 @@ async def run(
     *,
     config: dict[str, Any] | None = None,
     meter: MemoryMeter | None = None,
+    desk: InterventionDesk | None = None,
 ) -> tuple[DiscoveryResult, FakeModel, Path]:
-    desk = InterventionDesk(
-        InterventionStore(tmp_path / "iv.sqlite"), human_timeout_s=1.0, notify=lambda _l: None
-    )
+    desk = desk or new_desk(tmp_path)
     fake = FakeModel(desk, INPUTS, turns)
     result = await discover(
         DiscoveryConfig(goal=GOAL, model=MODEL, **(config or {})),
@@ -109,6 +112,12 @@ async def run(
     )
     assert not fake.errors, fake.errors
     return result, fake, tmp_path / "runs" / result.run_id
+
+
+def new_desk(tmp_path: Path) -> InterventionDesk:
+    return InterventionDesk(
+        InterventionStore(tmp_path / "iv.sqlite"), human_timeout_s=1.0, notify=lambda _l: None
+    )
 
 
 def trace(run_dir: Path) -> list[dict[str, Any]]:
@@ -216,10 +225,10 @@ async def test_typing_a_goal_value_with_type_is_auto_bound(
     ("turns", "config", "status", "reason"),
     [
         ([], {}, "failed", "ended"),
-        (
+        (  # a stall: handed to a person, who doesn't answer within the test's 1 s
             [lambda s: _same([member("mouse_move", coordinate=[700, 700])] * 4)],
             {},
-            "failed",
+            "needs_human",
             "no_progress",
         ),
         (
@@ -228,7 +237,7 @@ async def test_typing_a_goal_value_with_type_is_auto_bound(
             "failed",
             "policy_blocks",
         ),
-        ([click_menu, search], {"max_actions": 3}, "failed", "action_limit"),
+        ([click_menu, search], {"max_actions": 3}, "needs_human", "action_limit"),  # a stall
         (
             [lambda s: _same([custom("request_human", reason="stuck")])],
             {},
@@ -267,3 +276,120 @@ async def _same(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         copy["id"] = f"{b['id']}_{len(out)}"
         out.append(copy)
     return out
+
+
+# --- the clock and stalls -------------------------------------------------------------------------
+
+
+class Clock:
+    """The discovery clock, moved by hand: real time plus an offset."""
+
+    def __init__(self) -> None:
+        self.offset = 0.0
+
+    def __call__(self) -> float:
+        return time.monotonic() + self.offset
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
+    c = Clock()
+    monkeypatch.setattr(agent_loop, "_clock", c)
+    return c
+
+
+def after(clock: Clock, seconds: float, turn: Turn) -> Turn:
+    """A turn that plays once `seconds` have passed on the discovery clock."""
+
+    async def go(s: Any) -> list[dict[str, Any]]:
+        clock.offset += seconds
+        return await turn(s)
+
+    return go
+
+
+def ask_for_help(s: Any) -> Any:
+    return _same([custom("request_human", reason="Please check the member detail page.")])
+
+
+async def test_the_limit_is_600_s_and_just_under_it_discovery_carries_on(
+    browser: Browser, lantern: Bank, tmp_path: Path, clock: Clock
+) -> None:
+    assert DiscoveryConfig(goal=GOAL, model=MODEL).max_seconds == 600
+    turns = [click_menu, after(clock, 595, search), finish]
+    result, _, _ = await run(browser, lantern, tmp_path, turns)
+    assert (result.status, result.stop_reason) == ("success", "declared_success")
+
+
+async def test_past_600_s_a_stalled_discovery_goes_to_a_person(
+    browser: Browser, lantern: Bank, tmp_path: Path, clock: Clock
+) -> None:
+    result, fake, run_dir = await run(
+        browser, lantern, tmp_path, [after(clock, 601, click_menu), search, finish]
+    )
+    assert (result.status, result.stop_reason) == ("needs_human", "time_limit")
+    assert "600 s without success" in (result.message or "")
+    assert "nobody answered" in (result.message or "")
+    turns = [r for r in fake.requests if "format" not in r.get("output_config", {})]
+    assert len(turns) == 1  # the model was not asked again once time was up
+    [iv] = fake.desk.store.list(run_id=result.run_id)
+    assert (iv.kind, iv.reason, iv.goal) == ("takeover", "DISCOVERY_STALLED", GOAL)
+    assert iv.resolution == "timed_out"
+    assert iv.screenshot is not None and (run_dir / iv.screenshot).is_file()
+    kept = json.loads((run_dir / f"intervention_{iv.id.lower()}.json").read_text())
+    assert (kept["reason"], kept["resolution"]) == ("DISCOVERY_STALLED", "timed_out")
+    assert kept["state_summary"] and kept["screenshot"] == iv.screenshot
+    stalled = [
+        json.loads(x)
+        for x in (run_dir / "run.jsonl").read_text().splitlines()
+        if '"discovery.stalled"' in x
+    ]
+    assert [e["stop_reason"] for e in stalled] == ["time_limit"]
+
+
+async def answer(desk: InterventionDesk, then: Callable[[], None] | None = None) -> None:
+    """A person: wait for the request, take the session, and hand it straight back."""
+    asked = asyncio.Event()
+    desk.notify = lambda _line: asked.set()
+    await asked.wait()
+    [iv] = desk.store.list(open_only=True)
+    if then is not None:
+        then()
+    ctl = desk.session(iv.run_id).controller
+    ctl.take_control("operator:test")
+    ctl.resume("operator:test")
+    desk.resolve(iv.id, "resumed", "operator:test", "looked; carry on")
+
+
+async def test_time_a_person_holds_the_session_is_not_counted(
+    browser: Browser, lantern: Bank, tmp_path: Path, clock: Clock
+) -> None:
+    desk = new_desk(tmp_path)
+
+    def fifteen_minutes() -> None:
+        clock.offset += 900  # longer than the whole limit
+
+    person = asyncio.create_task(answer(desk, fifteen_minutes))
+    result, _, _ = await run(
+        browser, lantern, tmp_path, [click_menu, search, ask_for_help, finish], desk=desk
+    )
+    await person
+    assert (result.status, result.stop_reason) == ("success", "declared_success")
+
+
+async def test_a_stall_a_person_answers_still_ends_needing_a_person(
+    browser: Browser, lantern: Bank, tmp_path: Path
+) -> None:
+    """The person sees the live screen and may finish the step by hand; the model is not asked
+    again, because the limits are cost guards."""
+    desk = new_desk(tmp_path)
+    person = asyncio.create_task(answer(desk))
+    still = [lambda s: _same([member("mouse_move", coordinate=[700, 700])] * 4), finish]
+    result, fake, _ = await run(browser, lantern, tmp_path, still, desk=desk)
+    await person
+    assert (result.status, result.stop_reason) == ("needs_human", "no_progress")
+    assert "a person handed back" in (result.message or "")
+    [iv] = desk.store.list(run_id=result.run_id)
+    assert (iv.reason, iv.resolution) == ("DISCOVERY_STALLED", "resumed")
+    turns = [r for r in fake.requests if "format" not in r.get("output_config", {})]
+    assert len(turns) == 1

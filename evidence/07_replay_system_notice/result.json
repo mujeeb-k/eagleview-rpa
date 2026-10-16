@@ -4,7 +4,7 @@
   "shows": "recoverable condition",
   "command": "scripts/evidence/07_replay_system_notice.sh",
   "run": {
-    "run_id": "r_20261016T124525_981bab",
+    "run_id": "r_20261016T193619_1a96ee",
     "status": "success",
     "recoveries": [
       "system_notice.dismiss"
