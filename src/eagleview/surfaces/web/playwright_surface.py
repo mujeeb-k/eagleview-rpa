@@ -66,7 +66,12 @@ from eagleview.surfaces.base import (
 from eagleview.surfaces.extract import ExtractError, Grid, RawValue, map_columns
 from eagleview.surfaces.geometry import expand_aliases, group_lines, label_key, normalize_text
 from eagleview.surfaces.predicates import evaluate
-from eagleview.surfaces.web.grounding import Grounder, Grounding, GroundingError
+from eagleview.surfaces.web.grounding import (
+    Grounder,
+    Grounding,
+    GroundingError,
+    ImplicitSubmission,
+)
 from eagleview.surfaces.web.js import element_fn, page_fn
 from eagleview.surfaces.web.network_guard import GuardState, NetworkGuard
 from eagleview.surfaces.web.resolvers import (
@@ -582,6 +587,10 @@ class PlaywrightSurface:
             return ActionResult("error", action, actor, "key needs a key")
         # Ground the keyboard focus now: Enter on a focused "Post" button is a click on Post.
         grounded = await self.grounder.focus()
+        if action.type == "key" and playwright_key(action.key or "") == "Enter":
+            async with self.grounder.implicit_submission() as submission:
+                if submission is not None:
+                    return await self._submit(action, actor, ctx, grounded, submission)
         info = None if grounded is None else TargetInfo(grounded.policy_label, grounded.role)
         decision = self.engine.check(action, actor, replace(ctx, current_url=self.page.url), info)
         if not decision.allowed:
@@ -593,6 +602,29 @@ class PlaywrightSurface:
             else:
                 assert action.key is not None
                 await self.page.keyboard.press(playwright_key(action.key))
+        except PlaywrightError as exc:
+            return ActionResult("error", action, actor, str(exc), None, grounded, decision)
+        return ActionResult("done", action, actor, "", None, grounded, decision)
+
+    async def _submit(
+        self,
+        action: Action,
+        actor: str,
+        ctx: PolicyContext,
+        grounded: GroundedTarget | None,
+        submission: ImplicitSubmission,
+    ) -> ActionResult:
+        """Enter on a focused list in a form, the same on every host. The policy check sees the
+        default button Enter would press (so Enter can't post past layer 1); the result still
+        names the focused list, as the recorder and compiler expect of a key press."""
+        seen = submission.button or grounded
+        info = None if seen is None else TargetInfo(seen.policy_label, seen.role)
+        decision = self.engine.check(action, actor, replace(ctx, current_url=self.page.url), info)
+        if not decision.allowed:
+            return _refused(action, actor, decision, None, seen)
+        self._bind(actor, ctx)
+        try:
+            await self.grounder.submit_implicitly(submission)
         except PlaywrightError as exc:
             return ActionResult("error", action, actor, str(exc), None, grounded, decision)
         return ActionResult("done", action, actor, "", None, grounded, decision)

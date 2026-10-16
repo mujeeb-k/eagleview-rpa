@@ -65,6 +65,8 @@ fictional legacy app with synthetic data.
   as itself, never as "locator not found".
 - **A locator must resolve to exactly one element.** Ambiguity is a failure, never "pick the
   first".
+- **Host-independent input.** Enter on a list in a form follows the HTML implicit-submission
+  rule on every host, because Chromium's behaviour differs between macOS and Linux.
 - **A true-before `expect`** passes only after a visible change.
 - **Taxonomy.**
   - `rejected`: the caller's fault, before any UI action.

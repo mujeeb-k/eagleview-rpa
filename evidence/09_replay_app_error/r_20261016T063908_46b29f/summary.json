@@ -1,0 +1,38 @@
+{
+  "run_id": "r_20261016T063908_46b29f",
+  "capability": "member.lookup_share_balances@1.0.0",
+  "effective_hash": "sha256:6966fbe8bc44ac165d6a493cbc9d4de462187c06e4ed129fe0e9f5d1a5759287",
+  "tenant": "lantern-bay",
+  "status": "failed",
+  "failure": {
+    "category": "APP_ERROR",
+    "step_id": "open_member_inquiry",
+    "observed": "'Ironbridge Teller 7 - LANTERN BAY FCU'; frames: top=/frames, banner=/banner, nav=/nav, main=/inq; headings: SYSTEM ERROR",
+    "message": "app_error detected",
+    "retryable": false,
+    "evidence": {
+      "screenshot": "steps/0003_after.png",
+      "dom_snapshot": "dom/failure.redacted.html",
+      "events": "run.jsonl"
+    }
+  },
+  "recoveries": [
+    {
+      "handler": "app_error.retry_step_if_idempotent",
+      "at_step": "open_member_inquiry"
+    }
+  ],
+  "interventions": [],
+  "locator_report": [
+    {
+      "step_id": "open_member_inquiry",
+      "strategy": "a11y",
+      "rank": 0,
+      "agreement": true
+    }
+  ],
+  "timing_ms": {
+    "sign_on": 459,
+    "total": 931
+  }
+}

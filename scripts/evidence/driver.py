@@ -50,6 +50,7 @@ from eagleview.runner import environment, run_replay
 from eagleview.safety.policy_engine import PolicyEngine
 from eagleview.safety.redaction import Redactor
 from eagleview.schema.action import Action
+from eagleview.schema.common import Sensitivity
 from eagleview.schema.overlay import Overlay
 from eagleview.schema.policy import Policy
 from eagleview.schema.result import RunResult
@@ -66,8 +67,11 @@ PROFILE = load_app_profile(REPO / "app_profiles" / "ironbridge-teller.yaml")
 # Evidence runs on the synthetic training tenants, so balances stay readable (DECISIONS, P2).
 POLICY = load_policy(REPO / "policies" / "training-teller.yaml")
 DEMO = {"lantern-bay": "10482", "copperhill": "2210236"}
+# Every member number a scenario types, registered with result.json's redactor.
+KNOWN_INPUTS = ("10482", "2210236", "10377", "99999", "10 482")
 INJECTION_MEMBER = "10377"
 HELD_OUT_GOAL = "List member 10482's loans."
+AGENT_QUESTIONS = ("What's in member 10482's savings?", "What balances does member 99999 have?")
 
 
 def example_inputs(path: Path) -> dict[str, object]:
@@ -87,6 +91,16 @@ class Mismatch(Exception):
 def expect(condition: bool, what: str) -> None:
     if not condition:
         raise Mismatch(what)
+
+
+async def answered(answering: "asyncio.Task[list[str]]", ended: object) -> list[str]:
+    """What the operator did, once the run is over. A run that ended before asking for every
+    planned answer is a mismatch naming how it ended, not a wait for a request that won't come."""
+    finished, _ = await asyncio.wait({answering}, timeout=5)
+    if not finished:
+        answering.cancel()
+        raise Mismatch(f"the run ended before the operator's plan was done: {ended}")
+    return answering.result()
 
 
 @dataclass
@@ -175,6 +189,24 @@ async def console(out: Path) -> AsyncIterator[tuple[InterventionDesk, ScriptedOp
     (out / "interventions.sqlite").unlink(missing_ok=True)
 
 
+def brief(r: RunResult) -> dict[str, Any]:
+    """What result.json may say about a run: ids, statuses and categories, never values. The
+    run's own summary.json, written and redacted by the evidence writer, has the detail."""
+    out: dict[str, Any] = {"run_id": r.run_id, "status": r.status}
+    if r.failure is not None:
+        out["category"] = r.failure.category.value
+        out["step_id"] = r.failure.step_id
+    if r.outcome is not None:
+        out["outcome"] = r.outcome.code
+    if r.rejection is not None:
+        out["rejection"] = r.rejection.code.value
+    if r.recoveries:
+        out["recoveries"] = [x.handler for x in r.recoveries]
+    if r.interventions:
+        out["interventions"] = [f"{i.kind}: {i.resolution}" for i in r.interventions]
+    return out
+
+
 def summary(r: RunResult) -> dict[str, Any]:
     return json.loads(r.model_dump_json(exclude_none=True))
 
@@ -251,7 +283,7 @@ async def s03(ctx: Ctx, out: Path) -> dict[str, Any]:
         result = await ctx.pipeline(
             out, "For member 10482, open a Money Market share account and post it.", desk=desk
         )
-        done = await answering
+        done = await answered(answering, f"{result.status}: {result.notes}")
     cap = result.capability
     expect(result.status == "verified", f"pipeline ended {result.status}: {result.notes}")
     assert cap is not None
@@ -296,21 +328,21 @@ async def s04(ctx: Ctx, out: Path) -> dict[str, Any]:
     expect(r.status == "success", f"{r.status}")
     rows = r.outputs["share_balances"] if r.outputs else []
     expect(bool(rows) and all(isinstance(x["balance"], Decimal) for x in rows), "typed balances")  # type: ignore[index, union-attr]
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s05(ctx: Ctx, out: Path) -> dict[str, Any]:
     r = await ctx.replay(out, LOOKUP, {"member_id": "99999"})
     expect(r.status == "outcome" and r.outcome is not None, f"{r.status}")
     expect(r.outcome.code == "MEMBER_NOT_FOUND", f"{r.outcome}")  # type: ignore[union-attr]
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s06(ctx: Ctx, out: Path) -> dict[str, Any]:
     r = await ctx.replay(out, LOOKUP, {"member_id": "10 482"})
     expect(r.status == "rejected" and r.rejection is not None, f"{r.status}")
     expect(not acts(out, r.run_id), "a rejected run touched the UI")
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s07(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -318,7 +350,7 @@ async def s07(ctx: Ctx, out: Path) -> dict[str, Any]:
     r = await ctx.replay(out, LOOKUP, {"member_id": "10482"})
     expect(r.status == "success", f"{r.status}")
     expect([x.handler for x in r.recoveries] == ["system_notice.dismiss"], f"{r.recoveries}")
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s08(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -326,7 +358,7 @@ async def s08(ctx: Ctx, out: Path) -> dict[str, Any]:
     r = await ctx.replay(out, LOOKUP, {"member_id": "10482"})
     expect(r.status == "success", f"{r.status}")
     expect("session_expired.relogin_and_restart" in [x.handler for x in r.recoveries], "relogin")
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s09(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -337,7 +369,7 @@ async def s09(ctx: Ctx, out: Path) -> dict[str, Any]:
     expect(f.category == "APP_ERROR", f"{f.category}")  # type: ignore[union-attr]
     ev = f.evidence  # type: ignore[union-attr]
     expect(bool(ev.screenshot and ev.dom_snapshot), "screenshot and DOM snapshot")
-    return {"run": summary(r)}
+    return {"run": brief(r)}
 
 
 async def s10(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -349,10 +381,10 @@ async def s10(ctx: Ctx, out: Path) -> dict[str, Any]:
         r = await ctx.replay(
             out, LOOKUP, {"member_id": "10482"}, options=RunOptions(escalate=True), desk=desk
         )
-        done = await answering
+        done = await answered(answering, brief(r))
     expect(r.status == "success", f"{r.status}: {r.failure}")
     expect((out / r.run_id / "proposed_overlay.yaml").is_file(), "a proposed patch")
-    return {"operator": LABEL, "operator_did": done, "run": summary(r)}
+    return {"operator": LABEL, "operator_did": done, "run": brief(r)}
 
 
 async def s11(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -364,7 +396,7 @@ async def s11(ctx: Ctx, out: Path) -> dict[str, Any]:
             op.follow([Expect("approval", "APPROVAL_REQUIRED", approve)])
         )
         r = await ctx.replay(out, OPEN_SHARE, example_inputs(OPEN_SHARE), desk=desk)
-        done = await answering
+        done = await answered(answering, brief(r))
     gated = next(
         s.id for s in load_for_run(OPEN_SHARE).capability.steps if s.risk == "irreversible"
     )
@@ -377,7 +409,7 @@ async def s11(ctx: Ctx, out: Path) -> dict[str, Any]:
     expect(len(signons) == 1, "signed on again after the commit")
     expect(r.recoveries == [], "recovered after the commit")
     expect(bank.share_rows("10482") == before + 1, "exactly one new share")
-    return {"operator": LABEL, "operator_did": done, "run": summary(r)}
+    return {"operator": LABEL, "operator_did": done, "run": brief(r)}
 
 
 async def s12b(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -479,15 +511,17 @@ async def s14(ctx: Ctx, out: Path) -> dict[str, Any]:
         browser=ctx.browser,
     )
     client = make_client(ctx.environ, Redactor())
-    answers = []
-    for q in ("What's in member 10482's savings?", "What balances does member 99999 have?"):
+    asked = []
+    for n, q in enumerate(AGENT_QUESTIONS, 1):
         a = await ask(
             q, client=client, model=model_from(ctx.environ), meter=ctx.meter, catalog=catalog
         )
-        answers.append({"question": q, "answer": a.answer, "tool_calls": a.tool_calls})
-    statuses = [c["status"] for x in answers for c in x["tool_calls"]]
+        # Questions and answers name members and balances: only the README shows the questions
+        # (driver constants), and only the redacted run folders hold the detail.
+        asked.append({"question": n, "agent_run": a.run_id, "tool_calls": a.tool_calls})
+    statuses = [c["status"] for x in asked for c in x["tool_calls"]]
     expect("success" in statuses and "outcome" in statuses, f"tool statuses {statuses}")
-    return {"answers": answers}
+    return {"asked": asked}
 
 
 async def s15(ctx: Ctx, out: Path) -> dict[str, Any]:
@@ -536,7 +570,13 @@ SCENARIOS = [
 
 
 async def run(numbers: list[str], *, offline: bool, out_root: Path = EVIDENCE) -> int:
+    """Each scenario is generated into a staging folder and moved into place only when it passed
+    (or is pending), so a failed attempt never wipes good evidence. Replays run before the
+    scenarios that call the model, and a failure does not stop the others."""
     chosen = [s for s in SCENARIOS if "all" in numbers or s.number in numbers]
+    chosen.sort(key=lambda s: s.needs_model)
+    staging = REPO / "runs" / "evidence_staging"
+    shutil.rmtree(staging, ignore_errors=True)
     environ = environment()
     meter = LedgerMeter(Ledger(REPO / "runs" / "discovery_ledger.jsonl"))
     failed = 0
@@ -548,8 +588,8 @@ async def run(numbers: list[str], *, offline: bool, out_root: Path = EVIDENCE) -
                 if s.needs_model and offline:
                     print(f"[{s.number}] skipped (needs the model; --offline)", flush=True)
                     continue
-                out = out_root / s.folder
-                shutil.rmtree(out, ignore_errors=True)
+                final = out_root / s.folder
+                out = staging / s.folder
                 out.mkdir(parents=True)
                 for bank in banks.values():
                     bank.reset()
@@ -566,14 +606,29 @@ async def run(numbers: list[str], *, offline: bool, out_root: Path = EVIDENCE) -
                 except Mismatch as exc:
                     record |= {"status": "fail", "mismatch": str(exc)}
                     failed += 1
+                except Exception as exc:  # a crash fails its scenario, never the ones after it
+                    record |= {"status": "fail", "error": f"{type(exc).__name__}: {exc}"}
+                    failed += 1
                 record["seconds"] = round(time.monotonic() - started, 1)
                 for run_dir in sorted(p for p in out.glob("r_*") if p.is_dir()):
                     render(run_dir, label=LABEL if "operator" in record else None)
-                text = json.dumps(record, indent=2, default=str).replace(f"{REPO}/", "")
-                (out / "result.json").write_text(text + "\n")
+                written = write_record(out, record)
+                if record["status"] in ("pass", "pending"):
+                    shutil.rmtree(final, ignore_errors=True)
+                    final.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(out), str(final))
+                else:
+                    kept = REPO / "runs" / "evidence_failed" / s.folder
+                    shutil.rmtree(kept, ignore_errors=True)
+                    kept.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(out), str(kept))
+                    print(f"[{s.number}] previous evidence kept; this attempt is in {kept}")
                 print(
                     f"[{s.number}] {record['status']}: {s.name} ({record['seconds']}s)", flush=True
                 )
+                if "mismatch" in written or "error" in written:
+                    print(f"    {written.get('mismatch') or written.get('error')}", flush=True)
+    shutil.rmtree(staging, ignore_errors=True)
     return 1 if failed else 0
 
 
@@ -602,9 +657,21 @@ async def held_out() -> int:
     }
     for run_dir in sorted(p for p in out.glob("r_*") if p.is_dir()):
         render(run_dir)
-    (out / "result.json").write_text(json.dumps(record, indent=2).replace(f"{REPO}/", "") + "\n")
+    write_record(out, record)
     print(f"held-out: {result.status}", flush=True)
     return 0
+
+
+def write_record(out: Path, record: dict[str, Any]) -> dict[str, Any]:
+    """result.json, redacted like everything else on disk: the evidence redactor, with every
+    member number the scenarios type registered as an identifier (invariant 4)."""
+    redactor = Redactor.from_policy(POLICY)
+    for number in KNOWN_INPUTS:
+        redactor.register(number, Sensitivity.identifier, "member")
+    clean = redactor.redact_tree(json.loads(json.dumps(record, default=str)))
+    text = json.dumps(clean, indent=2).replace(f"{REPO}/", "")
+    (out / "result.json").write_text(text + "\n")
+    return json.loads(text)
 
 
 def write_index() -> int:

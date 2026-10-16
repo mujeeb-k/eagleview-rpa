@@ -5,8 +5,9 @@ for you to review, what is left for you, and the exact commands in order.
 
 ## What is done
 
-Every phase from P4 to P11 is built, tested, committed to `main` and pushed, with CI green on
-each one. The CI result for the last commit is at the bottom.
+Every phase from P4 to P11 is built, tested, committed to `main` and pushed. CI was green on
+P4 to P9. On P10+P11 it failed once on Linux, for a real reason I then fixed (see "CI" at the
+bottom).
 
 - **Screen-level redaction (before P5).** The app profile lists the labels whose neighbouring
   text is personal (address, notes, phone…). The evidence writer paints that text out of every
@@ -42,13 +43,14 @@ each one. The CI result for the last commit is at the bottom.
 - `capabilities/drafts/member.open_share_account.yaml`, the post flow, where Post needs approval
 
 **Spend.** About $0.55 over 11 real runs, out of your $25 / 30-run budget, so 19 runs remain.
-A full `make evidence` uses 4 runs (about $0.25), and 5 once scenario 14 can run. The cap lives
+A full `make evidence` uses 4 runs (about $0.25), and 6 once scenario 14 can run (its two
+agent questions), about $0.30. The cap lives
 in your local ledger, `runs/discovery_ledger.jsonl`. It is unchanged; to reset it, move that file
 aside. There was no blocker, so there is no `docs/STATUS.md`.
 
 ## Every [REVIEW] item, one line each
 
-These are all 38 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" docs/DECISIONS.md`).
+These are all 40 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" docs/DECISIONS.md`).
 
 **Redaction**
 1. Sensitive labels are listed per screen, named by its heading, rather than as one global list.
@@ -107,10 +109,17 @@ These are all 38 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" do
 
 34. Replay evidence uses the committed artifacts; discovery evidence keeps its own copies.
 35. The held-out check: "List member 10482's loans". It passed, verified, both times.
-36. After a select, focus stays on the list (needed for Enter to submit, as in discovery).
+36. After a select, focus stays on the list, as after a person's choice.
 37. New mock-bank fault `session_expire_on=<route>`, so scenario 11 doesn't depend on request
     counts.
 38. The PII scan allows the PLAN's named synthetic members only in READMEs and artifact copies.
+
+**After CI on Linux**
+
+39. Enter on a list in a form follows the HTML implicit-submission rule on every host, and the
+    policy check sees the button it presses. Chromium differs here between macOS and Linux.
+40. `make evidence` replaces a scenario's evidence only when its new run passed; a failed attempt
+    is kept in `runs/evidence_failed/`.
 
 ## What is left for you
 
@@ -130,7 +139,10 @@ These are all 38 judgment calls in `docs/DECISIONS.md` (`grep -n "\[REVIEW\]" do
 **Check**
 6. **`gitleaks`** isn't installed here, so it wasn't run. `.env` is not committed, and the PII
    scan test passes.
-7. **README and REPORT are drafts.** REPORT is about 1,450 words under PLAN §9's headings, and a
+7. **Enter on a text field** still submits by the browser's own rule, and the pre-action check
+   sees the field there, not the button it presses. The network guard covers it. Extending #39
+   to text fields is a small follow-up.
+8. **README and REPORT are drafts.** REPORT is about 1,450 words under PLAN §9's headings, and a
    test checks them. The release checklist asks for README commands copy-pasted from a real
    terminal session: please run them once yourself.
 
@@ -153,6 +165,10 @@ make evidence
 ```
 
 ```bash
+make check
+```
+
+```bash
 PYTHONPATH=. uv run python scripts/agent_demo.py "What's in member 10482's savings?"
 ```
 
@@ -162,7 +178,9 @@ make demo-handoff
 
 - `make demo-offline` needs no key and no person.
 - After the approve, `make evidence` regenerates everything and now runs scenario 14 for real.
-  It spends about $0.30.
+  It spends about $0.30. A scenario that fails keeps its old evidence and makes the command
+  exit non-zero; the failed attempt is in `runs/evidence_failed/`.
+- `make check` afterwards runs the PII scan over the new evidence.
 - The agent demo answers through the catalog. It spends a few cents.
 - `make demo-handoff` is optional: take over a stuck run yourself at http://127.0.0.1:8700.
 

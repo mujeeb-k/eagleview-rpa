@@ -1,2 +1,0 @@
-{"ts":"2026-10-16T05:58:59.873820+00:00","run_id":"r_20261016T055859_2089dc","seq":0,"actor":"system","kind":"run.start","capability":"member.lookup_share_balances@1.0.0","tenant":"lantern-bay","effective_hash":"sha256:6966fbe8bc44ac165d6a493cbc9d4de462187c06e4ed129fe0e9f5d1a5759287","artifact_status":"verified","unattended":false,"approve_gates":false,"escalate":false,"deadline_s":120.0,"modified":false}
-{"ts":"2026-10-16T05:58:59.874080+00:00","run_id":"r_20261016T055859_2089dc","seq":1,"actor":"system","kind":"run.end","status":"rejected","timing_ms":{"total":0}}

@@ -9,8 +9,10 @@ the element a click there means, and their DOM keys must agree, or the page chan
 and grounding is retried."""
 
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from playwright.async_api import CDPSession, Page
 from playwright.async_api import Error as PlaywrightError
@@ -72,6 +74,17 @@ class Grounding:
     xpath: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ImplicitSubmission:
+    """What Enter on a focused single-choice list in a form does, decided by the HTML rule rather
+    than by the host's browser build. `mode` is "button" (activate the form's default button,
+    `button`), "form" (no default button, and the form may still submit) or "none"."""
+
+    mode: Literal["button", "form", "none"]
+    button: GroundedTarget | None
+    object_id: str | None
+
+
 class Grounder:
     def __init__(self, page: Page, cdp: CDPSession, resolver: Resolver) -> None:
         self.page = page
@@ -117,6 +130,54 @@ class Grounder:
             return self._target(info, (0, 0), [])
         finally:
             await self.cdp.send("Runtime.releaseObjectGroup", {"objectGroup": group})
+
+    @asynccontextmanager
+    async def implicit_submission(self) -> AsyncIterator[ImplicitSubmission | None]:
+        """Enter on a focused <select> submits its form on one platform's Chromium and opens the
+        list on another's. Replay must not depend on the host, so for a single-choice list inside
+        a form this applies HTML implicit submission on every host: it names the default button,
+        so the policy check sees what Enter would press. None means the key goes to the browser
+        as it is (any other focus, a select outside a form, a list box)."""
+        group = f"ev-{uuid.uuid4().hex}"
+        try:
+            res = await self.cdp.send(
+                "Runtime.evaluate",
+                {"expression": "(" + _IMPLICIT_SUBMITTER + ")()", "objectGroup": group},
+            )
+            obj = res.get("result", {})
+            if obj.get("subtype") == "node" and "objectId" in obj:
+                info = await self._describe(obj["objectId"], group)
+                if info is None:
+                    yield ImplicitSubmission("none", None, None)
+                else:
+                    yield ImplicitSubmission(
+                        "button", self._target(info, (0, 0), []), obj["objectId"]
+                    )
+            elif obj.get("value") in ("form", "none"):
+                yield ImplicitSubmission(obj["value"], None, None)
+            else:
+                yield None
+        finally:
+            # A submission that navigated took the context, and the group, with it.
+            with suppress(PlaywrightError):
+                await self.cdp.send("Runtime.releaseObjectGroup", {"objectGroup": group})
+
+    async def submit_implicitly(self, submission: ImplicitSubmission) -> None:
+        """Carry out a submission named by `implicit_submission`: the default button's own
+        activation (never a pointer click at coordinates), or the form's `requestSubmit()`."""
+        if submission.mode == "button" and submission.object_id is not None:
+            await self.cdp.send(
+                "Runtime.callFunctionOn",
+                {
+                    "objectId": submission.object_id,
+                    "functionDeclaration": "function () { this.click(); }",
+                },
+            )
+        elif submission.mode == "form":
+            await self.cdp.send(
+                "Runtime.evaluate",
+                {"expression": "(" + _DEEP_ACTIVE + ")().form.requestSubmit()"},
+            )
 
     async def focused_backend_id(self) -> int | None:
         group = f"ev-{uuid.uuid4().hex}"
@@ -313,4 +374,24 @@ _DEEP_ACTIVE = """function () {
     el = el.contentDocument.activeElement;
   }
   return el;
+}"""
+
+# HTML implicit submission for a focused single-choice <select> in a form: the default button is
+# the form's first submit button in tree order; a disabled one means nothing is submitted. With
+# no default button the form submits only if at most one field blocks implicit submission.
+_IMPLICIT_SUBMITTER = """function () {
+  let el = document.activeElement;
+  while (el && (el.tagName === 'FRAME' || el.tagName === 'IFRAME') && el.contentDocument) {
+    el = el.contentDocument.activeElement;
+  }
+  if (!el || el.tagName !== 'SELECT' || el.multiple || el.size > 1 || !el.form) return 'native';
+  const fields = Array.from(el.form.elements);
+  const button = fields.find(e =>
+    (e.tagName === 'BUTTON' && e.type === 'submit') ||
+    (e.tagName === 'INPUT' && (e.type === 'submit' || e.type === 'image')));
+  if (button) return button.disabled ? 'none' : button;
+  const blocking = ['text', 'search', 'url', 'tel', 'email', 'password', 'date', 'month', 'week',
+                    'time', 'datetime-local', 'number'];
+  const n = fields.filter(e => e.tagName === 'INPUT' && blocking.includes(e.type)).length;
+  return n > 1 ? 'none' : 'form';
 }"""

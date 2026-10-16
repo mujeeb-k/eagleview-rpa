@@ -553,6 +553,8 @@ an intervention desk attached. The CLI attaches one, and starts the console on 8
 human could be needed: `--escalate`, or a gated step without `--approve-gates`. Without a desk,
 `--escalate` parks the run as `needs_human` and a gated step fails POLICY_BLOCKED, as in P4. The
 P4 tests stay as they are.
+The alternative was to start a console for every run. I rejected it because a run nobody can answer
+would then block instead of failing at once, and P4's tests pin that behaviour.
 
 **[REVIEW] Waiting for a human does not count against the run deadline.** The deadline bounds what
 automation spends, so it is pushed back by however long a human wait took. A human wait has its own
@@ -565,6 +567,9 @@ human time too, would make any real takeover fail at 120 s.
 - **Force take** moves the lease at once and bumps the epoch, so automation's next `act()` is
   refused as `not_holder`.
 
+The alternative was force take only. I rejected it because cutting in mid-step can leave a half-
+typed field, while pause hands over at a clean boundary.
+
 With a desk attached, `not_holder` now means "preempted": the engine waits for the human to hand
 back. Without a desk it is still POLICY_BLOCKED.
 
@@ -572,6 +577,9 @@ back. Without a desk it is still POLICY_BLOCKED.
 own irreversible step. With a desk attached, it opens an approval intervention and blocks until a
 human approves, denies or times out. `--approve-gates` is still refused with `--unattended`. Deny
 gives POLICY_BLOCKED, and a timeout gives `needs_human`; neither posts.
+The alternative was to refuse every gated step in unattended mode, as in P4. I rejected it because a
+person approving in the console is exactly the approval the gate asks for, and the run still never
+approves itself.
 
 **The commit rule covers operator actions.** Operator input goes through `Surface.act` as
 `operator:<name>`, at the controller's current epoch. When an operator's action is irreversible and
@@ -582,6 +590,9 @@ is OUTCOME_UNCERTAIN, and resume never acts on that step again.
 1. If a hard global state shows, the result is HANDOFF_STATE_MISMATCH.
 2. Otherwise, take the latest step, from the paused one onwards, whose `expect` holds, and resume
    after it.
+
+The alternative was PLAN §5 alone. I rejected it because a person who only closes a covering modal
+would always get HANDOFF_STATE_MISMATCH, although re-running a step that was never sent is safe.
 
 One extension: if no `expect` holds, the paused step's target resolves uniquely again, and that
 step was never sent (or is idempotent and nothing is committed), the paused step runs again. This
@@ -595,6 +606,9 @@ overlay with `source: human_demonstrated`. It adds a global state:
 - detect: the first new text shown at the moment of escalation;
 - recover: a new `click_sequence` handler.
 
+The alternative was to apply the person's fix automatically. I rejected it because an unreviewed
+patch would change replay behaviour without anyone signing off.
+
 Replay runs that handler type, and an engine test proves it. The patch is never applied
 automatically, and it can be replay-verified only once P8 resolves overlays.
 
@@ -605,15 +619,21 @@ in REPORT §7). Raw screencast frames go only to the operator's browser and neve
 
 **[REVIEW] Intervention notices go to stderr, not stdout.** PLAN §5 says "a stdout line", but
 `eagleview replay` reserves stdout for the result JSON a caller parses. The line names the run, the
-reason and the console URL. Keeping stdout clean was preferred over following the PLAN wording.
+reason and the console URL.
+The alternative, the PLAN's stdout line, was rejected because it would break every caller that
+parses the result JSON.
 
 **[REVIEW] The console exposes what the operator sees as text: `GET /api/sessions/{run}/boxes`.** It
 returns the visible text with geometry, raw, over loopback, like the screencast. The scripted
 operator needs it to find what to click; a person uses the picture. Operators are trusted
 (PLAN §6), and nothing from it is written to disk.
+The alternative was OCR of the screencast for the scripted operator. I rejected it because it adds a
+dependency and flakiness to evidence that should be deterministic.
 
 **[REVIEW] At most three takeovers per run.** Each needs a human. Without a cap, a screen that keeps
 failing would keep asking. After the third, a failure is final.
+The alternative was no cap. I rejected it because a screen that fails every time would keep asking a
+person; a different cap is a one-line change.
 
 **The layer rule for labelled values.** With covered text included, a modal's own text sits
 geometrically beside the labels beneath it. The first console test showed it: the drawer alert's
@@ -629,6 +649,8 @@ visible at the takeover that was not visible before the paused step. Text that d
 its digits doesn't count, which rules out the banner's session countdown, and the paused step's
 own frame is searched first. For the drawer alert that gives "Cash Drawer Alert". A reviewer
 checks it before the overlay is ever used (P8).
+The alternative was asking the operator to type the trigger. I rejected it because it adds a form
+during an incident, and the reviewer checks the guess anyway.
 
 **P4 behaviour holds without a desk.** All P4 replay tests pass unedited: `--escalate` without a
 console still parks, and a gated step without `--approve-gates` still fails POLICY_BLOCKED.
@@ -673,11 +695,16 @@ for Sonnet 5.5 on the Claude API, so a policy decline is retried on another mode
 serves a turn, the turn is priced at the dearer of the two models, and every serving model is
 recorded. If the API rejects fallbacks alongside the computer toolset, that call is still
 ledgered; fallbacks are switched off and recorded here, with no retry loop.
+The alternative was fallbacks off. I rejected it because one policy decline would then end a
+discovery run that another model could finish, and the price is recorded per turn.
 
 **[REVIEW] Toolset members the policy denies are disabled.** These are:
 - `right_click`, `middle_click` and `left_click_drag`;
 - `left_mouse_down` and `left_mouse_up`;
 - `hold_key` and `cursor_position`.
+
+The alternative was offering the whole toolset and letting the policy refuse. I rejected it because
+each refused attempt costs a turn and teaches the model nothing.
 
 The model cannot try what would only be refused. `zoom`, `wait` and `scroll` stay.
 
@@ -685,6 +712,8 @@ The model cannot try what would only be refused. `zoom`, `wait` and `scroll` sta
 actions" rule count only actions that can change the screen: clicks, type, key, scroll,
 mouse_move and `fill_input`. Screenshot, zoom and wait only look. A separate cap of 80 tool calls
 of any kind bounds the cost of a model that only looks.
+The alternative was counting every tool call toward the 40-action cap. I rejected it because a model
+that zooms to read small text would run out of actions without doing anything.
 
 **Credentials.** The API key comes from the merged environment (the shell over `.env`), is passed
 to the client explicitly, is registered with the redactor as a secret, and is never logged. The
@@ -734,6 +763,8 @@ costs more on every turn, and the sentence is what a reviewer actually reads.
 quoted the balances it had marked in its `declare_success` description, and they reached the trace
 readable. Marked values are now registered as personal data, and a marked table's amounts go
 through the amount rule, so they follow `redact_amounts`.
+The alternative was registering marked values at the end of the run. I rejected it because anything
+the model wrote in between, its success description included, would reach disk readable.
 
 **Drafts never overwrite.** `write_draft` creates `capabilities/drafts/<id>.yaml` exclusively,
 and adds `.2`, `.3`, … when the name is taken. P7's compiler writes through it.
@@ -766,7 +797,7 @@ screen-changing action the trace gains:
 Traces from P6 lack these, so the P7 pipeline re-runs discovery, and those runs count against the
 budget.
 
-**[REVIEW] Discovery can get an approval.** An irreversible action in discovery returns
+**[REVIEW] Discovery can get an approval.** *(Superseded by the correction in "P7 as built": discovery never commits; a person performs the irreversible action.)* An irreversible action in discovery returns
 `escalate`. With a desk attached, discovery opens an approval intervention, and the scripted
 operator answers it in evidence scenario 03. On approval it grants a token bound to (run, action)
 and acts again. Without a desk, the action is refused as in P6.
@@ -796,6 +827,9 @@ is skipped. When the next step has a target, `element_present` of that target is
   parses as money.
 - Sensitivity is `pii` for every output, and item fields inherit it.
 
+The alternative was guessing sensitivity from the field name. I rejected it because a wrong guess
+leaks data, while a cautious default costs a reviewer one edit.
+
 The fixture's `sensitivity: none` for suffix and description was a reviewer's choice, and a
 reviewer can make it again.
 
@@ -805,6 +839,9 @@ reviewer can make it again.
 - output and item field names;
 - input descriptions, examples and patterns;
 - raising a step's risk from `read` to `write_staged`.
+
+The alternative was letting the naming pass edit anything. I rejected it because locators,
+predicates and risk are what replay safety rests on, and an LLM must not lower them.
 
 It may not touch locators, predicates or order, and it may never lower a risk. An irreversible
 risk comes only from the policy decision recorded in the trace. A proposed input pattern must
@@ -832,6 +869,8 @@ Artifacts stay `verified`. I never approve.
   the scripted operator, labelled as such, on the synthetic training tenant after a bank reset.
   Verify never passes `--approve-gates` behind anyone's back. **Probe replays never get a desk or
   an approval**, so a "nonexistent" member that does exist stops at the gate; a test proves it.
+  The alternative, verifying with `--approve-gates`, was rejected because it would post with no
+  person involved.
 - **Checkbox and radio clicks set values.** They count as value-setting steps and survive
   pruning. A graph edge is the recorded `changed` flag (a new fingerprint or a new document), not
   the fingerprint alone.
@@ -870,6 +909,8 @@ records", which reads like probing a real bank.
   of crashing.
 - **[REVIEW]** If Claude still proposes nothing usable, the pipeline falls back to deterministic
   probes of the same shape: all nines, then all zeros, kept only if the input schema accepts them.
+  The alternative was to stop with no outcome probed. I rejected it because MEMBER_NOT_FOUND is the
+  outcome every lookup needs, and a fallback probe must still pass the same confirm run.
 
 The second real pipeline succeeded: verified, with MEMBER_NOT_FOUND `probed_verified`, for $0.04.
 
@@ -877,6 +918,8 @@ The second real pipeline succeeded: verified, with MEMBER_NOT_FOUND `probed_veri
 typing into an open list only highlights an option; the choice commits when the list closes. So
 the value read just after typing can be stale. When the model types a declared input into a
 select, the option binds to that input, as a fill does.
+The alternative, trusting the value read after typing, was rejected because in a real run it was the
+stale "-- Select --".
 
 **A key that changes the screen is a step, even while a select is being worked.** Enter on this
 app's select submits the form. Folding that key into the select had broken the shortest path.
@@ -889,6 +932,8 @@ value.
 
 **[REVIEW] The final verify runs only when probing added outcomes.** Without new outcomes the first
 verify stands, so an irreversible flow is not posted a third time just to re-prove itself.
+The alternative was always verifying again after probing. I rejected it because, for a post flow,
+that posts again and proves nothing new.
 
 **The import boundary is stricter.** `eagleview.control` joins the guarded packages, and
 `eagleview.compiler` joins the forbidden imports, beside `anthropic` and `eagleview.discovery`.
@@ -922,6 +967,7 @@ after the footer is read mid-run, would change the artifact during a run.
 "Hillcrest"`, not `option_index: 0`. The overlay is tenant-specific anyway, a label is
 reviewable, and choosing by position would need a surface call to list options. That call is not
 built (`option_index` still reports "unsupported").
+So the alternative, choosing the first option by position, was rejected.
 
 **The Copperhill overlay is hand-authored and reviewed like any artifact.** It holds:
 - label aliases ("Member #" is "Acct Holder No.", "Member Inquiry" is "Member Lookup");
@@ -936,9 +982,11 @@ When rank 0 stops winning, the screen has drifted.
 **Agent catalog (P9).**
 - **[REVIEW]** The registry lists only `approved` capabilities from `capabilities/`. Irreversible
   ones are left out, because an agent's run is unattended and could only block at the gate.
+  The alternative was listing irreversible capabilities too. I rejected it because an agent can't
+  answer an approval, so such a tool could never succeed.
 - Each capability maps to a tool: a snake_case name, a description built from the title,
   description, outcomes and risk plus the output shape, and the input JSON Schema.
-- `eagleview mcp` serves the tools over stdio with FastMCP. Each call runs an unattended replay
+- `eagleview mcp` serves the tools over stdio with the MCP SDK's low-level server (see below). Each call runs an unattended replay
   on the configured tenant and returns the RunResult JSON.
 - `scripts/agent_demo.py` has Claude, with plain tool use, pick the tool and answer.
 
@@ -951,6 +999,8 @@ approved copy) and marked pending the user's approval.
   (`capabilities: [member.lookup_share_balances]`): the search step patch. A step patch naming a
   missing step is an error only when the overlay names that capability explicitly. Under a glob it
   is skipped, so the profile-wide overlay works for every capability.
+  The alternative was one overlay holding everything. I rejected it because the search patch names a
+  step of one capability, and would fail every other capability at Copperhill.
 - **Overlays are opt-in.** The CLI and callers load them; `run_replay` never does by default. With
   no overlay, the effective hash is the content hash, and the P4 "base fails at Copperhill" test
   stays as it is.
@@ -985,6 +1035,8 @@ which derives each tool's schema from a Python signature. Catalog tools take the
 patterns included, from each capability, and the low-level server accepts that schema as given.
 The tests use the SDK's in-memory client, plus one stdio round trip that proves stdout carries
 only the protocol.
+The alternative, `MCPServer` with generated wrapper functions, was rejected because the generated
+schema drops each input's pattern, the contract's first check.
 
 **The agent demo exists and is tested offline only.** `scripts/agent_demo.py` refuses to run
 until a capability is approved, and its model calls go to the same spend ledger.
@@ -1011,6 +1063,9 @@ under `evidence/` is written by hand.
   their evidence folder. They never write into `capabilities/`.
 - The post flow that scenario 11 replays is committed the same way as the lookup: a verified
   draft from a real discovery, copied unchanged.
+
+The alternative was discovering afresh for every replay scenario. I rejected it because those
+scenarios would then cost money, need a key and vary from run to run.
 
 **Scenarios that need a person use the scripted operator, and say so.** That covers 03 (Post
 during discovery, then the verify approval) and 10 (the unknown-modal takeover). The operator
@@ -1039,6 +1094,8 @@ script writes a `PENDING.md` that says exactly what to approve. After the user a
 **[REVIEW] Held-out discovery check.** One real discovery goal outside the evidence set ("List
 member 10482's loans") is run once, and its result, pass or fail, goes into
 `evidence/README.md` and REPORT.md.
+The alternative was several held-out goals. I rejected it to stay well inside the spend cap; one
+honest result shows the pipeline was not tuned to the evidence set.
 
 **The PII scan** reads every text file under `evidence/` (JSON, JSONL, HTML, YAML, Markdown)
 for:
@@ -1056,15 +1113,17 @@ and the held-out check ran; 15 pass, and 14 is pending approval.
 
 **[REVIEW] Selects keep focus after a choice.** Verifying the discovered post flow failed the first
 time. In discovery, Enter on the select submitted the form. The replay's select left focus
-elsewhere, so the compiled `press Return` did nothing. In Chromium, Enter on a focused select
-submits its form here (checked), and a person who picks an option keeps focus on it, so the
-surface now focuses the list after selecting. The alternative, giving `press` steps a target to
-click first, would have opened the list instead.
+elsewhere, so the compiled `press Return` did nothing. A person who picks an option keeps focus
+on it, so the surface now focuses the list after selecting. The alternative, giving `press` steps
+a target to click first, would have opened the list instead. *(Corrected below: Enter on a list
+submits the form only in macOS Chromium.)*
 
 **[REVIEW] A new mock-bank fault: `session_expire_on=<route>`.** Scenario 11 must expire the
 session right after Post, whatever the request count of a discovered flow. A one-shot route
 trigger does that without counting. The bank is the harness, as with the earlier `maintenance`
 fault.
+The alternative, expiring after N requests, was rejected because the count depends on the discovered
+flow, which made scenario 11 fragile.
 
 **The committed post flow came from discovery.** `capabilities/drafts/member.open_share_account.yaml`
 is scenario 03's verified artifact, copied unchanged. Its inputs are named by discovery
@@ -1076,6 +1135,7 @@ files and copied artifacts may name each tenant's demo and drill member (read fr
 because an artifact's input example is the discovery value by design. Member numbers must stand
 alone to count, which stops a sha256 hash from matching. A self-test plants a name, a member
 number and an SSN, and checks all three are found.
+The alternative was no exemptions. I rejected it because the scan would then fail on correct files.
 
 **Evidence size: 14 MB.** Most of it is discovery screenshots. Scenario 15 keeps only its
 aggregate and telemetry, not 20 sets of screenshots.
@@ -1091,3 +1151,40 @@ approved.
   call.
 - `docs/DESIGN.md` is optional and was skipped: the generated `schemas/*.schema.json` is the
   reference.
+
+## 2026-10-16 — P10 + P11 follow-up: CI on Linux
+
+**CI failed on the P10+P11 commit.** `make demo-offline` stalled in scenario 11 on the Linux
+runner, though it passed on macOS. Enter on a focused `<select>` submits its form in macOS
+Chromium and opens the list in Linux Chromium. Discovery ran on macOS and recorded "press
+Return", so on Linux the post flow never reached the review screen. The scripted operator then
+waited out its 120 s for an approval that never came, which hid the failing step.
+
+**[REVIEW] Enter on a list in a form follows the HTML rule, on every host.** For Enter on a
+single-choice `<select>` inside a form, the surface applies HTML implicit submission itself and
+never sends the key: the form's default button is activated once, by its own `click()`. A
+disabled default button means nothing is submitted. With no default button, the form submits
+only if at most one field blocks implicit submission. The policy check sees the default button,
+so Enter on a list whose form posts is refused at layer 1, not only by the network guard. The
+result still names the focused list, so recording and compiling are unchanged. Alternatives:
+branching on the platform (a pass on one host would prove nothing about the other), or
+recompiling the step into a click on Validate (that edits a verified artifact for a host quirk,
+and anything discovered elsewhere would still stall). Not extended: Enter on a text field also
+submits implicitly everywhere, and layer 1 sees the field there, not the default button. The
+network guard covers that case.
+
+**[REVIEW] `make evidence` replaces a scenario's evidence only when the new run passed.** Each
+scenario is built in `runs/evidence_staging/`. On pass or pending it replaces its folder in
+`evidence/`; on failure the attempt goes to `runs/evidence_failed/` and the old evidence stays.
+Replays run before the scenarios that call the model, a crash fails only its own scenario, and
+the exit code is non-zero if any failed. The alternative, deleting `evidence/` first as before,
+meant one failed discovery wiped committed evidence that had nothing wrong with it.
+
+**`result.json` is written through the evidence redactor.** It holds statuses, categories, run
+ids and paths, and every member number a scenario types is registered for scrubbing, so a
+mismatch message can't carry one to disk. Scenario 14 records the question's number, not its
+text. A test builds a scenario-14 record and scans it.
+
+**A run that ends before the operator's plan is a mismatch.** In scenarios 03, 10 and 11, once
+the run returns, the operator gets 5 s to finish its plan; otherwise the scenario fails with how
+the run ended, instead of a timeout.

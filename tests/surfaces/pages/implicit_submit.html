@@ -1,0 +1,37 @@
+<html>
+<head><title>Implicit submission</title></head>
+<body>
+<!-- Enter on a focused list, one form per rule of HTML implicit submission. Every form counts its
+     submissions and never leaves the page; every list counts the keys that reached it. -->
+<script>
+var submits = {}, keys = 0, submitter = null;
+function counted(e) {
+  submits[e.target.id] = (submits[e.target.id] || 0) + 1;
+  submitter = e.submitter ? e.submitter.value : null;
+  return false;
+}
+</script>
+<form id="validate" onsubmit="return counted(event);">
+<select name="t" onkeydown="keys++;"><option>Savings</option><option>Club</option></select>
+<input type="text" name="nick"> <input type="text" name="other">
+<input type="button" value="Cancel"> <input type="submit" value="Validate"> <input type="submit" value="Later">
+</form>
+<form id="post" onsubmit="return counted(event);">
+<select name="t" onkeydown="keys++;"><option>Savings</option></select>
+<input type="submit" value="Post">
+</form>
+<form id="disabled" onsubmit="return counted(event);">
+<select name="t" onkeydown="keys++;"><option>Savings</option></select>
+<input type="submit" value="Go" disabled>
+</form>
+<form id="one_field" onsubmit="return counted(event);">
+<select name="t" onkeydown="keys++;"><option>Savings</option></select>
+<input type="text" name="nick">
+</form>
+<form id="two_fields" onsubmit="return counted(event);">
+<select name="t" onkeydown="keys++;"><option>Savings</option></select>
+<input type="text" name="a"> <input type="text" name="b">
+</form>
+<select id="loose" onkeydown="keys++;"><option>Savings</option></select>
+</body>
+</html>

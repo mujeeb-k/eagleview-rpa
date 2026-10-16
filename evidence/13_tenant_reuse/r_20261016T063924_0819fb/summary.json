@@ -1,0 +1,25 @@
+{
+  "run_id": "r_20261016T063924_0819fb",
+  "capability": "member.lookup_share_balances@1.0.0",
+  "effective_hash": "sha256:6966fbe8bc44ac165d6a493cbc9d4de462187c06e4ed129fe0e9f5d1a5759287",
+  "tenant": "copperhill",
+  "status": "failed",
+  "failure": {
+    "category": "UNKNOWN_STATE",
+    "expected": "text_present({'frame': ['banner'], 'text': 'Teller'})",
+    "observed": "'Ironbridge Teller - Select Branch'; frames: top=/branch; headings: Select Branch",
+    "message": "sign-on did not reach its success state: an unrecognized screen is showing after 15000 ms",
+    "retryable": false,
+    "evidence": {
+      "screenshot": "steps/0001_after.png",
+      "dom_snapshot": "dom/failure.redacted.html",
+      "events": "run.jsonl"
+    }
+  },
+  "recoveries": [],
+  "interventions": [],
+  "locator_report": [],
+  "timing_ms": {
+    "total": 15464
+  }
+}

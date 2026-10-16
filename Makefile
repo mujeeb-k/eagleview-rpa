@@ -35,8 +35,8 @@ demo-handoff:
 demo-full:
 	PYTHONPATH=. uv run python scripts/evidence/driver.py 01 04 --out runs/demo-full
 
-# Regenerate all evidence from scratch (real model for 01, 02, 03, 12a; 14 once approved).
+# Regenerate all evidence (real model for 01, 02, 03, 12a; 14 once approved). Each scenario is
+# built in a staging folder and replaces its evidence only if it passed, so a failed discovery
+# never wipes what is committed. Replays run first; a failure is reported at the end.
 evidence:
-	rm -rf evidence/[0-9]*_*
-	@set -e; for s in scripts/evidence/[0-9]*.sh; do "$$s"; done
-	scripts/evidence/index.sh
+	PYTHONPATH=. uv run python scripts/evidence/driver.py all; status=$$?; scripts/evidence/index.sh; exit $$status

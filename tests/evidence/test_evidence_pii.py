@@ -39,3 +39,28 @@ def test_numbers_that_are_not_strings_are_not_member_numbers(tmp_path: Path) -> 
 def test_a_member_number_inside_a_hash_is_not_a_member_number(tmp_path: Path) -> None:
     (tmp_path / "artifact.yaml").write_text("content_hash: sha256:3f10446dff2ffe1e2110b92d")
     assert scan(tmp_path) == []
+
+
+def test_a_scenario_record_is_written_redacted(tmp_path: Path) -> None:
+    """result.json goes through the evidence redactor too: scenario 14's record, from a fake
+    answer, plus a member number that slipped into a message, scans clean."""
+    from scripts.evidence.driver import write_record
+
+    record = {
+        "scenario": "14",
+        "name": "agent_catalog",
+        "status": "pass",
+        "asked": [
+            {
+                "question": 1,
+                "agent_run": "r_20261016T060000_abcdef",
+                "tool_calls": [
+                    {"tool": "member_lookup_share_balances", "status": "success", "run_id": "r_1"}
+                ],
+            }
+        ],
+        "mismatch": "expected member 10482 to have 3 shares",
+    }
+    write_record(tmp_path, record)
+    assert scan(tmp_path) == []
+    assert "10482" not in (tmp_path / "result.json").read_text()
