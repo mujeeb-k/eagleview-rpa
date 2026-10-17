@@ -1,32 +1,32 @@
 {
   "scenario": "14",
   "name": "agent_catalog",
-  "shows": "agent-facing interface",
+  "shows": "agent tool catalog",
   "command": "scripts/evidence/14_agent_catalog.sh",
   "asked": [
     {
       "question": 1,
-      "agent_run": "r_agent_20261016T194117_40f32a",
+      "agent_run": "r_agent_20261017T005758_ccd76f",
       "tool_calls": [
         {
           "tool": "member_lookup_share_balances",
           "status": "success",
-          "run_id": "r_20261016T194119_3c355e"
+          "run_id": "r_20261017T005800_d3d867"
         }
       ]
     },
     {
       "question": 2,
-      "agent_run": "r_agent_20261016T194121_c9e406",
+      "agent_run": "r_agent_20261017T005802_cfbd59",
       "tool_calls": [
         {
           "tool": "member_lookup_share_balances",
           "status": "outcome",
-          "run_id": "r_20261016T194122_522992"
+          "run_id": "r_20261017T005803_539a3b"
         }
       ]
     }
   ],
   "status": "pass",
-  "seconds": 8.1
+  "seconds": 10.8
 }

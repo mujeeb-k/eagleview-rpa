@@ -1,5 +1,5 @@
 {
-  "run_id": "r_20261016T194119_3c355e",
+  "run_id": "r_20261017T005800_d3d867",
   "capability": "member.lookup_share_balances@1.0.0",
   "effective_hash": "sha256:abb277d1bdd73b6a0845987a9f4a6c27a0c1eb3d1a5166e8f062fa4e44cf4810",
   "tenant": "lantern-bay",
@@ -52,11 +52,11 @@
     }
   ],
   "timing_ms": {
-    "sign_on": 460,
-    "open_member_inquiry": 265,
-    "enter_member_id": 223,
-    "submit_member_search": 307,
-    "extract_share_balances": 2,
-    "total": 1356
+    "sign_on": 656,
+    "open_member_inquiry": 263,
+    "enter_member_id": 234,
+    "submit_member_search": 352,
+    "extract_share_balances": 4,
+    "total": 1796
   }
 }

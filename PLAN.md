@@ -567,7 +567,7 @@ This app must feel like a real 2004-era core system:
 - **Done when:** the same discovered capability replays on both tenants, each with its own member.
   *(Done: `tests/overlays/`; the plan was reviewed by a second model.)*
 
-### P9: Agent-facing catalog (extension; runs together with P8)
+### P9: Agent tool catalog (extension; runs together with P8)
 - [x] The registry lists approved capabilities and maps each to a tool definition: snake_case name;
       description built from title, description, outcomes, and risk; input JSON Schema; output shape in
       the description.
