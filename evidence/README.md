@@ -32,3 +32,7 @@ All institutions, people and data are fictional and synthetic. Runs use the trai
 ## Held-out discovery check
 
 Goal "List member 10482's loans.": pipeline **verified** (discovery success, declared_success). See [held_out_member_loans](held_out_member_loans/).
+
+## Where the approved lookup came from
+
+`capabilities/member.lookup_share_balances.yaml` was compiled from one discovery run, verified by 2 replays, and its MEMBER_NOT_FOUND outcome was learned by 3 probe runs; all of them are in [approved_lookup_provenance](approved_lookup_provenance/), copied by `scripts/evidence/provenance.sh`. Scenario 01 is an independent re-run of the same goal whose output names differ (`share_accounts` rather than `share_balances`), which is why a person approves a capability before anything runs unattended.

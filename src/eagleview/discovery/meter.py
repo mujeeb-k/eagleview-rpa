@@ -2,7 +2,7 @@
 
 Every real API response is priced from its usage and appended to a ledger the moment it arrives,
 so a crash still records the spend. Before every real request the ledger is checked against the
-limits: at most $25 in total and at most 33 runs, where a run counts once it has made its first
+limits: at most $25 in total and at most 45 runs, where a run counts once it has made its first
 real call. Tests inject a meter that never touches the real ledger."""
 
 import json

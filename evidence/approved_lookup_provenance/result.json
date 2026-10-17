@@ -1,0 +1,41 @@
+{
+  "capability": "member.lookup_share_balances@1.0.0",
+  "artifact": "capabilities/member.lookup_share_balances.yaml",
+  "command": "scripts/evidence/provenance.sh",
+  "runs": [
+    {
+      "run_id": "r_20261016T045318_95953d",
+      "role": "discovery",
+      "status": "success"
+    },
+    {
+      "run_id": "r_20261016T045340_82d75b",
+      "role": "verify",
+      "status": "success"
+    },
+    {
+      "run_id": "r_20261016T045343_be3221",
+      "role": "probe",
+      "status": "failed",
+      "category": "UNKNOWN_STATE"
+    },
+    {
+      "run_id": "r_20261016T045356_6b09f1",
+      "role": "probe",
+      "status": "outcome",
+      "outcome": "MEMBER_NOT_FOUND"
+    },
+    {
+      "run_id": "r_20261016T045357_af9369",
+      "role": "probe",
+      "status": "failed",
+      "category": "UNKNOWN_STATE"
+    },
+    {
+      "run_id": "r_20261016T045406_0e9516",
+      "role": "verify",
+      "status": "success"
+    }
+  ],
+  "status": "pass"
+}

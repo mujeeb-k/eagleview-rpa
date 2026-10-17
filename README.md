@@ -93,10 +93,24 @@ In another terminal:
 uv run eagleview discover --goal "Look up member 10482 and read their share balances."
 ```
 
-Replay the generated capability without AI:
+`discover` prints the draft's path. It stays a draft until a person approves it.
+
+Replay the approved capability without AI, with `make bank` still running:
 
 ```bash
-uv run eagleview replay <capability-path> --input member_id=10482
+uv run eagleview replay member.lookup_share_balances --input member_id=10482
+```
+
+Approve a verified draft and replay it. The commands below use the committed draft; pass the path
+`discover` printed to approve your own. `--into capabilities/mine` keeps it apart from the
+committed capability, which `approve` will not overwrite:
+
+```bash
+uv run eagleview approve capabilities/drafts/member.lookup_share_balances.yaml --reviewer your-name --into capabilities/mine
+```
+
+```bash
+uv run eagleview replay capabilities/mine/member.lookup_share_balances.yaml --input member_id=10482
 ```
 
 To experiment with human takeover:
@@ -123,4 +137,4 @@ For the architecture, failure cases, design decisions, and limitations, see [REP
 
 ## License
 
-MIT — [LICENSE](LICENSE).
+MIT: [LICENSE](LICENSE).

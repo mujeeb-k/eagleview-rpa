@@ -5,6 +5,7 @@
     uv run python scripts/evidence/driver.py all --offline   skip those that call the real model
     uv run python scripts/evidence/driver.py --index      write evidence/README.md
     uv run python scripts/evidence/driver.py --held-out   the held-out discovery check
+    uv run python scripts/evidence/driver.py --provenance the approved lookup's own runs
 
 Every scenario declares what it expects and checks it: a mismatch fails the scenario and the
 command exits non-zero, so the evidence can never quietly show the wrong thing. The bank runs
@@ -71,6 +72,8 @@ DEMO = {"lantern-bay": "10482", "copperhill": "2210236"}
 KNOWN_INPUTS = ("10482", "2210236", "10377", "99999", "10 482")
 INJECTION_MEMBER = "10377"
 HELD_OUT_GOAL = "List member 10482's loans."
+APPROVED_LOOKUP = REPO / "capabilities" / "member.lookup_share_balances.yaml"
+PROVENANCE = EVIDENCE / "approved_lookup_provenance"
 AGENT_QUESTIONS = ("What's in member 10482's savings?", "What balances does member 99999 have?")
 
 
@@ -689,6 +692,87 @@ async def held_out() -> int:
     return 0
 
 
+def provenance() -> int:
+    """The approved lookup's own history: the discovery run it was compiled from, the replays
+    that verified it, and the probe runs that learned "member not found". Those runs were written,
+    and redacted, by the evidence writer when the pipeline ran; this copies them out of runs/ by
+    the ids in the capability's provenance and checks they tell one consistent story. They exist
+    only where that pipeline ran, so elsewhere this stops and leaves any evidence as it is."""
+    cap = load_for_run(APPROVED_LOOKUP).capability
+    prov = cap.provenance
+    discovery = prov.discovered_by.run_id if prov.discovered_by else None
+    verifies = [v.run_id for v in prov.verified_by]
+    runs = REPO / "runs"
+
+    def stamp(run_id: str) -> str:
+        return run_id.split("_")[1]  # r_<YYYYMMDDTHHMMSS>_<hex>: sortable as text
+
+    missing = [r for r in [discovery, *verifies] if r is None or not (runs / r).is_dir()]
+    if missing:
+        print(f"provenance: runs not found under runs/: {missing}", file=sys.stderr)
+        return 1
+    assert discovery is not None
+    # Probe runs: replays of this capability between the discovery and the final verify.
+    probes = []
+    for d in sorted(runs.glob("r_*")):
+        if d.name in (discovery, *verifies) or not (d / "run.jsonl").is_file():
+            continue
+        if not stamp(discovery) <= stamp(d.name) <= stamp(verifies[-1]):
+            continue
+        start = json.loads((d / "run.jsonl").read_text().splitlines()[0])
+        if start.get("kind") == "run.start" and start.get("capability") == cap.ref:
+            probes.append(d.name)
+    roles = {discovery: "discovery", **dict.fromkeys(verifies, "verify")}
+    roles |= dict.fromkeys(probes, "probe")
+    record: dict[str, Any] = {
+        "capability": cap.ref,
+        "artifact": str(APPROVED_LOOKUP.relative_to(REPO)),
+        "command": "scripts/evidence/provenance.sh",
+        "runs": [],
+    }
+    try:
+        for run_id in sorted(roles, key=stamp):
+            s = json.loads((runs / run_id / "summary.json").read_text())
+            entry = {"run_id": run_id, "role": roles[run_id], "status": s.get("status")}
+            if s.get("outcome"):
+                entry["outcome"] = s["outcome"]["code"]
+            if s.get("failure"):
+                entry["category"] = s["failure"]["category"]
+            record["runs"].append(entry)
+        trace = (runs / discovery / "trace.jsonl").read_text().splitlines()
+        marked = {
+            json.loads(x)["input"].get("name")
+            for x in trace
+            if json.loads(x).get("tool") == "mark_output"
+        }
+        expect(set(cap.outputs) <= marked, f"outputs {sorted(cap.outputs)} vs marked {marked}")
+        statuses = {e["role"]: [] for e in record["runs"]}
+        for e in record["runs"]:
+            statuses[e["role"]].append(e["status"])
+        expect(statuses["discovery"] == ["success"], f"discovery: {statuses['discovery']}")
+        expect(set(statuses["verify"]) == {"success"}, f"verify: {statuses['verify']}")
+        probed = [e.get("outcome") for e in record["runs"] if e["role"] == "probe"]
+        expect(
+            all(o.code != "MEMBER_NOT_FOUND" for o in cap.outcomes) or "MEMBER_NOT_FOUND" in probed,
+            "no probe run confirmed MEMBER_NOT_FOUND",
+        )
+    except Mismatch as exc:
+        print(f"provenance: {exc}", file=sys.stderr)
+        return 1
+    staging = REPO / "runs" / "evidence_staging" / PROVENANCE.name
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    for run_id in roles:
+        shutil.copytree(runs / run_id, staging / run_id)
+        render(staging / run_id)
+    record["status"] = "pass"
+    write_record(staging, record, moved_to=PROVENANCE)
+    shutil.rmtree(PROVENANCE, ignore_errors=True)
+    shutil.move(str(staging), str(PROVENANCE))
+    print(f"provenance: {len(roles)} runs for {cap.ref} in {PROVENANCE.relative_to(REPO)}")
+    return 0
+
+
 def write_record(
     out: Path, record: dict[str, Any], *, moved_to: Path | None = None
 ) -> dict[str, Any]:
@@ -729,6 +813,20 @@ def write_index() -> int:
             f'Goal "{HELD_OUT_GOAL}": pipeline **{h["status"]}** (discovery {h["discovery"]}, '
             f"{h['stop_reason']}). See [held_out_member_loans](held_out_member_loans/)."
         )
+    prov = PROVENANCE / "result.json"
+    provenance_line = "Not copied yet: run `scripts/evidence/provenance.sh`."
+    if prov.is_file():
+        p = json.loads(prov.read_text())
+        count = {r: sum(e["role"] == r for e in p["runs"]) for r in ("verify", "probe")}
+        provenance_line = (
+            f"`{p['artifact']}` was compiled from one discovery run, verified by "
+            f"{count['verify']} replays, and its MEMBER_NOT_FOUND outcome was learned by "
+            f"{count['probe']} probe runs; all of them are in "
+            f"[{PROVENANCE.name}]({PROVENANCE.name}/), copied by `{p['command']}`. "
+            "Scenario 01 is an independent re-run of the same goal whose output names differ "
+            "(`share_accounts` rather than `share_balances`), which is why a person approves a "
+            "capability before anything runs unattended."
+        )
     text = f"""# Evidence
 
 Generated by `scripts/evidence/*.sh` (`make evidence`). Nothing here is written by hand. Each
@@ -747,6 +845,10 @@ All institutions, people and data are fictional and synthetic. Runs use the trai
 ## Held-out discovery check
 
 {held_line}
+
+## Where the approved lookup came from
+
+{provenance_line}
 """
     (EVIDENCE / "README.md").write_text(text)
     print(EVIDENCE / "README.md")
@@ -761,12 +863,15 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--index", action="store_true")
     parser.add_argument("--held-out", action="store_true")
+    parser.add_argument("--provenance", action="store_true")
     parser.add_argument("--out", type=Path, default=EVIDENCE, help="default: evidence/")
     args = parser.parse_args()
     if args.index:
         return write_index()
     if args.held_out:
         return asyncio.run(held_out())
+    if args.provenance:
+        return provenance()
     if not args.scenarios:
         parser.print_help()
         return 2

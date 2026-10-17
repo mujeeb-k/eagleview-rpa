@@ -17,3 +17,6 @@ video/out/
 
 # Documents
 *.pdf
+
+# Capabilities you approve locally (README: --into capabilities/mine)
+capabilities/mine/

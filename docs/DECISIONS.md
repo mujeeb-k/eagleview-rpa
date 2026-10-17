@@ -1447,3 +1447,17 @@ project owner: the idea, how it works, what was tested and how to try it; REPORT
 before publication. The discovery trace review stays where it is, retitled as REPORT's
 appendix, with its findings summarised in two sentences under Architecture. CLAUDE.md and
 PLAN.md stay at the root: they are how the work was directed and staged.
+
+## 2026-10-17 — The approved lookup's provenance, in evidence
+
+**[REVIEW] The approved capability's own runs are copied into evidence, not regenerated.**
+`capabilities/member.lookup_share_balances.yaml` was compiled from discovery run
+`r_20261016T045318_95953d`, verified by two replays and probed by three runs, all written and
+redacted by the evidence writer at the time and kept in `runs/`. `scripts/evidence/provenance.sh`
+copies them, by the ids in the capability's provenance, into
+`evidence/approved_lookup_provenance/`, and checks that the discovery marked the capability's
+outputs, the verify replays succeeded and a probe confirmed MEMBER_NOT_FOUND. The PII scan covers
+the folder like any evidence. The alternative, approving the later scenario-01 artifact and
+regenerating every replay, would change the output names (`share_accounts` rather than
+`share_balances`) that the overlays, tests, catalog and video rely on. The copy can only be
+regenerated where those runs exist; elsewhere the script stops and changes nothing.
