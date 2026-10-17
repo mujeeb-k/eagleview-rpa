@@ -2,7 +2,10 @@
 
 **Teach an AI to navigate software once. Turn what it learns into a program that runs without AI.**
 
-[![Watch Eagleview in action](evidence/demo_poster.png)](evidence/demo.mp4)
+https://github.com/user-attachments/assets/b5e906d9-3968-4956-9f23-7bacc3a40331
+
+[Full-quality video](evidence/demo.mp4)
+
 
 ## The idea
 
