@@ -103,7 +103,7 @@ def read_s(text: str) -> float:
 
 # --- the words -----------------------------------------------------------------------------
 
-# Shortened from the brief to bring the film under 3:00, after the clips' dead time was cut.
+# Shortened to bring the film under 3:00, after the clips' dead time was cut.
 OPENING = (
     "Banks still rely on old software that other programs can't connect to, so staff click "
     "through it by hand.",
@@ -134,7 +134,7 @@ BEFORE = {
     "agent": "An AI assistant is asked: what's in customer 10482's savings?",
 }
 AFTER = {
-    # Adjusted from the brief: an unapproved capability can still be replayed by a person at the
+    # Worded with care: an unapproved capability can still be replayed by a person at the
     # CLI, so "before anyone can use it" would overclaim. Approval gates unattended use.
     "discovery": "Done. Eagleview recorded every step as a reusable recipe, called a "
     "capability. A person must approve it before it runs unattended.",
@@ -149,7 +149,7 @@ AFTER = {
     "agent": "It answers by running the approved recipe, not by clicking around itself. It can "
     "only use recipes a person approved, and never ones that can't be undone.",
 }
-# Adjusted from the brief to what the screenshot shows: balances stay readable on this training
+# Worded to match what the screenshot shows: balances stay readable on this training
 # tenant (its policy has redact_amounts: false), so the claim names what is painted out.
 REDACTION = "Saved screenshots paint out names, contact details and account numbers automatically."
 HANDOFF_MIDDLE = (

@@ -7,11 +7,10 @@ that have no API. An LLM discovers how to do a task once. The run compiles into 
 take over the **same live session** when automation is stuck, then hand it back.
 Full build plan: PLAN.md. Decision log: docs/DECISIONS.md.
 
-## Voice and framing
-Eagleview is a standalone prototype. Documents in the repo (README, REPORT, evidence index,
-DECISIONS, code comments, commit messages) describe what Eagleview is, how it works, and why it was
-designed this way, in plain language. Name no real companies, banks, or vendors; all institutions
-and data are the fictional ones defined in PLAN.md §1.
+## Writing and naming
+Documents (README, REPORT, evidence index, DECISIONS, code comments, commit messages) explain what
+Eagleview is, how it works, and why, in plain language. Every institution, person and record is
+the fictional one defined in PLAN.md §1, so real companies, banks and vendors are never named.
 
 ## Non-negotiable invariants
 1. **No LLM on the replay path.** `eagleview.replay`, `eagleview.surfaces`, and `eagleview.safety`

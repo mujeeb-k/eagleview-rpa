@@ -36,7 +36,7 @@ PRICES: dict[str, Price] = {
 @dataclass(frozen=True)
 class Limits:
     max_usd: Decimal = Decimal("25")
-    max_runs: int = 45  # 30, then 33, raised by the user's authorisation (docs/DECISIONS.md)
+    max_runs: int = 45  # 30, then 33, raised as the owner authorised paid runs (docs/DECISIONS.md)
 
 
 class BudgetExceeded(Exception):

@@ -1,6 +1,8 @@
 # Decision log
 
-Short entries, newest last: what I decided and why.
+Short entries, newest last: what I decided and why. Entries marked **[REVIEW]** were flagged for
+the project owner to review. Plans were reviewed by a second model before building; the project
+owner approved capabilities and paid runs.
 
 ## 2026-10-15 — P0 bootstrap
 
@@ -536,7 +538,7 @@ checks every personal value's box is solid black and absent from the DOM snapsho
 shows that a failure run's evidence no longer contains them, and it fails when the engine stops
 passing the labels to the writer.
 
-## 2026-10-16 — P5 plan (self-reviewed with the advisor, not with the user)
+## 2026-10-16 — P5 plan (reviewed by a second model, not by the project owner)
 
 **What gets built.**
 - `control/session_controller.py`: the lease (holder plus fencing epoch) and the state machine
@@ -656,7 +658,7 @@ during an incident, and the reviewer checks the guess anyway.
 console still parks, and a gated step without `--approve-gates` still fails POLICY_BLOCKED.
 `HandoffHolder` is gone; the SessionController's `hand_to` does that job.
 
-## 2026-10-16 — P6 plan (self-reviewed with the advisor)
+## 2026-10-16 — P6 plan (reviewed by a second model)
 
 **Order.**
 1. Build the loop: tools, prompts, recorder, sign-on reuse and the spend ledger.
@@ -772,7 +774,7 @@ and adds `.2`, `.3`, … when the name is taken. P7's compiler writes through it
 **The intervention store accepts a discovery goal.** `request_human` during discovery opens a
 takeover naming the goal rather than a capability, and it waits at most `human_timeout_s`.
 
-## 2026-10-16 — P7 plan (self-reviewed with the advisor)
+## 2026-10-16 — P7 plan (reviewed by a second model)
 
 **What gets built.** A `compiler/` package:
 - **segment:** trace to steps;
@@ -863,7 +865,7 @@ so the same contract works at a tenant with longer member numbers (P8).
 
 Artifacts stay `verified`. I never approve.
 
-**P7 plan addendum, from the advisor's review.**
+**P7 plan addendum, from the second model's review.**
 - **[REVIEW] Verifying an irreversible capability needs a person.** The verify replay of a post flow
   runs with a desk attached, and a person approves the post in the console. In evidence that is
   the scripted operator, labelled as such, on the synthetic training tenant after a bank reset.
@@ -940,12 +942,12 @@ that posts again and proves nothing new.
 
 **Real spend so far: $0.16 over 4 runs.**
 
-## 2026-10-16 — P8 + P9 plan (self-reviewed with the advisor)
+## 2026-10-16 — P8 + P9 plan (reviewed by a second model)
 
 **The committed lookup capability comes from discovery.**
 `capabilities/drafts/member.lookup_share_balances.yaml` is the verified draft produced by the real
 P7 pipeline run, copied unchanged and still `verified`. Replay evidence and the Copperhill overlay
-are written against it. Approving it, which promotes it to `capabilities/`, is the user's step.
+are written against it. Approving it, which promotes it to `capabilities/`, is the project owner's step.
 
 **Overlay resolution (`eagleview/overlays/`).**
 - **Order:** base capability, then version patches, then the tenant overlay.
@@ -991,9 +993,9 @@ When rank 0 stops winning, the screen has drifted.
 - `scripts/agent_demo.py` has Claude, with plain tool use, pick the tool and answer.
 
 No capability is approved yet, so scenario 14 is built and tested offline (with a test-only
-approved copy) and marked pending the user's approval.
+approved copy) and marked pending the project owner's approval.
 
-**P8 + P9 plan addendum, from the advisor's review.**
+**P8 + P9 plan addendum, from the second model's review.**
 - **[REVIEW] Copperhill gets two overlays.** One is profile-wide (`capabilities: ["*"]`): label
   aliases and the Select Branch interstitial. The other is capability-scoped
   (`capabilities: [member.lookup_share_balances]`): the search step patch. A step patch naming a
@@ -1041,7 +1043,7 @@ schema drops each input's pattern, the contract's first check.
 **The agent demo exists and is tested offline only.** `scripts/agent_demo.py` refuses to run
 until a capability is approved, and its model calls go to the same spend ledger.
 
-## 2026-10-16 — P10 + P11 plan (self-reviewed with the advisor)
+## 2026-10-16 — P10 + P11 plan (reviewed by a second model)
 
 **One Python evidence driver, thin shell scripts.** `scripts/evidence/NN_name.sh` (one per §8
 scenario) each call `python -m scripts.evidence.driver NN`. `make evidence` runs them all in
@@ -1078,8 +1080,8 @@ uses only the console's HTTP API. Every artifact it touches is labelled
 - **12b:** a scripted model that does comply, so the evidence shows the policy and the network
   guard blocking `/__admin/faults`.
 
-**Scenario 14 (agent catalog) is pending the user's approval.** With no approved capability, its
-script writes a `PENDING.md` that says exactly what to approve. After the user approves,
+**Scenario 14 (agent catalog) is pending the project owner's approval.** With no approved capability, its
+script writes a `PENDING.md` that says exactly what to approve. After the project owner approves,
 `make evidence` runs it for real.
 
 **Demos.**
@@ -1147,8 +1149,8 @@ approved.
 **Not done, and why.**
 - No demo video was recorded: the script exists, as asked.
 - `gitleaks` is not installed here, so it was not run.
-- No LICENSE was added, and CLAUDE.md's "Voice and framing" was not touched: both are the user's
-  call.
+- No LICENSE was added, and CLAUDE.md's "Voice and framing" was not touched: both are the project
+  owner's call.
 - `docs/DESIGN.md` is optional and was skipped: the generated `schemas/*.schema.json` is the
   reference.
 
@@ -1222,7 +1224,7 @@ posted, which fails safe. A handler that submits somewhere else is caught only b
 
 ## 2026-10-16 — Evidence with the approved lookup
 
-**Scenario 14 ran for real.** The user approved `member.lookup_share_balances` themselves; the
+**Scenario 14 ran for real.** The project owner approved `member.lookup_share_balances`; the
 approved file is committed as written by `eagleview approve`. `make evidence` passed all 16
 scenarios: the agent answered one question with a successful lookup and the other with
 MEMBER_NOT_FOUND. Six real runs, about $0.25.
@@ -1236,7 +1238,7 @@ hide which bank (and which `.env` password) a person's question really ran again
 
 ## 2026-10-16 — Run cap raised for the demo video
 
-**The run cap is 33, up from 30.** The user authorised up to 6 more paid runs to fix and finish
+**The run cap is 33, up from 30.** The project owner authorised up to 6 more paid runs to fix and finish
 the demo video, with the $25 cap unchanged. 27 runs were used, so the cap in
 `eagleview.discovery.meter.Limits` is now 33: the authorisation is enforced by the meter itself,
 not by care. `runs/discovery_ledger.jsonl` is unchanged; nothing was deleted or rewritten. The
@@ -1365,7 +1367,7 @@ button for GO; the card shows all four, from the overlay files.
 records footage (opt-in) and then renders the story with Remotion to `evidence/demo.mp4` and
 `evidence/demo_poster.png`; the old ffmpeg assembly was removed with the film it made.
 
-## 2026-10-16 — Closing the audit's gaps
+## 2026-10-16 — Closing the self-review's gaps
 
 **[REVIEW] App validation errors are a business outcome, detected by the app profile.** Ironbridge
 shows a refused form field as an `IBT-2xxx` code in red, with the form still on screen. The
@@ -1384,7 +1386,7 @@ now remembers what it is waiting for (the step's `expect`, a target, the sign-on
 output contract), and `_fail` uses that when a call site gives nothing. That was the gap in
 evidence 09: a failure pre-empted by a hard state carried no `expected`. A failure before the
 first step or after the last names a phase as its step: `open_app`, `sign_on` or
-`check_success`. The alternative, leaving the step empty there, is what the audit flagged. The
+`check_success`. The alternative, leaving the step empty there, is what the self-review flagged. The
 old maintenance test asserted an empty step; it now asserts `open_app`. If the screen can't be
 read at all, `observed` says so.
 
@@ -1405,7 +1407,7 @@ counts towards the 600 s, for model requests and approvals too. Without a desk t
 `needs_human`. The tests use the scripted fake model and a fake discovery clock (`_clock`), with
 no paid runs.
 
-**The run cap is 45, up from 33.** The user authorised paid runs to regenerate all evidence with
+**The run cap is 45, up from 33.** The project owner authorised paid runs to regenerate all evidence with
 `make evidence`, about 6 runs, on top of the 31 already in the ledger. The ledger is unchanged.
 
 ## 2026-10-16 — Narration that waits for what it names
@@ -1438,9 +1440,10 @@ rather than last, so all four differences are on screen together for about a sec
 
 ## 2026-10-16 — The front-door docs
 
-**README.md and REPORT.md are the reviewed proposals from the audit.** README leads with the
-poster, the five-line thread and the two commands; REPORT keeps the seven headings within 1,600
-words. `docs/MORNING.md`, a status note for the person directing the build, moved to
-`docs/history/` with a note that it is no longer maintained. The discovery trace review stays
-where it is, retitled as REPORT's appendix, with its findings summarised in two sentences under
-Architecture. CLAUDE.md and PLAN.md stay at the root, because the README links them.
+**REPORT.md is the reviewed proposal from a self-review of the repository against its goals,**
+and keeps the seven headings within 1,600 words. README.md is a short overview written by the
+project owner: the idea, how it works, what was tested and how to try it; REPORT.md and
+`evidence/README.md` carry the detail. `docs/MORNING.md`, a status note for the project owner during the build, was removed
+before publication. The discovery trace review stays where it is, retitled as REPORT's
+appendix, with its findings summarised in two sentences under Architecture. CLAUDE.md and
+PLAN.md stay at the root: they are how the work was directed and staged.

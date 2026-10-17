@@ -32,8 +32,8 @@ TOOL = "member_lookup_share_balances"
 
 @pytest.fixture
 def catalog_dir(tmp_path: Path) -> Path:
-    """An approved copy of the discovered lookup (test-only; approving is the user's step), a
-    verified draft, and an approved irreversible capability."""
+    """An approved copy of the discovered lookup (test-only; approving is the project owner's
+    step), a verified draft, and an approved irreversible capability."""
     root = tmp_path / "capabilities"
     root.mkdir()
     shutil.copy(approved_copy(LOOKUP, tmp_path), root / "member.lookup_share_balances.yaml")

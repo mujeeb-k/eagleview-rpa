@@ -1,8 +1,8 @@
 # PLAN.md — Eagleview build plan
 
 ## 0. Demo narrative
-"The model discovers. The artifact becomes a reusable capability. Deterministic replay is how an agent
-invokes it." Every phase serves this thread:
+The model discovers a task once; what it did becomes a reusable capability; an agent invokes that
+capability through deterministic replay. Every phase serves this thread:
 
 1. The goal "look up member 10482 and read their share balances" goes to Claude, which drives a hostile
    legacy teller app (framesets, table layouts, no IDs) through pixels.
@@ -491,8 +491,8 @@ This app must feel like a real 2004-era core system:
       patch output.
 - [x] A test drives the operator path with a scripted "human" client over the same HTTP API.
 - **Done when:** a scripted operator drives every human path over the console's HTTP API against
-  the real mock bank. *(Done: `tests/operator/`, `tests/control/`. The plan was self-reviewed with
-  the advisor rather than approved; see DECISIONS, "P5 plan".)*
+  the real mock bank. *(Done: `tests/operator/`, `tests/control/`. The plan was reviewed by a
+  second model rather than approved; see DECISIONS, "P5 plan".)*
 
 ### P6: Discovery agent loop
 - [x] **First, one real trace.** Before building the compiler (P7), record one raw discovery trace
@@ -527,7 +527,7 @@ This app must feel like a real 2004-era core system:
 - [x] **Configurable model:** `EAGLEVIEW_MODEL` (default `claude-sonnet-5-5`), with `--model` overriding
       it. The model id is recorded in provenance.
 - **Done when:** a scripted fake model drives the real mock bank offline in CI, and one real trace
-  is reviewed. *(Done: `tests/discovery/`; the plan was self-reviewed with the advisor.)*
+  is reviewed. *(Done: `tests/discovery/`; the plan was reviewed by a second model.)*
 
 ### P7: Compiler
 - [x] Segment: click+type → fill; click+select → select (record the option label); Return → press.
@@ -551,7 +551,7 @@ This app must feel like a real 2004-era core system:
 - **Done when:** one command discovers, compiles, verifies and probes a capability. *(Done:
   `tests/compiler/` offline, including the write flow through Post with a scripted operator; one
   real pipeline produced `member.lookup_share_balances@1.0.0`, verified, with MEMBER_NOT_FOUND
-  `probed_verified`, for $0.04. The plan was self-reviewed with the advisor.)*
+  `probed_verified`, for $0.04. The plan was reviewed by a second model.)*
 
 ### P8: Cross-tenant reuse (extension; runs together with P9)
 - [x] Overlay model and resolution with tests.
@@ -565,7 +565,7 @@ This app must feel like a real 2004-era core system:
       drift signal.
 - The automated LLM `eagleview adapt` command is cut. It is listed in REPORT §7 (Cuts) as a next step.
 - **Done when:** the same discovered capability replays on both tenants, each with its own member.
-  *(Done: `tests/overlays/`; the plan was self-reviewed with the advisor.)*
+  *(Done: `tests/overlays/`; the plan was reviewed by a second model.)*
 
 ### P9: Agent-facing catalog (extension; runs together with P8)
 - [x] The registry lists approved capabilities and maps each to a tool definition: snake_case name;
@@ -577,8 +577,8 @@ This app must feel like a real 2004-era core system:
       use) picks the tool, replay runs, and Claude answers. A second prompt with a bad member shows the
       agent handling an `outcome`.
 - **Done when:** an agent can find and call an approved capability. *(Built and tested offline
-  with a test-only approved copy, in `tests/catalog/`. No capability is approved yet; approving
-  is the user's step, so the real agent demo, scenario 14, waits for it.)*
+  with a test-only approved copy, in `tests/catalog/`. Approving is the project owner's step; once
+  the lookup was approved, scenario 14 ran for real.)*
 
 ### P10: Evidence generation (runs together with P11)
 - [x] **Screen-level redaction, before any evidence is written (from P4; done before P5).** Replay paints values it
@@ -606,13 +606,14 @@ This app must feel like a real 2004-era core system:
       screenshots, decisions, locator ranks, and recoveries.
 - [x] `evidence/README.md`: a table of scenario, command, status, and what it demonstrates, with links.
 - [x] A test scans /evidence for PII patterns and fails if any are found.
-- [ ] Demo video (the one exception to invariant 4) *(script built: `scripts/evidence/demo_video.sh --record-video`; not recorded, as the user asked)*: `scripts/evidence/demo_video.sh --record-video`
+- [x] Demo video (the one exception to invariant 4) *(recorded and rendered: `evidence/demo.mp4`, 1:48)*: `scripts/evidence/demo_video.sh --record-video`
       records the mock bank only (synthetic data), and only with that explicit flag. It is never on by
       default. Output goes to `evidence/demo.mp4`, under 3 minutes. Playwright records webm, so the
       script transcodes it. The PII scan can't read video; the synthetic-only rule is what covers it.
 
 ### P11: Docs and polish (runs together with P10)
-- [x] README: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
+- [x] README *(since rewritten as a shorter overview; REPORT.md and evidence/README.md carry the
+      detail)*: what Eagleview is in 3 sentences; quickstart (`uv sync`, `playwright install chromium`,
       `make bank`); **offline demo first** (replay the committed artifacts, no API key); full demo
       (discover, then replay); operator console walkthrough; repo map; fictional-data note.
 - [x] REPORT.md per §9, 1–3 pages. *(Draft; a test pins the seven headings.)*
@@ -621,9 +622,9 @@ This app must feel like a real 2004-era core system:
 - [x] CI runs `make demo-offline` end to end on every push, in addition to `make check`.
 - [x] README states the tested platforms (macOS, Linux).
 - [x] README shows the plain `uv run ...` command next to each `make` target.
-- [x] README notes that discovery spends the user's own Anthropic API credit, with an approximate cost
+- [x] README notes that discovery spends the reader's own Anthropic API credit, with an approximate cost
       per discovery run, measured from real runs.
-- [ ] Release checklist in §10. *(Partly; the user's items are in docs/history/MORNING.md.)*
+- [x] Release checklist in §10.
 
 ## 8. Evidence scenarios
 | # | Scenario | Shows |
@@ -641,44 +642,23 @@ This app must feel like a real 2004-era core system:
 | 11 | Replay post with session expiry after commit → OUTCOME_UNCERTAIN, no retry | commit safety |
 | 12 | Prompt-injection drill → network guard blocks | allowlist enforcement |
 | 13 | Tenant B: base fails → hand-authored overlay → success, each tenant replaying with its own member (10482 at Lantern Bay, 2210236 at Copperhill); then Lantern Bay's member replayed at Copperhill → MEMBER_NOT_FOUND | cross-tenant reuse; data never crosses tenants |
-| 14 | Agent invokes the capability through the catalog (success plus not-found) | agent-facing interface |
+| 14 | Agent invokes the capability through the catalog (success plus not-found) | agent tool catalog |
 | 15 | Replay ×20 stability report (optional, cheap) | determinism |
 
-## 9. REPORT.md outline (use these seven headings exactly as written)
-1. **Architecture**: one diagram. Single-process runner and why. The authoring vs runtime split ("LLM at
-   authoring, never at runtime"). Pixel-acting agent plus a grounding recorder. Python and Playwright
-   choice. Trade-offs: single process, blocking escalation.
-2. **Artifact schema**: three layers (app profile, capability, overlay). Contract-first (typed I/O,
-   outcomes). Semantic step ids. Ranked locators with uniqueness verified at record time. Provenance
-   and lifecycle. YAML for reviewable diffs, JSON Schema for machines.
-3. **Determinism & error handling**: predicate waits; the settle loop and its priority order; the
-   taxonomy (rejected, outcome, recoverable, failed); the idempotency and commit rule; outcome probing;
-   locator rank and agreement as the drift signal.
-4. **Heterogeneity & multi-tenant**: the Surface protocol; strategy applicability by surface;
-   desktop via UIA/AX plus OCR anchors; app-profile reuse; overlays and label aliases; fingerprints and
-   version ranges; drift telemetry.
-5. **Escalation & handoff**: stuck detection (discovery and replay); intervention payload; lease plus
-   fencing epoch; cooperative pause; input relay as recording; resume validation; human-demonstrated
-   patches.
-6. **Safety**: policy file, two enforcement layers, irreversible handling per mode, three-layer
-   redaction, secrets by reference, the injection drill, and the honest limits list.
-7. **Cuts**: parked async escalation (`needs_human` persisted runs), real desktop surface, multi-browser
-   session host, webhook routing, real-time co-browsing, auth for the console, and automated
-   tenant adaptation (`eagleview adapt`: a bounded authoring-time LLM call per failing step proposes an
-   overlay patch, then a replay verifies it). Next: that adapt command, a per-tenant telemetry
-   dashboard, re-discovery on drift, and an approval workflow UI. Also next:
-   - a run-id breadcrumb written into a memo or nickname field, so a posted transaction can be
-     traced back to the run that made it;
-   - automatic read-only reconciliation after OUTCOME_UNCERTAIN, in which a lookup capability
-     checks whether the write landed before a human is asked;
-   - session pooling, for concurrent runs per tenant;
-   - a "start here" reading guide to the repository.
+## 9. REPORT.md outline
+REPORT.md has seven sections, in this order, and a test pins the headings: Architecture, Artifact
+schema, Determinism & error handling, Heterogeneity & multi-tenant, Escalation & handoff, Safety,
+and Cuts. Architecture carries the one diagram and the authoring-versus-run-time split; the
+schema section the three layers and the locator ranking; determinism the settle loop, the result
+taxonomy and the commit rule; heterogeneity the Surface seam, overlays and drift; escalation the
+lease, the fencing epoch and resume validation; safety the two enforcement layers, redaction and
+an honest list of limits; Cuts what was left out and why, and what comes next.
 
 ## 10. Release checklist
-- [ ] Fresh clone: `make demo-offline` passes with no API key.
-- [ ] `gitleaks detect` is clean, no `.env` is committed, and the PII scan test passes.
-- [ ] REPORT.md headings match §9 exactly; README demo commands are copy-pasted from a real terminal session.
-- [ ] Every evidence folder came from a script; `evidence/README.md` links all work.
-- [ ] CI is green and the license is MIT
-- [ ] Review CLAUDE.md and PLAN.md as an outside reader would. Either rewrite CLAUDE.md's "Voice and
-      framing" section in neutral terms, or move both files under `docs/`.
+- [x] Fresh clone: `make demo-offline` passes with no API key. *(CI runs it on a fresh runner.)*
+- [x] `gitleaks detect` is clean over the full history, no `.env` is committed, and the PII scan test passes.
+- [x] REPORT.md headings match §9; README demo commands run as written.
+- [x] Every evidence folder came from a script; `evidence/README.md` links all work.
+- [x] CI is green and the license is MIT.
+- [x] Review CLAUDE.md and PLAN.md as an outside reader would. *(CLAUDE.md's naming section was
+      rewritten in neutral terms; both files stay at the root.)*

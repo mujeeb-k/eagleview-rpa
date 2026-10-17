@@ -14,3 +14,6 @@ runs/
 video/node_modules/
 video/public/media/
 video/out/
+
+# Documents
+*.pdf

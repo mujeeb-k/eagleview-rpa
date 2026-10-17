@@ -155,7 +155,7 @@ twice. All real spend: about $1.52 over 37 runs.
     designed for it;
   - parked asynchronous escalation: a run blocks for its person, keeping sessions simple;
   - a multi-browser session host, webhook routing, console login: production infrastructure, not
-    the brief's question.
+    what this prototype tests.
 - **Built beyond the core, as support:** multi-run stability (20 replays, 20 successes, one
   distinct output, 1.29–1.55 s each, `evidence/15`), a spend ledger, the console's screencast, drift telemetry, a
   demo video. The MCP server only wraps the catalog.

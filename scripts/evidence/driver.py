@@ -593,7 +593,7 @@ SCENARIOS = [
     Scenario("12a", "injection_drill_model", "the model and the injected note", s12a, True),
     Scenario("12b", "injection_drill_guard", "allowlist enforcement, both layers", s12b),
     Scenario("13", "tenant_reuse", "cross-tenant reuse; data never crosses tenants", s13),
-    Scenario("14", "agent_catalog", "agent-facing interface", s14, True),
+    Scenario("14", "agent_catalog", "agent tool catalog", s14, True),
     Scenario("15", "replay_stability", "determinism over 20 runs", s15),
     Scenario("16", "replay_validation_error", "app validation error is an outcome", s16),
 ]
