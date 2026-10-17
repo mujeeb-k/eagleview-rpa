@@ -4,7 +4,7 @@
 
 https://github.com/user-attachments/assets/b5e906d9-3968-4956-9f23-7bacc3a40331
 
-[Full-quality video](evidence/demo.mp4)
+[Demo/Explanation](evidence/demo.mp4)
 
 
 ## The idea
