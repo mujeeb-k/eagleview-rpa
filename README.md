@@ -47,7 +47,7 @@ A missing member is a valid result, not necessarily a failed execution. An unexp
 
 That distinction matters when software is making decisions around financial records.
 
-## What we've tested
+## What I've tested
 
 Eagleview was tested against a simulated banking system with two credit unions, including variations in their interfaces.
 
